@@ -1,8 +1,8 @@
-import { useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { ChevronDown, ChevronRight, Plus, X } from 'lucide-react'
 import type { Account } from '../types'
 import { useApp } from '../store/AppProvider'
-import { allTags, childCategories, normalizeTag, topCategories } from '../lib/calc'
+import { allTags, childCategories, normalizeTag, titleSuggestions, topCategories } from '../lib/calc'
 import { CatBubble, Sheet } from './ui'
 
 /** Riga del form in stile elenco: etichetta a sinistra, valore a destra, linea sottile sotto. */
@@ -143,5 +143,28 @@ export function SelectField({ value, onChange, options, ariaLabel, className = p
       </select>
       <ChevronDown size={16} className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-muted" />
     </div>
+  )
+}
+
+/** Titolo con proposte: mentre scrivi compaiono i titoli già usati che corrispondono. */
+export function TitleRow({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
+  const { db } = useApp()
+  const [focus, setFocus] = useState(false)
+  const list = useMemo(() => (focus ? titleSuggestions(db, value) : []), [db, value, focus])
+  return (
+    <Row label="Titolo">
+      <input className={plain} placeholder={placeholder} value={value} autoComplete="off" autoCapitalize="sentences" role="combobox" aria-expanded={list.length > 0} aria-autocomplete="list" aria-label="Titolo"
+        onChange={(e) => onChange(e.target.value)} onFocus={() => setFocus(true)} onBlur={() => setFocus(false)} />
+      {list.length > 0 && (
+        <ul role="listbox" aria-label="Titoli già usati" className="mt-1 overflow-hidden rounded-xl border border-line bg-bg">
+          {list.map((t) => (
+            <li key={t} role="option" aria-selected={false}>
+              <button type="button" className="block w-full truncate px-3 py-2 text-left text-[15px] hover:bg-line/50 active:bg-line/70"
+                onPointerDown={(e) => e.preventDefault()} onClick={() => { onChange(t); setFocus(false) }}>{t}</button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Row>
   )
 }

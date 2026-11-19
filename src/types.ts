@@ -103,6 +103,28 @@ export interface Transaction {
   updatedAt: string
 }
 
+/** Modello di transazione salvato tra i preferiti: scegliendolo si apre il form di copia con la data di oggi. */
+export interface Favorite {
+  id: string
+  /** a chi appartiene: ogni membro vede solo i propri preferiti (i conti privati restano tali) */
+  by: MemberId | null
+  type: TxType
+  amount: number
+  accountId: string
+  toAccountId: string | null
+  categoryId: string | null
+  title: string
+  note: string
+  paidBy: MemberId | null
+  participants: MemberId[]
+  splitMode?: SplitMode
+  splitValues?: Record<MemberId, number> | null
+  payments?: Payment[] | null
+  tags?: string[]
+  createdAt: string
+  updatedAt: string
+}
+
 export interface DbMeta {
   dbId: string
   createdAt: string
@@ -120,6 +142,8 @@ export interface Db {
   accounts: Account[]
   categories: Category[]
   transactions: Transaction[]
+  /** modelli di transazione preferiti (assente nei file creati prima di questa funzione) */
+  favorites: Favorite[]
   /** tombstone: id eliminato -> data di eliminazione (serve al merge tra dispositivi) */
   deleted: Record<string, string>
 }

@@ -1,4 +1,4 @@
-import type { Account, Category, Db, Member, Payment, Transaction } from '../types'
+import type { Account, Category, Db, Favorite, Member, Payment, Transaction } from '../types'
 import { SCHEMA_VERSION } from '../types'
 import { nowIso, uid } from './ids'
 import { MEMBER_COLORS } from './defaults'
@@ -41,6 +41,7 @@ export function mergeDb(local: Db, remote: Db): Db {
     accounts: mergeList(local.accounts, remote.accounts, deleted).sort((x, y) => x.order - y.order),
     categories: mergeList(local.categories, remote.categories, deleted).sort((x, y) => x.order - y.order),
     transactions: mergeList(local.transactions, remote.transactions, deleted),
+    favorites: mergeList(local.favorites, remote.favorites, deleted),
     deleted,
   }
 }
@@ -49,7 +50,7 @@ export function mergeDb(local: Db, remote: Db): Db {
 export function sameData(a: Db, b: Db): boolean {
   const byId = <T extends { id: string }>(l: T[]) => [...l].sort((x, y) => x.id.localeCompare(y.id))
   const norm = (d: Db) =>
-    JSON.stringify([d.family, byId(d.members), byId(d.accounts), byId(d.categories), byId(d.transactions), Object.entries(d.deleted).sort(([x], [y]) => x.localeCompare(y))])
+    JSON.stringify([d.family, byId(d.members), byId(d.accounts), byId(d.categories), byId(d.transactions), byId(d.favorites), Object.entries(d.deleted).sort(([x], [y]) => x.localeCompare(y))])
   return norm(a) === norm(b)
 }
 
@@ -57,7 +58,7 @@ export function sameData(a: Db, b: Db): boolean {
 export function replaceData(current: Db, incoming: Db): Db {
   const t = nowIso()
   const deleted = mergeDeleted(current.deleted, incoming.deleted)
-  const all = (d: Db) => [...d.members, ...d.accounts, ...d.categories, ...d.transactions]
+  const all = (d: Db) => [...d.members, ...d.accounts, ...d.categories, ...d.transactions, ...d.favorites]
   const keep = new Set(all(incoming).map((x) => x.id))
   for (const x of all(current)) if (!keep.has(x.id)) deleted[x.id] = t
   const bump = <T extends Rec>(list: T[]): T[] => list.map((x) => (deleted[x.id] && deleted[x.id] >= x.updatedAt ? { ...x, updatedAt: t } : x))
@@ -71,6 +72,7 @@ export function replaceData(current: Db, incoming: Db): Db {
     accounts: bump(incoming.accounts),
     categories: bump(incoming.categories),
     transactions: bump(incoming.transactions),
+    favorites: bump(incoming.favorites),
     deleted,
   }
 }
@@ -194,6 +196,26 @@ export function parseDb(input: unknown): Db {
     updatedAt: str(x.updatedAt, EPOCH),
   }))
 
+  const favorites: Favorite[] = list(raw.favorites).map((x) => ({
+    id: x.id as string,
+    by: typeof x.by === 'string' ? x.by : null,
+    type: pick(x.type, ['expense', 'income', 'transfer'] as const, 'expense'),
+    amount: Math.abs(Math.round(num(x.amount))),
+    accountId: str(x.accountId),
+    toAccountId: typeof x.toAccountId === 'string' ? x.toAccountId : null,
+    categoryId: typeof x.categoryId === 'string' ? x.categoryId : null,
+    title: str(x.title),
+    note: str(x.note),
+    paidBy: typeof x.paidBy === 'string' ? x.paidBy : null,
+    participants: strArr(x.participants),
+    splitMode: pick(x.splitMode, ['equal', 'amount', 'percent'] as const, 'equal'),
+    splitValues: numMap(x.splitValues),
+    payments: parsePayments(x.payments),
+    tags: strArr(x.tags),
+    createdAt: str(x.createdAt, EPOCH),
+    updatedAt: str(x.updatedAt, EPOCH),
+  }))
+
   const deleted: Record<string, string> = {}
   if (isObj(raw.deleted)) for (const [k, v] of Object.entries(raw.deleted)) if (typeof v === 'string') deleted[k] = v
 
@@ -211,6 +233,7 @@ export function parseDb(input: unknown): Db {
     accounts,
     categories,
     transactions,
+    favorites,
     deleted,
   }
 }

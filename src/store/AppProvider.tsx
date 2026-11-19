@@ -13,6 +13,8 @@ const PREFS_KEY = 'moneyduo:prefs'
 
 export interface View {
   month: Date
+  /** mese singolo oppure intero anno (l'anno è quello di `month`) */
+  period: 'month' | 'year'
   scope: Scope
   accountId: string
   q: string
@@ -23,6 +25,8 @@ export interface TxFormState {
   initial?: Partial<Transaction>
   /** quale form aprire per una nuova voce (modificando si sceglie in base alla transazione) */
   kind?: 'normal' | 'split'
+  /** cambia a ogni apertura: forza un form nuovo anche se ne è già aperto uno (es. copia o preferito) */
+  nonce?: number
 }
 
 interface Prefs {
@@ -171,12 +175,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (sync.remoteVersion !== lastVersion.current) { lastVersion.current = sync.remoteVersion; writeCache(dbRef.current, sync.remoteVersion) }
   }, [sync.remoteVersion])
 
-  const [view, setViewState] = useState<View>({ month: new Date(), scope: 'all', accountId: 'all', q: '' })
+  const [view, setViewState] = useState<View>({ month: new Date(), period: 'month', scope: 'all', accountId: 'all', q: '' })
   const setView = useCallback((p: Partial<View>) => setViewState((v) => ({ ...v, ...p })), [])
 
   const [txForm, setTxForm] = useState<TxFormState | null>(null)
-  const openTx = useCallback((s: TxFormState = {}) => setTxForm(s), [])
-  const openSplit = useCallback((s: TxFormState = {}) => setTxForm({ ...s, kind: 'split' }), [])
+  const formNonce = useRef(0)
+  const openTx = useCallback((s: TxFormState = {}) => setTxForm({ ...s, nonce: ++formNonce.current }), [])
+  const openSplit = useCallback((s: TxFormState = {}) => setTxForm({ ...s, kind: 'split', nonce: ++formNonce.current }), [])
   const closeTx = useCallback(() => setTxForm(null), [])
 
   const [prefs, setPrefsState] = useState<Prefs>(() => {

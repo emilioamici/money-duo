@@ -8,7 +8,8 @@ import { nowIso, uid } from '../lib/ids'
 import { deleteTransaction, saveTransaction } from '../lib/mutations'
 import { Segmented, Sheet } from './ui'
 import { ask } from './dialogs'
-import { CategoryRow, Row, SelectField, TagsRow, accountLabel, plain } from './formParts'
+import { TxFooterActions } from './txActions'
+import { CategoryRow, Row, SelectField, TagsRow, TitleRow, accountLabel, plain } from './formParts'
 
 /** Nuova transazione "normale": uscita, entrata o trasferimento. Le spese condivise hanno un form dedicato (Nuovo split). */
 export function TransactionForm({ state, onClose }: { state: TxFormState; onClose: () => void }) {
@@ -30,15 +31,19 @@ export function TransactionForm({ state, onClose }: { state: TxFormState; onClos
   const [type, setType] = useState<TxType>(seed.type ?? 'expense')
   const [amount, setAmount] = useState(seed.amount ? centsToInput(seed.amount) : '')
   const [date, setDate] = useState(toLocalInput(seed.date ?? nowIso()))
-  const [accountId, setAccountId] = useState(seed.accountId ?? defaultAcc)
-  const [toAccountId, setToAccountId] = useState(seed.toAccountId ?? accounts.find((a) => a.id !== (seed.accountId ?? defaultAcc))?.id ?? '')
+  // per una copia o un preferito il conto salvato può non essere più selezionabile (nascosto, non visibile): si usa quello predefinito
+  const usable = (id: string | null | undefined) => (id && (tx || accounts.some((a) => a.id === id)) ? id : undefined)
+  const startAcc = usable(seed.accountId) ?? defaultAcc
+  const [accountId, setAccountId] = useState(startAcc)
+  const [toAccountId, setToAccountId] = useState(usable(seed.toAccountId) && usable(seed.toAccountId) !== startAcc ? usable(seed.toAccountId)! : accounts.find((a) => a.id !== startAcc)?.id ?? '')
   const [categoryId, setCategoryId] = useState<string | null>(seed.categoryId ?? null)
   const [title, setTitle] = useState(seed.title ?? '')
   const [note, setNote] = useState(seed.note ?? '')
   const [tags, setTags] = useState<string[]>(seed.tags ?? [])
   // chi ha pagato non si sceglie qui: segue il conto (personale = il suo proprietario); si conserva se la transazione ne aveva uno
-  const [paidBy, setPaidBy] = useState<string | null>(seed.paidBy !== undefined ? seed.paidBy : payerFor(seed.accountId ?? defaultAcc))
-  const [paidTouched] = useState(seed.paidBy !== undefined)
+  const keepPayer = seed.paidBy !== undefined && (!!tx || usable(seed.accountId) === seed.accountId)
+  const [paidBy, setPaidBy] = useState<string | null>(keepPayer ? seed.paidBy! : payerFor(startAcc))
+  const [paidTouched] = useState(keepPayer)
   const [error, setError] = useState('')
 
   const cents = parseAmount(amount)
@@ -84,6 +89,7 @@ export function TransactionForm({ state, onClose }: { state: TxFormState; onClos
       footer={
         <div className="flex gap-2">
           {tx && <button className="btn-danger" onClick={remove} aria-label="Elimina"><Trash2 size={18} /></button>}
+          {tx && <TxFooterActions tx={tx} />}
           <button className="btn-primary flex-1" onClick={save}>Salva</button>
         </div>
       }>
@@ -110,7 +116,7 @@ export function TransactionForm({ state, onClose }: { state: TxFormState; onClos
         ) : (
           <Row label="Conto"><SelectField value={accountId} onChange={pickAccount} options={options()} /></Row>
         )}
-        <Row label="Titolo"><input className={plain} placeholder={type === 'transfer' ? 'Es. Quota mensile' : 'Es. Spesa settimanale'} value={title} onChange={(e) => setTitle(e.target.value)} /></Row>
+        <TitleRow value={title} onChange={setTitle} placeholder={type === 'transfer' ? 'Es. Quota mensile' : 'Es. Spesa settimanale'} />
         <Row label="Note"><textarea className={`${plain} resize-none`} rows={1} value={note} onChange={(e) => setNote(e.target.value)} /></Row>
         <TagsRow value={tags} onChange={setTags} />
       </div>
