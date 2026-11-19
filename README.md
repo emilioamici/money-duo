@@ -85,13 +85,23 @@ La notifica push parte **dopo che i dati sono arrivati su Drive** (anche per le 
 - **Titoli già usati:** mentre scrivi il titolo compaiono le proposte (prima quelli che iniziano con il testo, poi quelli che lo contengono).
 - **Comportamento da app su mobile:** la pagina non scorre né rimbalza in orizzontale.
 
+**Filtri, dettaglio conto e impostazioni.**
+- **Filtri** (Transazioni, icona accanto alla campanella): tipo (uscite, entrate, trasferimenti), conti, importo minimo e massimo, categorie (una categoria principale include le sue sottocategorie), tag e «solo spese condivise». I criteri si combinano; l'anteprima nel pulsante mostra quanti risultati ci sono. Il badge sull'icona e la riga «N filtri attivi» ricordano che la lista è filtrata; i filtri restano finché non li azzeri.
+- **Conti:** toccando un conto si apre il suo dettaglio (saldo e movimenti del mese o dell'anno scelto). Scorrendo un conto verso sinistra compaiono *Modifica*, *Escludi dal totale* (o *Includi*) e *Nascondi* (o *Mostra*).
+- **Impostazioni** a schede che si aprono e si chiudono: Famiglia, Sincronizzazione e account, Notifiche, Backup e dati; *Categorie* resta una schermata a parte. Da chiuse mostrano un riepilogo; lo stato aperto/chiuso si ricorda su ogni dispositivo.
+
+**Rimborsi con PayPal.** Ogni membro può indicare il proprio nome **PayPal.Me** (Impostazioni → Famiglia → «Il tuo PayPal»; basta anche incollare il link `paypal.me/…`). Nelle Statistiche, accanto a «Rimborsa», un debito verso chi ha collegato PayPal mostra il pulsante **PayPal**: apre `paypal.me/<nome>/<importo>EUR` con l'importo già impostato e, nell'app, il rimborso già compilato da salvare. Il nome PayPal.Me è visibile a tutta la famiglia (vive nel file su Drive, campo `paypal` del membro).
+Limite: PayPal.Me non permette di preselezionare «Per amici e familiari» da link; quel passaggio si sceglie in PayPal al momento del pagamento (con un conto personale la scelta è proposta da PayPal).
+
+**Icona e stile.** L'icona dell'app (due gattini salvadanaio) e la palette derivano dall'immagine scelta: menta, crema e beige, con il marrone caldo del contorno per il testo e un verde-menta scuro come colore principale (chiaro in modalità scura). Tutti i colori del testo rispettano il contrasto minimo 4,5:1. Angoli più morbidi e carattere arrotondato dove il sistema lo offre (iPhone). Le icone (`public/icon-*.png`, `apple-touch-icon.png`, versione adattiva per Android) sono ricavate dall'immagine originale.
+
 ## Schema del JSON (`schemaVersion: 2`)
 ```jsonc
 {
   "schemaVersion": 2,
   "meta": { "dbId": "uuid", "createdAt": "ISO", "updatedAt": "ISO", "updatedBy": "email", "revision": 0 },
   "family": { "name": "Famiglia", "updatedAt": "ISO" },
-  "members": [{ "id", "name", "email": "account Google | null", "color": "#6366f1", "active": true, "joinedAt": "ISO | null", "updatedAt" }],
+  "members": [{ "id", "name", "email": "account Google | null", "color": "#6366f1", "active": true, "joinedAt": "ISO | null", "paypal": "nome PayPal.Me | null", "updatedAt" }],
   "accounts": [{ "id", "name", "group": "cash|bank|card|savings|investment|other",
                  "members": ["<id membro>"] /* [] = tutta la famiglia, 1 = personale */,
                  "initialBalance": 0, "excludeFromTotal": false, "hidden": false, "order": 0, "by": "<id membro>", "createdAt", "updatedAt" }],

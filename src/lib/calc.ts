@@ -1,4 +1,4 @@
-import type { Account, Category, CategoryType, Db, Member, MemberId, Payment, Transaction } from '../types'
+import type { Account, Category, CategoryType, Db, Member, MemberId, Payment, Transaction, TxType } from '../types'
 
 /** all = tutti i conti che vedo · shared = conti con più membri · altrimenti id di un membro */
 export type Scope = 'all' | 'shared' | MemberId
@@ -76,6 +76,28 @@ export function inScope(db: Db, accs: Map<string, Account>, tx: Transaction, sco
   return involved.some((a) => accountMemberIds(db, a).includes(scope))
 }
 
+/** Filtri avanzati della lista transazioni. Vuoto = nessun filtro; i criteri si combinano (e), dentro un criterio basta uno (o). */
+export interface TxFilters {
+  types: TxType[]
+  /** conti coinvolti nella transazione (anche come conto di destinazione o tra i pagamenti di uno split) */
+  accountIds: string[]
+  /** categorie; scegliere una categoria principale include le sue sottocategorie */
+  categoryIds: string[]
+  tags: string[]
+  /** importo minimo e massimo in centesimi, inclusi */
+  min: number | null
+  max: number | null
+  /** solo le spese condivise (split) */
+  splitOnly: boolean
+}
+
+export const emptyFilters = (): TxFilters => ({ types: [], accountIds: [], categoryIds: [], tags: [], min: null, max: null, splitOnly: false })
+
+/** Quanti criteri sono attivi (per il badge sul pulsante). */
+export function countFilters(f: TxFilters): number {
+  return (f.types.length ? 1 : 0) + (f.accountIds.length ? 1 : 0) + (f.categoryIds.length ? 1 : 0) + (f.tags.length ? 1 : 0) + (f.min !== null || f.max !== null ? 1 : 0) + (f.splitOnly ? 1 : 0)
+}
+
 export interface Filters {
   from: Date
   to: Date // esclusa
@@ -83,6 +105,8 @@ export interface Filters {
   accountId: string // 'all' oppure id
   q: string
   me: MemberId | null
+  /** filtri avanzati (solo schermata Transazioni) */
+  adv?: TxFilters
 }
 
 export function monthRange(d: Date): { from: Date; to: Date } {
@@ -97,18 +121,34 @@ export function periodRange(d: Date, period: Period): { from: Date; to: Date } {
   return monthRange(d)
 }
 
+function matchesFilters(t: Transaction, f: TxFilters, catIds: Set<string> | null, tagSet: Set<string> | null): boolean {
+  if (f.types.length && !f.types.includes(t.type)) return false
+  if (f.accountIds.length && !involvedAccountIds(t).some((id) => f.accountIds.includes(id))) return false
+  if (f.categoryIds.length && !(t.categoryId && catIds?.has(t.categoryId))) return false
+  if (f.tags.length && !(t.tags ?? []).some((g) => tagSet?.has(g.toLowerCase()))) return false
+  if (f.min !== null && t.amount < f.min) return false
+  if (f.max !== null && t.amount > f.max) return false
+  if (f.splitOnly && !isSplit(t)) return false
+  return true
+}
+
 export function filterTransactions(db: Db, f: Filters): Transaction[] {
   const accs = accountById(db)
   const cats = categoryById(db)
   const q = f.q.trim().toLowerCase()
   const from = f.from.getTime()
   const to = f.to.getTime()
+  const adv = f.adv && countFilters(f.adv) ? f.adv : null
+  // categorie scelte + sottocategorie delle principali scelte
+  const catIds = adv ? new Set(db.categories.filter((c) => adv.categoryIds.includes(c.id) || (c.parentId && adv.categoryIds.includes(c.parentId))).map((c) => c.id)) : null
+  const tagSet = adv ? new Set(adv.tags.map((g) => g.toLowerCase())) : null
   return db.transactions
     .filter((t) => {
       const ts = new Date(t.date).getTime()
       if (ts < from || ts >= to) return false
       if (!inScope(db, accs, t, f.scope, f.me)) return false
       if (f.accountId !== 'all' && !involvedAccountIds(t).includes(f.accountId)) return false
+      if (adv && !matchesFilters(t, adv, catIds, tagSet)) return false
       if (q) {
         const hay = [t.title, t.note, cats.get(t.categoryId ?? '')?.name, ...involvedAccountIds(t).map((id) => accs.get(id)?.name), ...(t.tags ?? []).map((g) => '#' + g), (t.amount / 100).toFixed(2).replace('.', ',')]
           .filter(Boolean).join(' ').toLowerCase()

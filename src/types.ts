@@ -23,6 +23,8 @@ export interface Member {
   active: boolean
   /** quando la persona ha aperto l'app per la prima volta (null = solo invitata) */
   joinedAt: string | null
+  /** nome utente PayPal.Me (es. «mario.rossi»): gli altri membri lo usano per rimborsarlo; assente = non collegato */
+  paypal?: string | null
   updatedAt: string
 }
 

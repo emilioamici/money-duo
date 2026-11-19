@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react'
-import { Eye, EyeOff, Plus, Wallet } from 'lucide-react'
+import { CircleSlash, CircleCheck, Eye, EyeOff, Pencil, Plus, Wallet } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
 import { NotificationBell } from '../components/Notifications'
 import { accountBalances, isSharedAccount, sortedAccounts, totalLiquidity, visibleTo } from '../lib/calc'
 import { formatMoney } from '../lib/format'
-import { setAccountHidden } from '../lib/mutations'
+import { setAccountExcluded, setAccountHidden } from '../lib/mutations'
 import { AccountForm, GROUP_LABEL } from '../components/AccountForm'
 import { EmptyState, MembersBadge, Toggle } from '../components/ui'
+import { SwipeRow } from '../components/SwipeRow'
+import { AccountDetail } from '../components/AccountDetail'
 import type { Account, AccountGroup } from '../types'
 
 const GROUP_ORDER: AccountGroup[] = ['cash', 'bank', 'card', 'savings', 'investment', 'other']
@@ -15,11 +17,22 @@ export function AccountsPage() {
   const { db, commit, me, members } = useApp()
   const [showHidden, setShowHidden] = useState(false)
   const [form, setForm] = useState<{ account?: Account } | null>(null)
+  const [selected, setSelected] = useState<string | null>(null)
   const bal = useMemo(() => accountBalances(db), [db])
   const mine = (a: Account) => visibleTo(db, a, me?.id ?? null)
   const total = totalLiquidity(db, bal, mine)
   const list = sortedAccounts(db).filter((a) => mine(a) && (showHidden || !a.hidden))
   const hiddenCount = db.accounts.filter((a) => a.hidden && mine(a)).length
+
+  const detail = selected ? db.accounts.find((a) => a.id === selected) : undefined
+  if (detail && mine(detail)) {
+    return (
+      <>
+        <AccountDetail account={detail} onBack={() => setSelected(null)} onEdit={() => setForm({ account: detail })} />
+        {form && <AccountForm account={form.account} onClose={() => setForm(null)} />}
+      </>
+    )
+  }
 
   return (
     <div>
@@ -53,24 +66,26 @@ export function AccountsPage() {
               <h2 className="mb-1.5 px-1 text-xs font-bold uppercase tracking-wide text-muted">{GROUP_LABEL[g]}</h2>
               <div className="card divide-y divide-line/50 overflow-hidden">
                 {items.map((a) => (
-                  <div key={a.id} className={`flex items-center gap-2 pr-2 ${a.hidden ? 'opacity-55' : ''}`}>
-                    <button className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left" onClick={() => setForm({ account: a })}>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-semibold">{a.name}</span>
-                        <span className="mt-0.5 flex items-center gap-1.5"><MembersBadge ids={a.members} />{a.excludeFromTotal && <span className="text-[11px] text-muted">fuori dal totale</span>}</span>
-                      </span>
-                      <span className={`font-bold tabular-nums ${(bal[a.id] ?? 0) < 0 ? 'text-exp' : ''}`}>{formatMoney(bal[a.id] ?? 0)}</span>
-                    </button>
-                    <button className="rounded-full p-2 text-muted hover:bg-line/60" aria-label={a.hidden ? 'Mostra conto' : 'Nascondi conto'} onClick={() => commit((d) => setAccountHidden(d, a.id, !a.hidden))}>
-                      {a.hidden ? <Eye size={18} /> : <EyeOff size={18} />}
-                    </button>
-                  </div>
+                  <SwipeRow key={a.id} testId="account-row" className={a.hidden ? 'opacity-55' : ''} actionWidth={76}
+                    onTap={() => setSelected(a.id)} buttonClass="flex w-full min-w-0 items-center gap-3 px-4 py-3 text-left"
+                    actions={[
+                      { label: 'Modifica', ariaLabel: 'Modifica conto', icon: <Pencil size={18} />, className: 'bg-brand', onClick: () => setForm({ account: a }) },
+                      { label: a.excludeFromTotal ? 'Includi' : 'Escludi', ariaLabel: a.excludeFromTotal ? 'Includi nel totale' : 'Escludi dal totale', icon: a.excludeFromTotal ? <CircleCheck size={18} /> : <CircleSlash size={18} />, className: 'bg-trf', onClick: () => commit((d) => setAccountExcluded(d, a.id, !a.excludeFromTotal)) },
+                      { label: a.hidden ? 'Mostra' : 'Nascondi', ariaLabel: a.hidden ? 'Mostra conto' : 'Nascondi conto', icon: a.hidden ? <Eye size={18} /> : <EyeOff size={18} />, className: 'bg-exp', onClick: () => commit((d) => setAccountHidden(d, a.id, !a.hidden)) },
+                    ]}>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-semibold">{a.name}</span>
+                      <span className="mt-0.5 flex items-center gap-1.5"><MembersBadge ids={a.members} />{a.excludeFromTotal && <span className="text-[11px] text-muted">fuori dal totale</span>}</span>
+                    </span>
+                    <span className={`font-bold tabular-nums ${(bal[a.id] ?? 0) < 0 ? 'text-exp' : ''}`}>{formatMoney(bal[a.id] ?? 0)}</span>
+                  </SwipeRow>
                 ))}
               </div>
             </section>
           )
         })}
 
+        {list.length > 0 && <p className="px-1 text-xs text-muted">Tocca un conto per vedere i suoi movimenti. Scorrilo verso sinistra per modificarlo, escluderlo dal totale o nasconderlo.</p>}
         <button className="btn-soft w-full" onClick={() => setForm({})}><Plus size={18} />Aggiungi conto</button>
         {hiddenCount > 0 && <div className="card px-4 pt-3"><Toggle checked={showHidden} onChange={setShowHidden} label={`Mostra conti nascosti (${hiddenCount})`} /></div>}
       </div>

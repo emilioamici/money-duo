@@ -146,6 +146,7 @@ export function parseDb(input: unknown): Db {
     color: str(x.color, MEMBER_COLORS[i % MEMBER_COLORS.length]),
     active: x.active !== false,
     joinedAt: typeof x.joinedAt === 'string' ? x.joinedAt : null,
+    paypal: typeof x.paypal === 'string' && x.paypal ? x.paypal : null,
     updatedAt: str(x.updatedAt, EPOCH),
   }))
 

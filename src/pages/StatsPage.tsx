@@ -4,6 +4,7 @@ import { useApp } from '../store/AppProvider'
 import { NotificationBell } from '../components/Notifications'
 import { categoryBreakdown, familyBalances, filterTransactions, periodRange, sortedAccounts, summarize, type Debt } from '../lib/calc'
 import { formatMoney } from '../lib/format'
+import { paypalUrl } from '../lib/paypal'
 import { MonthNav, ScopeChips } from '../components/Nav'
 import { LiquidityChart } from '../components/LiquidityChart'
 import { Donut } from '../components/Donut'
@@ -30,6 +31,15 @@ export function StatsPage() {
     openTx({ initial: { type: 'transfer', amount: d.amount, title: 'Rimborso spese', accountId: personal(d.debtor)?.id, toAccountId: personal(d.creditor)?.id ?? null } })
   }
 
+  const payTo = (id: string) => db.members.find((m) => m.id === id)?.paypal ?? null
+  /** apre PayPal.Me con l'importo e, qui nell'app, il rimborso già compilato da salvare */
+  const payPaypal = (d: Debt) => {
+    const handle = payTo(d.creditor)
+    if (!handle) return
+    window.open(paypalUrl(handle, d.amount), '_blank', 'noopener')
+    settle(d)
+  }
+
   const DebtList = ({ list, actions }: { list: Debt[]; actions?: boolean }) =>
     list.length === 0 ? <p className="py-2 text-sm text-muted">Siete in pari</p> : (
       <ul className="space-y-2">
@@ -39,6 +49,7 @@ export function StatsPage() {
             <span className="flex items-center gap-2">
               <b className="tabular-nums">{formatMoney(d.amount)}</b>
               {actions && <button className="btn-soft !px-2.5 !py-1 !text-xs" onClick={() => settle(d)}>Rimborsa</button>}
+              {actions && d.debtor === me?.id && payTo(d.creditor) && <button className="btn-soft !px-2.5 !py-1 !text-xs !text-trf" onClick={() => payPaypal(d)} aria-label={`Paga ${nameOf(d.creditor)} con PayPal`}>PayPal</button>}
             </span>
           </li>
         ))}

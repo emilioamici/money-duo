@@ -28,7 +28,8 @@ function Shell() {
   const [favOpen, setFavOpen] = useState(false)
   const [tab, setTab] = useState<Tab>('home')
   const syncRef = useRef<HTMLDivElement>(null)
-  const goSync = () => { setTab('settings'); setTimeout(() => syncRef.current?.scrollIntoView({ behavior: 'smooth' }), 80) }
+  const [syncReq, setSyncReq] = useState(0)
+  const goSync = () => { setTab('settings'); setSyncReq((n) => n + 1); setTimeout(() => syncRef.current?.scrollIntoView({ behavior: 'smooth' }), 80) }
 
   useEffect(() => { document.title = 'MoneyDuo' }, [])
 
@@ -48,7 +49,7 @@ function Shell() {
         {tab === 'home' && <HomePage onOpenSync={goSync} />}
         {tab === 'stats' && <StatsPage />}
         {tab === 'accounts' && <AccountsPage />}
-        {tab === 'settings' && <SettingsPage syncRef={syncRef} />}
+        {tab === 'settings' && <SettingsPage syncRef={syncRef} openSync={syncReq} />}
       </main>
 
       {fabOpen && <div className="fixed inset-0 z-30 animate-fade bg-black/40 md:hidden" onClick={() => setFabOpen(false)} />}

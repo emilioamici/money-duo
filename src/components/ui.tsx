@@ -1,6 +1,6 @@
 import { useEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, X } from 'lucide-react'
+import { Check, ChevronDown, X } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
 
 /** Finestre aperte, dalla più vecchia alla più recente: Esc chiude solo l'ultima. */
@@ -133,5 +133,24 @@ export function CatBubble({ icon, color, size = 40 }: { icon: string; color: str
     <span className="flex shrink-0 items-center justify-center rounded-full" style={{ width: size, height: size, background: color + '26', fontSize: size * 0.5 }}>
       {icon}
     </span>
+  )
+}
+
+/** Scheda che si apre e si chiude: titolo, riga di riepilogo quando è chiusa, contenuto quando è aperta. */
+export function Accordion({ title, summary, icon, open, onToggle, children }: {
+  title: string; summary?: ReactNode; icon: ReactNode; open: boolean; onToggle: () => void; children: ReactNode
+}) {
+  return (
+    <section className="card overflow-hidden" data-open={open || undefined}>
+      <button type="button" onClick={onToggle} aria-expanded={open} className="flex w-full items-center gap-3 p-4 text-left active:bg-line/30">
+        <span className="text-brand">{icon}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-bold">{title}</span>
+          {summary && !open && <span className="block truncate text-xs text-muted">{summary}</span>}
+        </span>
+        <ChevronDown size={20} className={`shrink-0 text-muted transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && <div className="border-t border-line/60 p-4">{children}</div>}
+    </section>
   )
 }

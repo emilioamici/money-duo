@@ -46,6 +46,11 @@ export function setAccountHidden(db: Db, id: string, hidden: boolean): Db {
   return { ...db, accounts: db.accounts.map((a) => (a.id === id ? { ...a, hidden, updatedAt: t } : a)) }
 }
 
+export function setAccountExcluded(db: Db, id: string, excludeFromTotal: boolean): Db {
+  const t = nowIso()
+  return { ...db, accounts: db.accounts.map((a) => (a.id === id ? { ...a, excludeFromTotal, updatedAt: t } : a)) }
+}
+
 export function saveCategory(db: Db, cat: Category): Db {
   const next = { ...cat, updatedAt: nowIso() }
   const exists = db.categories.some((x) => x.id === cat.id)

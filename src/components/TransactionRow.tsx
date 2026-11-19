@@ -3,73 +3,20 @@ import { useApp } from '../store/AppProvider'
 import { accountById, categoryById, involvedAccountIds, isSplit, txPayerIds, visibleTo } from '../lib/calc'
 import { formatMoney, timeLabel } from '../lib/format'
 import { CatBubble } from './ui'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo } from 'react'
 import { ArrowLeftRight, Copy, Pencil, Trash2 } from 'lucide-react'
 import { deleteTransaction } from '../lib/mutations'
 import { ask } from './dialogs'
 import { useTxActions } from './txActions'
-
-const ACTION_W = 68
-const ACTIONS_W = ACTION_W * 3
+import { SwipeRow } from './SwipeRow'
 
 /** Riga della lista: scorrendola verso sinistra compaiono «Modifica», «Copia» ed «Elimina». */
 export function TransactionRow({ tx }: { tx: Transaction }) {
   const { db, nameOf, openTx, me, commit } = useApp()
   const { copy } = useTxActions()
-  const rootRef = useRef<HTMLDivElement>(null)
-  const [offset, setOffset] = useState(0)
-  const [drag, setDrag] = useState(false)
-  const g = useRef({ id: -1, sx: 0, sy: 0, base: 0, mode: '' as '' | 'h' | 'v', swiped: false })
-  const opened = offset < 0
-  // i pulsanti esistono solo mentre servono (aperti, trascinando o durante la chiusura)
-  const [show, setShow] = useState(false)
-  useEffect(() => {
-    if (opened || drag) { setShow(true); return }
-    const t = setTimeout(() => setShow(false), 250)
-    return () => clearTimeout(t)
-  }, [opened, drag])
-
-  // una sola riga aperta: toccando altrove si chiude
-  useEffect(() => {
-    if (!opened) return
-    const away = (e: PointerEvent) => { if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOffset(0) }
-    document.addEventListener('pointerdown', away)
-    return () => document.removeEventListener('pointerdown', away)
-  }, [opened])
-
-  const down = (e: React.PointerEvent) => {
-    if (e.pointerType === 'mouse' && e.button !== 0) return
-    g.current = { id: e.pointerId, sx: e.clientX, sy: e.clientY, base: offset, mode: '', swiped: false }
-  }
-  const move = (e: React.PointerEvent) => {
-    const s = g.current
-    if (e.pointerId !== s.id || s.mode === 'v') return
-    const dx = e.clientX - s.sx, dy = e.clientY - s.sy
-    if (!s.mode) {
-      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return
-      s.mode = Math.abs(dx) > Math.abs(dy) * 1.2 ? 'h' : 'v'
-      if (s.mode === 'h') { e.currentTarget.setPointerCapture(e.pointerId); setDrag(true) } else s.swiped = true   // un trascinamento non è un tocco
-      return
-    }
-    s.swiped = true
-    setOffset(Math.max(-ACTIONS_W, Math.min(0, s.base + dx)))
-  }
-  const up = (e: React.PointerEvent) => {
-    const s = g.current
-    if (e.pointerId !== s.id) return
-    if (s.mode === 'h') { setDrag(false); setOffset((o) => (o < -ACTIONS_W / 2 ? -ACTIONS_W : 0)) }
-    s.id = -1
-  }
-  const click = (e: React.MouseEvent) => {
-    if (g.current.swiped) { g.current.swiped = false; e.preventDefault(); return }
-    if (opened) { setOffset(0); return }
-    openTx({ tx })
-  }
   const remove = async () => {
     if (await ask({ title: 'Eliminare la transazione?', message: 'I saldi verranno ricalcolati.', ok: 'Elimina', danger: true })) commit((d) => deleteTransaction(d, tx.id))
-    else setOffset(0)
   }
-
   const accs = useMemo(() => accountById(db), [db])
   const cats = useMemo(() => categoryById(db), [db])
   const cat = tx.categoryId ? cats.get(tx.categoryId) : undefined
@@ -90,15 +37,12 @@ export function TransactionRow({ tx }: { tx: Transaction }) {
   const color = tx.type === 'income' ? 'text-inc' : tx.type === 'expense' ? 'text-exp' : 'text-trf'
 
   return (
-    <div ref={rootRef} className="relative overflow-hidden" data-testid="tx-row">
-      {show && <div className="absolute inset-y-0 right-0 flex" style={{ width: ACTIONS_W }}>
-        <button className="flex flex-col items-center justify-center gap-1 bg-brand text-[11px] font-semibold text-onbrand" style={{ width: ACTION_W }} onClick={() => { setOffset(0); openTx({ tx }) }} aria-label="Modifica"><Pencil size={18} />Modifica</button>
-        <button className="flex flex-col items-center justify-center gap-1 bg-trf text-[11px] font-semibold text-onbrand" style={{ width: ACTION_W }} onClick={() => { setOffset(0); copy(tx) }} aria-label="Copia"><Copy size={18} />Copia</button>
-        <button className="flex flex-col items-center justify-center gap-1 bg-exp text-[11px] font-semibold text-onbrand" style={{ width: ACTION_W }} onClick={() => void remove()} aria-label="Elimina"><Trash2 size={18} />Elimina</button>
-      </div>}
-      <div className="relative touch-pan-y bg-surface" style={{ transform: `translateX(${offset}px)`, transition: drag ? 'none' : 'transform .2s ease-out' }}
-        onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
-    <button onClick={click} className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-line/30 active:bg-line/50">
+    <SwipeRow testId="tx-row" onTap={() => openTx({ tx })} buttonClass="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-line/30 active:bg-line/50"
+      actions={[
+        { label: 'Modifica', icon: <Pencil size={18} />, className: 'bg-brand', onClick: () => openTx({ tx }) },
+        { label: 'Copia', icon: <Copy size={18} />, className: 'bg-trf', onClick: () => copy(tx) },
+        { label: 'Elimina', icon: <Trash2 size={18} />, className: 'bg-exp', onClick: () => void remove() },
+      ]}>
       {tx.type === 'transfer'
         ? <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-trf/15 text-trf"><ArrowLeftRight size={18} /></span>
         : <CatBubble icon={cat?.icon ?? '❔'} color={cat?.color ?? '#94a3b8'} />}
@@ -111,8 +55,6 @@ export function TransactionRow({ tx }: { tx: Transaction }) {
         </span>
       </span>
       <span className={`shrink-0 font-bold tabular-nums ${color}`}>{tx.type === 'expense' ? '−' : tx.type === 'income' ? '+' : ''}{formatMoney(tx.amount)}</span>
-    </button>
-      </div>
-    </div>
+    </SwipeRow>
   )
 }
