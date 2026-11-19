@@ -1,5 +1,6 @@
 import type { Db } from '../types'
 import { isPristine } from '../lib/defaults'
+import { t } from '../i18n'
 import { engine } from '../sync/engine'
 import { ask } from './dialogs'
 
@@ -12,10 +13,10 @@ export async function linkDatabase(db: Db, fileId: string): Promise<boolean> {
   let mode: 'merge' | 'replace' = 'replace'
   if (!isPristine(db)) {
     const r = await ask({
-      title: `Collegare «${file.name}»`,
-      message: `Su questo dispositivo ci sono dati non ancora presenti nel file (${db.transactions.length} transazioni locali). Vuoi unirli ai dati del file Drive o usare solo il file Drive? In quel caso i dati locali verranno scartati.`,
-      ok: 'Unisci ai dati del file',
-      alt: 'Usa solo il file Drive',
+      title: t('Collegare «{name}»', { name: file.name }),
+      message: t('Su questo dispositivo ci sono dati non ancora presenti nel file ({n} transazioni locali). Vuoi unirli ai dati del file Drive o usare solo il file Drive? In quel caso i dati locali verranno scartati.', { n: db.transactions.length }),
+      ok: t('Unisci ai dati del file'),
+      alt: t('Usa solo il file Drive'),
     })
     if (!r) return false
     mode = r === 'ok' ? 'merge' : 'replace'

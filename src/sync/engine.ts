@@ -7,6 +7,7 @@ import * as drive from './drive'
 import { DriveError } from './drive'
 import { GoogleAuthError, cachedToken, clearToken, requestToken, revokeToken, setToken, tokenRemainingMs, type Prompt } from './google'
 import { SessionExpired, brokerAvailable, hasSession, logoutBroker, refreshAccessToken, startBrokerLogin } from './auth'
+import { t } from '../i18n'
 
 /**
  * Motore di sincronizzazione con un file JSON su Google Drive.
@@ -309,7 +310,7 @@ export class SyncEngine {
   /** Invita un account Google: concede l'accesso in modifica al file (solo il capofamiglia). */
   async invite(email: string, familyName: string): Promise<void> {
     if (!this.p.fileId) return
-    await drive.shareFile(await this.token(), this.p.fileId, email.trim(), `Ti invito nella famiglia «${familyName}» su MoneyDuo. Apri l'app e accedi con questo account Google: il database ti verrà collegato in automatico.`)
+    await drive.shareFile(await this.token(), this.p.fileId, email.trim(), t('Ti invito nella famiglia «{name}» su MoneyDuo. Apri l\'app e accedi con questo account Google: il database ti verrà collegato in automatico.', { name: familyName }))
   }
 
   /** Revoca l'accesso al file a un account. Ritorna false se non aveva permessi. */
@@ -324,7 +325,7 @@ export class SyncEngine {
     const token = await this.token()
     const meta = await drive.getMeta(token, this.p.fileId)
     const id = meta.parents?.[0]
-    return id ? { id, name: await drive.folderName(token, id).catch(() => 'Cartella') } : null
+    return id ? { id, name: await drive.folderName(token, id).catch(() => t('Cartella')) } : null
   }
 
   async listFolders(parentId: string): Promise<drive.DriveFolder[]> {
@@ -392,7 +393,7 @@ export class SyncEngine {
         this.pullMode = 'merge'
         this.reconciled = true
       }
-      if (!this.reconciled) throw new Error('Copia locale non allineata a Drive: invio annullato per non sovrascrivere i dati.')
+      if (!this.reconciled) throw new Error(t('Copia locale non allineata a Drive: invio annullato per non sovrascrivere i dati.'))
 
       if (needPush) {
         const seq = this.dirtySeq
@@ -423,12 +424,12 @@ export class SyncEngine {
   private handleError(e: unknown): void {
     if (e instanceof GoogleAuthError || (e instanceof DriveError && e.status === 401)) {
       clearToken()
-      return this.set('auth', 'Sessione Google scaduta: riconnettiti per continuare a sincronizzare.')
+      return this.set('auth', t('Sessione Google scaduta: riconnettiti per continuare a sincronizzare.'))
     }
     if (e instanceof DriveError) {
-      if (e.status === 404) return this.set('error', 'Non hai più accesso al database: forse sei stato rimosso dalla famiglia o il file è stato spostato. Puoi scollegarti da Impostazioni.')
-      if (e.status === 403) return this.set('error', 'Permesso negato: serve l\'accesso in modifica al file. ' + e.message)
-      return this.set('error', `Errore Google Drive (${e.status}): ${e.message}`)
+      if (e.status === 404) return this.set('error', t('Non hai più accesso al database: forse sei stato rimosso dalla famiglia o il file è stato spostato. Puoi scollegarti da Impostazioni.'))
+      if (e.status === 403) return this.set('error', t('Permesso negato: serve l\'accesso in modifica al file.') + ' ' + e.message)
+      return this.set('error', t('Errore Google Drive ({status}): {message}', { status: e.status, message: e.message }))
     }
     if (e instanceof TypeError || !navigator.onLine) return this.set('offline')
     this.set('error', e instanceof Error ? e.message : String(e))

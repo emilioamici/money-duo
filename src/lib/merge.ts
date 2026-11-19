@@ -2,6 +2,7 @@ import type { Account, Category, Db, Favorite, Member, Payment, Transaction } fr
 import { SCHEMA_VERSION } from '../types'
 import { nowIso, uid } from './ids'
 import { MEMBER_COLORS } from './defaults'
+import { t as tr } from '../i18n'
 
 type Rec = { id: string; updatedAt: string }
 const EPOCH = '1970-01-01T00:00:00.000Z'
@@ -127,11 +128,11 @@ function migrateV1(o: Obj): Obj {
 
 /** Valida e normalizza un JSON sconosciuto (file Drive o import locale), migrando i file v1. Lancia Error con messaggio leggibile. */
 export function parseDb(input: unknown): Db {
-  if (!isObj(input)) throw new Error('Il file non è un database MoneyDuo valido.')
-  if (typeof input.schemaVersion !== 'number') throw new Error('Il file non è un database MoneyDuo (schemaVersion mancante).')
-  if (input.schemaVersion > SCHEMA_VERSION) throw new Error('Il file è stato creato da una versione più recente dell\'app: aggiorna MoneyDuo.')
+  if (!isObj(input)) throw new Error(tr('Il file non è un database MoneyDuo valido.'))
+  if (typeof input.schemaVersion !== 'number') throw new Error(tr('Il file non è un database MoneyDuo (schemaVersion mancante).'))
+  if (input.schemaVersion > SCHEMA_VERSION) throw new Error(tr('Il file è stato creato da una versione più recente dell\'app: aggiorna MoneyDuo.'))
   if (!Array.isArray(input.accounts) || !Array.isArray(input.categories) || !Array.isArray(input.transactions))
-    throw new Error('Database incompleto: mancano conti, categorie o transazioni.')
+    throw new Error(tr('Database incompleto: mancano conti, categorie o transazioni.'))
   const raw = input.schemaVersion < 2 ? migrateV1(input) : input
 
   const meta = isObj(raw.meta) ? raw.meta : {}

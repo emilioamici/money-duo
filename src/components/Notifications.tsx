@@ -3,11 +3,12 @@ import { Bell, Receipt, Wallet, X } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
 import { Sheet } from './ui'
 import type { Notif } from '../lib/notifications'
+import { locale, t } from '../i18n'
 
 export function NotificationBell() {
   const { unread, setCenterOpen } = useApp()
   return (
-    <button className="relative rounded-full p-2 hover:bg-line/60" aria-label={unread ? `Notifiche (${unread} non lette)` : 'Notifiche'} onClick={() => setCenterOpen(true)}>
+    <button className="relative rounded-full p-2 hover:bg-line/60" aria-label={unread ? t('Notifiche ({n} non lette)', { n: unread }) : t('Notifiche')} onClick={() => setCenterOpen(true)}>
       <Bell size={20} />
       {unread > 0 && <span className="absolute right-0.5 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-exp px-1 text-[10px] font-bold text-white">{unread > 9 ? '9+' : unread}</span>}
     </button>
@@ -16,10 +17,10 @@ export function NotificationBell() {
 
 const ago = (iso: string): string => {
   const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000)
-  if (m < 1) return 'ora'
-  if (m < 60) return `${m} min fa`
-  if (m < 1440) return `${Math.round(m / 60)} h fa`
-  return new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'short' }).format(new Date(iso))
+  if (m < 1) return t('ora')
+  if (m < 60) return t('{n} min fa', { n: m })
+  if (m < 1440) return t('{n} h fa', { n: Math.round(m / 60) })
+  return new Intl.DateTimeFormat(locale(), { day: 'numeric', month: 'short' }).format(new Date(iso))
 }
 
 const Icon = ({ n }: { n: Notif }) => (
@@ -37,18 +38,18 @@ export function NotificationCenter({ onOpenAccounts }: { onOpenAccounts: () => v
     if (tx) { setCenterOpen(false); openTx({ tx }) } else if (n.accountId) { setCenterOpen(false); onOpenAccounts() }
   }
   return (
-    <Sheet open={centerOpen} onClose={() => setCenterOpen(false)} title="Notifiche"
+    <Sheet open={centerOpen} onClose={() => setCenterOpen(false)} title={t('Notifiche')}
       footer={notifications.length > 0 ? (
         <div className="flex gap-2">
-          <button className="btn-soft flex-1" disabled={unread === 0} onClick={markAllRead}>Segna tutte come lette</button>
-          <button className="btn-ghost" onClick={clearNotifications}>Svuota</button>
+          <button className="btn-soft flex-1" disabled={unread === 0} onClick={markAllRead}>{t('Segna tutte come lette')}</button>
+          <button className="btn-ghost" onClick={clearNotifications}>{t('Svuota')}</button>
         </div>
       ) : undefined}>
       {notifications.length === 0 ? (
         <div className="py-10 text-center text-sm text-muted">
           <MascotImg kind="mochi" className="mx-auto mb-3 h-20 w-auto" />
-          <p className="font-semibold text-ink">Nessuna notifica</p>
-          <p className="mx-auto mt-1 max-w-xs">Ti avviso quando un altro membro aggiunge una transazione che ti riguarda o un conto in comune, o condivide un conto con te.</p>
+          <p className="font-semibold text-ink">{t('Nessuna notifica')}</p>
+          <p className="mx-auto mt-1 max-w-xs">{t('Ti avviso quando un altro membro aggiunge una transazione che ti riguarda o un conto in comune, o condivide un conto con te.')}</p>
         </div>
       ) : (
         <ul className="-mx-2 divide-y divide-line/50">
@@ -61,7 +62,7 @@ export function NotificationCenter({ onOpenAccounts }: { onOpenAccounts: () => v
                   <span className="block text-xs text-muted">{n.body}</span>
                   <span className="mt-0.5 block text-[11px] text-muted">{ago(n.at)}</span>
                 </span>
-                {!n.read && <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-brand" aria-label="Non letta" />}
+                {!n.read && <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-brand" aria-label={t('Non letta')} />}
               </button>
             </li>
           ))}
@@ -82,7 +83,7 @@ export function NotificationToast() {
           <Icon n={toast} />
           <span className="min-w-0"><span className="block text-sm font-bold">{toast.title}</span><span className="block truncate text-xs text-muted">{toast.body}</span></span>
         </button>
-        <button className="rounded-full p-1 text-muted hover:bg-line/60" aria-label="Chiudi" onClick={dismissToast}><X size={16} /></button>
+        <button className="rounded-full p-1 text-muted hover:bg-line/60" aria-label={t('Chiudi')} onClick={dismissToast}><X size={16} /></button>
       </div>
     </div>
   )

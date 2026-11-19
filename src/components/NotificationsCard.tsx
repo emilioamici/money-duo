@@ -1,112 +1,104 @@
 import { useState } from 'react'
 import { useApp } from '../store/AppProvider'
 import { engine } from '../sync/engine'
-import { configError, disablePush, enablePush, pushConfigured, pushSupported, savePushConfig, pushUrl, vapidPublicKey, sendPush } from '../sync/push'
+import { disablePush, enablePush, pushConfigured, pushSupported, sendPush } from '../sync/push'
 import { Toggle } from './ui'
+import { t } from '../i18n'
 
-/** Impostazioni delle notifiche di sistema di questo dispositivo (le notifiche nell'app sono sempre attive). */
+/**
+ * Notifiche di questo dispositivo: un solo interruttore «Attiva notifiche» che le accende tutte
+ * (notifiche del dispositivo e, se il server è configurato, push anche con l'app chiusa).
+ * La campanella dentro l'app c'è sempre.
+ */
 export function NotificationsCard() {
   const { prefs, setPrefs, sync, me } = useApp()
-  const [pushMsg, setPushMsg] = useState('')
-  const [pushBusy, setPushBusy] = useState(false)
-  const [, bump] = useState(0)
   const supported = typeof Notification !== 'undefined'
   const [perm, setPerm] = useState<NotificationPermission>(supported ? Notification.permission : 'denied')
-  const [msg, setMsg] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null)
+  const on = (prefs.systemNotif || prefs.pushEnabled) && perm === 'granted'
+  const server = pushConfigured() && pushSupported()
 
-  const toggle = async (on: boolean) => {
-    setMsg('')
-    if (!on) return setPrefs({ systemNotif: false })
-    const p = Notification.permission === 'default' ? await Notification.requestPermission() : Notification.permission
-    setPerm(p)
-    if (p === 'granted') setPrefs({ systemNotif: true })
-    else setMsg('Il permesso per le notifiche è stato negato: abilitalo dalle impostazioni del browser o del telefono per questo sito.')
+  const needToken = (): string => {
+    const tok = engine.currentToken()
+    if (!tok) throw new Error(t('Sessione Google scaduta: riconnettiti e riprova.'))
+    return tok
+  }
+  const err = (e: unknown) => (e instanceof Error ? e.message : String(e))
+
+  /** Iscrive il dispositivo al server push (se c'è). Non lancia: ritorna l'errore da mostrare. */
+  const startPush = async (): Promise<string | null> => {
+    if (!server) return null
+    try {
+      if (!sync.fileId) throw new Error(t('Nessuna famiglia collegata.'))
+      await enablePush(sync.fileId, needToken())
+      setPrefs({ pushEnabled: true })
+      return null
+    } catch (e) { return err(e) }
+  }
+
+  const turnOn = async () => {
+    setMsg(null); setBusy(true)
+    try {
+      const p = Notification.permission === 'default' ? await Notification.requestPermission() : Notification.permission
+      setPerm(p)
+      if (p !== 'granted') return setMsg({ text: t('Il permesso per le notifiche è stato negato: abilitalo dalle impostazioni del browser o del telefono per questo sito.'), bad: true })
+      setPrefs({ systemNotif: true })
+      const e = await startPush()
+      setMsg(e ? { text: t('Notifiche attivate, ma il server delle notifiche non risponde ({e}). Le riceverai finché l\'app è aperta o in background; puoi riprovare dal pulsante qui sotto.', { e }), bad: true } : { text: t('Notifiche attivate su questo dispositivo.') })
+    } finally { setBusy(false) }
+  }
+
+  const turnOff = async () => {
+    setMsg(null); setBusy(true)
+    try {
+      if (sync.fileId && prefs.pushEnabled && pushConfigured()) await disablePush(sync.fileId, engine.currentToken()).catch(() => undefined)
+      setPrefs({ systemNotif: false, pushEnabled: false })
+    } finally { setBusy(false) }
+  }
+
+  const retry = async () => {
+    setMsg(null); setBusy(true)
+    const e = await startPush()
+    setMsg(e ? { text: e, bad: true } : { text: t('Notifiche attive anche con l\'app chiusa.') })
+    setBusy(false)
   }
 
   const test = async () => {
-    const opts: NotificationOptions = { body: 'Le notifiche di MoneyDuo funzionano su questo dispositivo.', icon: './icon-192.png', tag: 'moneyduo-test' }
+    setMsg(null); setBusy(true)
     try {
-      const reg = await navigator.serviceWorker?.getRegistration()
-      if (reg) await reg.showNotification('Notifica di prova', opts)
-      else new Notification('Notifica di prova', opts)
-    } catch { setMsg('Non riesco a mostrare la notifica su questo browser.') }
-  }
-
-  const needToken = (): string => {
-    const t = engine.currentToken()
-    if (!t) throw new Error('Sessione Google scaduta: riconnettiti e riprova.')
-    return t
-  }
-  const togglePush = async (on: boolean) => {
-    setPushMsg(''); setPushBusy(true)
-    try {
-      if (!sync.fileId) throw new Error('Nessuna famiglia collegata.')
-      if (on) { await enablePush(sync.fileId, needToken()); setPrefs({ pushEnabled: true }); setPushMsg('Notifiche push attivate su questo dispositivo.') }
-      else { await disablePush(sync.fileId, engine.currentToken()); setPrefs({ pushEnabled: false }) }
-    } catch (e) { setPushMsg(e instanceof Error ? e.message : String(e)) } finally { setPushBusy(false) }
-  }
-  const testPush = async () => {
-    setPushMsg(''); setPushBusy(true)
-    try {
-      if (!sync.fileId || !me?.email) throw new Error('Serve una famiglia collegata e un account associato.')
-      await sendPush(sync.fileId, needToken(), { recipients: [me.email], title: 'Notifica push di prova', body: 'Il server delle notifiche funziona.', tag: 'moneyduo-push-test', test: true })
-      setPushMsg('Prova inviata: dovrebbe arrivare tra pochi secondi (con l\'app in background).')
-    } catch (e) { setPushMsg(e instanceof Error ? e.message : String(e)) } finally { setPushBusy(false) }
+      if (prefs.pushEnabled && server && sync.fileId && me?.email) {
+        await sendPush(sync.fileId, needToken(), { recipients: [me.email], title: t('Notifica di prova'), body: t('Le notifiche di MoneyDuo funzionano.'), tag: 'moneyduo-push-test', test: true })
+        setMsg({ text: t('Prova inviata dal server: dovrebbe arrivare tra pochi secondi (con l\'app in background).') })
+      } else {
+        const opts: NotificationOptions = { body: t('Le notifiche di MoneyDuo funzionano su questo dispositivo.'), icon: './icon-192.png', tag: 'moneyduo-test' }
+        const reg = await navigator.serviceWorker?.getRegistration()
+        if (reg) await reg.showNotification(t('Notifica di prova'), opts)
+        else new Notification(t('Notifica di prova'), opts)
+      }
+    } catch (e) { setMsg({ text: err(e), bad: true }) } finally { setBusy(false) }
   }
 
   return (
     <div>
       <p className="mb-3 text-xs text-muted">
-        Nell'app trovi sempre la campanella: ti avviso quando un altro membro aggiunge una transazione che ti riguarda o un conto in comune, o condivide un conto con te.
-        Puoi ricevere anche una notifica del dispositivo.
+        {t('Nell\'app trovi sempre la campanella: ti avviso quando un altro membro aggiunge una transazione che ti riguarda o un conto in comune, o condivide un conto con te. Attivando le notifiche le ricevi anche come avviso del telefono.')}
       </p>
       {!supported ? (
-        <p className="rounded-xl bg-bg p-3 text-sm text-muted">Questo browser non supporta le notifiche di sistema. Su iPhone servono iOS 16.4+ e l'app aggiunta alla schermata Home.</p>
+        <p className="rounded-xl bg-bg p-3 text-sm text-muted">{t('Questo browser non supporta le notifiche di sistema. Su iPhone servono iOS 16.4+ e l\'app aggiunta alla schermata Home.')}</p>
       ) : (
         <>
-          <Toggle checked={prefs.systemNotif && perm === 'granted'} onChange={(v) => void toggle(v)} label="Notifiche del dispositivo" hint="Quando l'app è in background" />
-          {prefs.systemNotif && perm === 'granted' && <button className="btn-soft w-full" onClick={() => void test()}>Invia una notifica di prova</button>}
-          {msg && <p className="mt-2 text-sm text-exp">{msg}</p>}
+          <Toggle checked={on} onChange={(v) => void (v ? turnOn() : turnOff())} label={t('Attiva notifiche')} hint={server ? t('Anche con l\'app chiusa') : t('Quando l\'app è aperta o in background')} />
+          {on && <button className="btn-soft w-full" disabled={busy} onClick={() => void test()}>{t('Invia una notifica di prova')}</button>}
+          {on && server && !prefs.pushEnabled && <button className="btn-soft mt-2 w-full" disabled={busy} onClick={() => void retry()}>{t('Riprova ad attivarle anche con l\'app chiusa')}</button>}
+          {msg && <p className={`mt-2 text-sm ${msg.bad ? 'text-exp' : 'text-muted'}`}>{msg.text}</p>}
         </>
       )}
-      <div className="mt-4 border-t border-line/70 pt-4">
-        <p className="mb-1 font-semibold">Notifiche push (anche ad app chiusa)</p>
-        {!pushConfigured() ? (
-          <div className="space-y-2 text-xs text-muted">
-            <p>Serve il piccolo server di notifiche (guida in <b>worker/README.md</b>). Quando è pronto, inserisci qui i due valori.</p>
-            <input className="input" placeholder="Indirizzo del server (https://….workers.dev)" defaultValue={pushUrl()} onBlur={(e) => { savePushConfig(e.target.value, vapidPublicKey()); bump((n) => n + 1) }} />
-            <input className="input" placeholder="Chiave pubblica VAPID" defaultValue={vapidPublicKey()} onBlur={(e) => { savePushConfig(pushUrl(), e.target.value); bump((n) => n + 1) }} />
-            {configError() && <p className="text-exp">{configError()}</p>}
-          </div>
-        ) : configError() ? (
-          <div className="space-y-2 text-xs">
-            <p className="text-exp">{configError()}</p>
-            <input className="input" placeholder="Indirizzo del server (https://….workers.dev)" defaultValue={pushUrl()} onBlur={(e) => { savePushConfig(e.target.value, vapidPublicKey()); bump((n) => n + 1) }} />
-            <input className="input" placeholder="Chiave pubblica VAPID" defaultValue={vapidPublicKey()} onBlur={(e) => { savePushConfig(pushUrl(), e.target.value); bump((n) => n + 1) }} />
-          </div>
-        ) : !pushSupported() ? (
-          <p className="text-xs text-muted">Questo browser non supporta le notifiche push. Su iPhone servono iOS 16.4+ e l'app aggiunta alla schermata Home.</p>
-        ) : (
-          <>
-            <Toggle checked={prefs.pushEnabled} onChange={(v) => void togglePush(v)} label="Ricevi le notifiche anche con l'app chiusa" hint="Su questo dispositivo" />
-            {prefs.pushEnabled && <button className="btn-soft w-full" disabled={pushBusy} onClick={() => void testPush()}>Invia una notifica push di prova</button>}
-          </>
-        )}
-        {pushConfigured() && (
-          <details className="mt-3 text-xs">
-            <summary className="cursor-pointer text-muted">Impostazioni del server (modifica o rimuovi)</summary>
-            <div className="mt-2 space-y-2">
-              <input className="input" aria-label="Indirizzo del server" placeholder="Indirizzo del server (https://….workers.dev)" defaultValue={pushUrl()} onBlur={(e) => { savePushConfig(e.target.value, vapidPublicKey()); setPushMsg('Salvato. Se avevi già attivato le notifiche, disattiva e riattiva l\'interruttore per iscrivere di nuovo il dispositivo.'); bump((n) => n + 1) }} />
-              <input className="input" aria-label="Chiave pubblica VAPID" placeholder="Chiave pubblica VAPID" defaultValue={vapidPublicKey()} onBlur={(e) => { savePushConfig(pushUrl(), e.target.value); setPushMsg('Salvato. Se avevi già attivato le notifiche, disattiva e riattiva l\'interruttore per iscrivere di nuovo il dispositivo.'); bump((n) => n + 1) }} />
-              <button className="btn-danger w-full" onClick={() => { if (sync.fileId && prefs.pushEnabled) void disablePush(sync.fileId, engine.currentToken()); setPrefs({ pushEnabled: false }); savePushConfig('', ''); setPushMsg('Configurazione rimossa.'); bump((n) => n + 1) }}>Rimuovi la configurazione del server</button>
-            </div>
-          </details>
-        )}
-        {pushMsg && <p className="mt-2 text-sm text-muted">{pushMsg}</p>}
-      </div>
       <p className="mt-3 text-xs text-muted">
-        Senza il server push, il sito non può svegliare il telefono: le notifiche arrivano mentre l'app è aperta o in background (si controlla ogni 2 minuti),
-        e quelle perse mentre era chiusa le trovi alla riapertura. {sync.persistent ? "L'accesso persistente tiene attiva la sessione Google anche in background." : "La sessione Google dura 1 ora: finché usi l'app si rinnova da sola; se resta in background senza essere toccata, dopo un'ora le notifiche si fermano finché non la riapri."}
+        {server
+          ? t('Con l\'app chiusa le notifiche arrivano dal server delle notifiche.')
+          : t('Senza il server delle notifiche il sito non può svegliare il telefono: le notifiche arrivano mentre l\'app è aperta o in background (si controlla ogni 2 minuti) e quelle perse le trovi alla riapertura.')}
+        {' '}{sync.persistent ? t('L\'accesso persistente tiene attiva la sessione Google anche in background.') : t('La sessione Google dura 1 ora: con l\'accesso persistente (scheda Sincronizzazione) non serve rinnovarla.')}
       </p>
     </div>
   )

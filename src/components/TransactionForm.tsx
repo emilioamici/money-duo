@@ -10,6 +10,7 @@ import { Segmented, Sheet } from './ui'
 import { ask } from './dialogs'
 import { TxFooterActions } from './txActions'
 import { CategoryRow, Row, SelectField, TagsRow, TitleRow, accountLabel, plain } from './formParts'
+import { t } from '../i18n'
 
 /** Nuova transazione "normale": uscita, entrata o trasferimento. Le spese condivise hanno un form dedicato (Nuovo split). */
 export function TransactionForm({ state, onClose }: { state: TxFormState; onClose: () => void }) {
@@ -59,24 +60,24 @@ export function TransactionForm({ state, onClose }: { state: TxFormState; onClos
   }
 
   const save = () => {
-    if (!cents || cents <= 0) return setError('Inserisci un importo maggiore di zero.')
-    if (!accountId) return setError('Seleziona un conto.')
-    if (type === 'transfer' && (!toAccountId || toAccountId === accountId)) return setError('Scegli due conti diversi per il trasferimento.')
-    const t: Transaction = {
+    if (!cents || cents <= 0) return setError(t('Inserisci un importo maggiore di zero.'))
+    if (!accountId) return setError(t('Seleziona un conto.'))
+    if (type === 'transfer' && (!toAccountId || toAccountId === accountId)) return setError(t('Scegli due conti diversi per il trasferimento.'))
+    const next: Transaction = {
       id: tx?.id ?? uid(), type, amount: cents, date: fromLocalInput(date || toLocalInput(nowIso())), accountId,
       toAccountId: type === 'transfer' ? toAccountId : null, categoryId: type === 'transfer' ? null : categoryId,
       title: title.trim(), note: note.trim(), paidBy: type === 'transfer' ? payerFor(accountId) : paidBy,
       participants: [], splitMode: 'equal', splitValues: null, payments: null, tags,
       by: me?.id ?? null, createdAt: tx?.createdAt ?? nowIso(), updatedAt: nowIso(),
     }
-    commit((d) => saveTransaction(d, t))
+    commit((d) => saveTransaction(d, next))
     setPrefs({ lastAccountId: accountId })
     onClose()
   }
 
   const remove = async () => {
     if (!tx) return
-    if (await ask({ title: 'Eliminare la transazione?', message: 'I saldi verranno ricalcolati.', ok: 'Elimina', danger: true })) {
+    if (await ask({ title: t('Eliminare la transazione?'), message: t('I saldi verranno ricalcolati.'), ok: t('Elimina'), danger: true })) {
       commit((d) => deleteTransaction(d, tx.id))
       onClose()
     }
@@ -94,44 +95,44 @@ export function TransactionForm({ state, onClose }: { state: TxFormState; onClos
   const options = (skip?: string) => accounts.filter((a) => a.id !== skip).map((a) => ({ value: a.id, label: accountLabel(a, nameOf) }))
 
   return (
-    <Sheet open onClose={onClose} title={tx ? 'Modifica transazione' : 'Nuova transazione'}
+    <Sheet open onClose={onClose} title={tx ? t('Modifica transazione') : t('Nuova transazione')}
       footer={
         <div className="flex gap-2">
-          {tx && <button className="btn-danger" onClick={remove} aria-label="Elimina"><Trash2 size={18} /></button>}
+          {tx && <button className="btn-danger" onClick={remove} aria-label={t('Elimina')}><Trash2 size={18} /></button>}
           {tx && <TxFooterActions tx={tx} />}
-          <button className="btn-primary flex-1" onClick={save}>Salva</button>
+          <button className="btn-primary flex-1" onClick={save}>{t('Salva')}</button>
         </div>
       }>
       <Segmented<TxType> value={type} onChange={changeType} options={[
-        { value: 'expense', label: 'Uscita', color: 'text-exp' }, { value: 'income', label: 'Entrata', color: 'text-inc' }, { value: 'transfer', label: 'Trasferimento', color: 'text-trf' },
+        { value: 'expense', label: t('Uscita'), color: 'text-exp' }, { value: 'income', label: t('Entrata'), color: 'text-inc' }, { value: 'transfer', label: t('Trasferimento'), color: 'text-trf' },
       ]} />
 
       <div className="my-4 rounded-2xl bg-bg p-4 text-center">
-        <input inputMode="decimal" autoFocus={!tx} placeholder="0,00" value={amount} onChange={(e) => { setAmount(e.target.value); setError('') }}
+        <input inputMode="decimal" autoFocus={!tx} placeholder={t('0,00')} value={amount} onChange={(e) => { setAmount(e.target.value); setError('') }}
           className={`w-full bg-transparent text-center text-4xl font-bold outline-none placeholder:text-line ${type === 'expense' ? 'text-exp' : type === 'income' ? 'text-inc' : 'text-trf'}`} />
-        <span className="text-xs text-muted">Importo in euro</span>
+        <span className="text-xs text-muted">{t('Importo in euro')}</span>
       </div>
 
       <div className="-mx-1">
-        <Row label="Data"><input type="datetime-local" className={plain} value={date} onChange={(e) => setDate(e.target.value)} /></Row>
+        <Row label={t('Data')}><input type="datetime-local" className={plain} value={date} onChange={(e) => setDate(e.target.value)} /></Row>
         {type !== 'transfer' && <CategoryRow type={type} value={categoryId} onChange={setCategoryId} />}
         {accounts.length === 0 ? (
-          <p className="my-3 rounded-xl bg-exp/10 p-3 text-sm text-exp">Nessun conto visibile: crea o mostra un conto dalla sezione Conti.</p>
+          <p className="my-3 rounded-xl bg-exp/10 p-3 text-sm text-exp">{t('Nessun conto visibile: crea o mostra un conto dalla sezione Conti.')}</p>
         ) : type === 'transfer' ? (
           <>
-            <Row label="Da"><SelectField value={accountId} onChange={pickAccount} options={options()} /></Row>
+            <Row label={t('Da')}><SelectField value={accountId} onChange={pickAccount} options={options()} /></Row>
             <Row label="A"><SelectField value={toAccountId} onChange={setToAccountId} options={options(accountId)} /></Row>
           </>
         ) : (
-          <Row label="Conto"><SelectField value={accountId} onChange={pickAccount} options={options()} /></Row>
+          <Row label={t('Conto')}><SelectField value={accountId} onChange={pickAccount} options={options()} /></Row>
         )}
-        <TitleRow value={title} onChange={setTitle} placeholder={type === 'transfer' ? 'Es. Quota mensile' : 'Es. Spesa settimanale'} />
-        <Row label="Note"><textarea className={`${plain} resize-none`} rows={1} value={note} onChange={(e) => setNote(e.target.value)} /></Row>
+        <TitleRow value={title} onChange={setTitle} placeholder={type === 'transfer' ? t('Es. Quota mensile') : t('Es. Spesa settimanale')} />
+        <Row label={t('Note')}><textarea className={`${plain} resize-none`} rows={1} value={note} onChange={(e) => setNote(e.target.value)} /></Row>
         <TagsRow value={tags} onChange={setTags} />
       </div>
 
       {tx && type === 'expense' && (
-        <button type="button" className="btn-soft mt-4 w-full" onClick={toSplit}><Users size={18} />Dividi questa spesa</button>
+        <button type="button" className="btn-soft mt-4 w-full" onClick={toSplit}><Users size={18} />{t('Dividi questa spesa')}</button>
       )}
 
       {error && <p className="mt-3 text-sm font-medium text-exp">{error}</p>}

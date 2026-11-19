@@ -12,6 +12,8 @@ import { MascotPeek } from '../components/Mascots'
 import { Donut } from '../components/Donut'
 import { CatBubble, Segmented } from '../components/ui'
 import type { CategoryType } from '../types'
+import { t } from '../i18n'
+import { tb } from '../i18n/rich'
 
 const TONE = { credit: 'text-inc', debit: 'text-exp', neutral: 'text-ink' } as const
 
@@ -25,15 +27,13 @@ export function StatsPage() {
   const total = items.reduce((s, i) => s + i.total, 0)
   const sum = summarize(txs)
 
-  // saldi tra membri: su tutte le transazioni (ignora il filtro d'ambito), del mese e complessivi
-  const monthDebts = useMemo(() => familyBalances(db, db.transactions.filter((x) => { const d = new Date(x.date); return d >= from && d < to })), [db, from.getTime()]) // eslint-disable-line react-hooks/exhaustive-deps
   const totalDebts = useMemo(() => familyBalances(db, db.transactions), [db])
   const head = headlineDebt(totalDebts, me?.id)
 
   const settle = (d: Debt) => {
     const accs = sortedAccounts(db).filter((a) => !a.hidden)
     const personal = (id: string) => accs.find((a) => a.members.length === 1 && a.members[0] === id) ?? accs.find((a) => a.members.includes(id))
-    openTx({ initial: { type: 'transfer', amount: d.amount, title: 'Rimborso spese', accountId: personal(d.debtor)?.id, toAccountId: personal(d.creditor)?.id ?? null } })
+    openTx({ initial: { type: 'transfer', amount: d.amount, title: t('Rimborso spese'), accountId: personal(d.debtor)?.id, toAccountId: personal(d.creditor)?.id ?? null } })
   }
 
   const payTo = (id: string) => db.members.find((m) => m.id === id)?.paypal ?? null
@@ -46,15 +46,15 @@ export function StatsPage() {
   }
 
   const DebtList = ({ list, actions }: { list: Debt[]; actions?: boolean }) =>
-    list.length === 0 ? <p className="flex items-center gap-1.5 py-2 text-sm text-muted"><CircleCheck size={16} aria-hidden />Siete in pari</p> : (
+    list.length === 0 ? <p className="flex items-center gap-1.5 py-2 text-sm text-muted"><CircleCheck size={16} aria-hidden />{t('Siete in pari')}</p> : (
       <ul className="space-y-2">
         {[...list].sort((a, b) => Number(b.debtor === me?.id || b.creditor === me?.id) - Number(a.debtor === me?.id || a.creditor === me?.id)).map((d) => (
           <li key={d.debtor + d.creditor} className="flex items-center justify-between gap-2 rounded-xl bg-bg px-3 py-2 text-sm">
-            <span><b>{nameOf(d.debtor)}</b> deve a <b>{nameOf(d.creditor)}</b></span>
+            <span>{tb('<b>{a}</b> deve a <b>{b}</b>', { a: nameOf(d.debtor), b: nameOf(d.creditor) })}</span>
             <span className="flex items-center gap-2">
               <b className={`tabular-nums ${TONE[debtTone(d, me?.id)]}`}>{formatMoney(d.amount)}</b>
-              {actions && <button className="btn-soft !px-2.5 !py-1 !text-xs" onClick={() => settle(d)}>Rimborsa</button>}
-              {actions && d.debtor === me?.id && payTo(d.creditor) && <button className="btn-soft !px-2.5 !py-1 !text-xs !text-trf" onClick={() => payPaypal(d)} aria-label={`Paga ${nameOf(d.creditor)} con PayPal`}>PayPal</button>}
+              {actions && <button className="btn-soft !px-2.5 !py-1 !text-xs" onClick={() => settle(d)}>{t('Rimborsa')}</button>}
+              {actions && d.debtor === me?.id && payTo(d.creditor) && <button className="btn-soft !px-2.5 !py-1 !text-xs !text-trf" onClick={() => payPaypal(d)} aria-label={t('Paga {name} con PayPal', { name: nameOf(d.creditor) })}>{t('PayPal')}</button>}
             </span>
           </li>
         ))}
@@ -64,21 +64,18 @@ export function StatsPage() {
   return (
     <div>
       <div className="space-y-3 px-4 pt-safe">
-        <div className="flex items-center justify-between pt-3"><h1 className="text-xl font-extrabold tracking-tight">Statistiche</h1><NotificationBell /></div>
+        <div className="flex items-center justify-between pt-3"><h1 className="text-xl font-extrabold tracking-tight">{t('Statistiche')}</h1><NotificationBell /></div>
         <MascotPeek kind="zenitsu" side="left">
-          <Panel id="debts" label="Saldi tra i membri" icon={<Handshake size={22} />}
+          <Panel id="debts" label={t('Saldi tra i membri')} icon={<Handshake size={22} />}
             headline={head
-              ? <span className={TONE[head.tone]} data-tone={head.tone}><b>{nameOf(head.debt.debtor)}</b> deve a <b>{nameOf(head.debt.creditor)}</b> · {formatMoney(head.debt.amount)}</span>
-              : <span className="inline-flex items-center gap-1.5 text-ink" data-tone="ok"><CircleCheck size={20} aria-hidden />Tutti i saldi tra i membri sono in ordine</span>}
+              ? <>{tb('<b>{a}</b> deve a <b>{b}</b>', { a: nameOf(head.debt.debtor), b: nameOf(head.debt.creditor) })} · <span className={TONE[head.tone]} data-tone={head.tone}>{formatMoney(head.debt.amount)}</span></>
+              : <span className="inline-flex items-center gap-1.5 text-ink" data-tone="ok"><CircleCheck size={20} aria-hidden />{t('Tutti i saldi tra i membri sono in ordine')}</span>}
             quick={head && head.tone === 'debit' && payTo(head.debt.creditor)
-              ? <button className="btn-soft w-full" onClick={() => payPaypal(head.debt)} aria-label={`Paga ${nameOf(head.debt.creditor)} con PayPal`}><Wallet size={18} />Paga {nameOf(head.debt.creditor)} con PayPal · {formatMoney(head.debt.amount)}</button>
+              ? <button className="btn-soft w-full" onClick={() => payPaypal(head.debt)} aria-label={t('Paga {name} con PayPal', { name: nameOf(head.debt.creditor) })}><Wallet size={18} />{t('Paga {name} con PayPal', { name: nameOf(head.debt.creditor) })} · {formatMoney(head.debt.amount)}</button>
               : undefined}
-            sub={totalDebts.length > 1 ? <span className="text-muted">+ {totalDebts.length - 1} {totalDebts.length === 2 ? 'altro saldo' : 'altri saldi'}</span> : undefined}>
-            <p className="mb-1 text-[11px] font-semibold uppercase text-muted">{view.period === 'year' ? 'Quest\'anno' : 'Questo mese'}</p>
-            <DebtList list={monthDebts} />
-            <p className="mb-1 mt-4 text-[11px] font-semibold uppercase text-muted">Complessivo</p>
+            sub={totalDebts.length > 1 ? <span className="text-muted">{totalDebts.length === 2 ? t('+ 1 altro saldo') : t('+ {n} altri saldi', { n: totalDebts.length - 1 })}</span> : undefined}>
             <DebtList list={totalDebts} actions />
-            <p className="mt-3 text-xs text-muted">Calcolato sulle spese pagate da un membro e divise con altri; i trasferimenti tra conti personali di membri diversi contano come rimborsi. Le spese pagate dal «conto condiviso» non generano debiti.</p>
+            <p className="mt-3 text-xs text-muted">{t('Calcolato sulle spese pagate da un membro e divise con altri; i trasferimenti tra conti personali di membri diversi contano come rimborsi. Le spese pagate dal «conto condiviso» non generano debiti.')}</p>
           </Panel>
         </MascotPeek>
         <LiquidityPanel />
@@ -89,12 +86,12 @@ export function StatsPage() {
       </div>
       <div className="space-y-3 px-4">
         <div className="card p-4">
-          <Segmented<CategoryType> value={type} onChange={(t) => { setType(t); setOpen(null) }} options={[{ value: 'expense', label: 'Uscite', color: 'text-exp' }, { value: 'income', label: 'Entrate', color: 'text-inc' }]} />
+          <Segmented<CategoryType> value={type} onChange={(ty) => { setType(ty); setOpen(null) }} options={[{ value: 'expense', label: t('Uscite'), color: 'text-exp' }, { value: 'income', label: t('Entrate'), color: 'text-inc' }]} />
           {items.length === 0 ? (
-            <p className="py-10 text-center text-sm text-muted">Nessun dato in questo periodo.</p>
+            <p className="py-10 text-center text-sm text-muted">{t('Nessun dato in questo periodo.')}</p>
           ) : (
             <>
-              <div className="py-3"><Donut slices={items.map((i) => ({ color: i.color, value: i.total }))} center={formatMoney(total)} sub={type === 'expense' ? 'Uscite' : 'Entrate'} /></div>
+              <div className="py-3"><Donut slices={items.map((i) => ({ color: i.color, value: i.total }))} center={formatMoney(total)} sub={type === 'expense' ? t('Uscite') : t('Entrate')} /></div>
               <ul className="divide-y divide-line/60">
                 {items.map((i) => (
                   <li key={i.id}>
@@ -119,7 +116,7 @@ export function StatsPage() {
               </ul>
             </>
           )}
-          <p className="mt-2 text-center text-xs text-muted">Periodo: entrate {formatMoney(sum.income)} · uscite {formatMoney(sum.expense)} (trasferimenti esclusi)</p>
+          <p className="mt-2 text-center text-xs text-muted">{t('Periodo: entrate {inc} · uscite {exp} (trasferimenti esclusi)', { inc: formatMoney(sum.income), exp: formatMoney(sum.expense) })}</p>
         </div>
 
       </div>

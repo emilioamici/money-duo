@@ -3,6 +3,7 @@ import type { Transaction } from '../types'
 import { useApp } from '../store/AppProvider'
 import { isSplit } from '../lib/calc'
 import { addFavorite, copyOf, deleteFavorite, findFavorite } from '../lib/mutations'
+import { t } from '../i18n'
 
 /** Copia e preferiti: usati dal form di modifica e dallo swipe sulla riga. */
 export function useTxActions() {
@@ -24,9 +25,9 @@ export function TxFooterActions({ tx }: { tx: Transaction }) {
   const fav = !!favoriteOf(tx)
   return (
     <>
-      <button type="button" className="btn-soft !px-3" onClick={() => copy(tx)} aria-label="Copia transazione" title="Copia con la data di oggi"><Copy size={18} /></button>
+      <button type="button" className="btn-soft !px-3" onClick={() => copy(tx)} aria-label={t('Copia transazione')} title={t('Copia con la data di oggi')}><Copy size={18} /></button>
       <button type="button" className={`btn-soft !px-3 ${fav ? '!text-amber-500' : ''}`} onClick={() => toggleFavorite(tx)} aria-pressed={fav}
-        aria-label={fav ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'} title={fav ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}><Star size={18} fill={fav ? 'currentColor' : 'none'} /></button>
+        aria-label={fav ? t('Rimuovi dai preferiti') : t('Aggiungi ai preferiti')} title={fav ? t('Rimuovi dai preferiti') : t('Aggiungi ai preferiti')}><Star size={18} fill={fav ? 'currentColor' : 'none'} /></button>
     </>
   )
 }

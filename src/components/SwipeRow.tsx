@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { t } from '../i18n'
 
 export interface SwipeAction {
   label: string
@@ -80,7 +81,7 @@ export function SwipeRow({ actions, onTap, buttonClass, testId = 'swipe-row', ac
         <div className="absolute inset-y-0 right-0 flex" style={{ width: total }}>
           {actions.map((a) => (
             <button key={a.label} className={`flex flex-col items-center justify-center gap-1 text-[11px] font-semibold text-onbrand ${a.className}`} style={{ width: actionWidth }}
-              aria-label={a.ariaLabel ?? a.label} onClick={() => { setOffset(0); a.onClick() }}>{a.icon}{a.label}</button>
+              aria-label={t(a.ariaLabel ?? a.label)} onClick={() => { setOffset(0); a.onClick() }}>{a.icon}{t(a.label)}</button>
           ))}
         </div>
       )}

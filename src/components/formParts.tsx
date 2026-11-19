@@ -4,6 +4,7 @@ import type { Account } from '../types'
 import { useApp } from '../store/AppProvider'
 import { allTags, childCategories, normalizeTag, titleSuggestions, topCategories } from '../lib/calc'
 import { CatBubble, Sheet } from './ui'
+import { lang, t } from '../i18n'
 
 /** Riga del form in stile elenco: etichetta a sinistra, valore a destra, linea sottile sotto. */
 export function Row({ label, children, onClick }: { label: string; children: ReactNode; onClick?: () => void }) {
@@ -18,7 +19,7 @@ export function Row({ label, children, onClick }: { label: string; children: Rea
 }
 export const plain = 'w-full bg-transparent py-1.5 text-[15px] outline-none placeholder:text-muted/70'
 
-export const pctToInput = (bp: number) => (bp % 100 === 0 ? String(bp / 100) : (bp / 100).toFixed(2).replace('.', ','))
+export const pctToInput = (bp: number) => (bp % 100 === 0 ? String(bp / 100) : (bp / 100).toFixed(2).replace('.', lang() === 'en' ? '.' : ','))
 /** "33,33" -> 3333 (centesimi di punto); null se non valido */
 export const parsePercent = (s: string): number | null => {
   const t = s.trim().replace('%', '').replace(',', '.')
@@ -64,7 +65,7 @@ export function CategoryPicker({ type, value, onChange }: { type: 'expense' | 'i
 function CategorySheet({ type, value, onChange, onClose }: { type: 'expense' | 'income'; value: string | null; onChange: (id: string | null) => void; onClose: () => void }) {
   const { db } = useApp()
   return (
-    <Sheet open onClose={onClose} title="Categoria" footer={<button className="btn-primary w-full" onClick={onClose}>Fatto</button>}>
+    <Sheet open onClose={onClose} title={t('Categoria')} footer={<button className="btn-primary w-full" onClick={onClose}>{t('Fatto')}</button>}>
       <CategoryPicker type={type} value={value} onChange={(id) => {
         onChange(id)
         if (!id || childCategories(db, id).length === 0) onClose()
@@ -81,9 +82,9 @@ export function CategoryRow({ type, value, onChange }: { type: 'expense' | 'inco
   const parent = cat?.parentId ? db.categories.find((c) => c.id === cat.parentId) : undefined
   return (
     <>
-      <Row label="Categoria" onClick={() => setOpen(true)}>
+      <Row label={t('Categoria')} onClick={() => setOpen(true)}>
         <span className="flex items-center gap-2 py-1.5 text-[15px]">
-          {cat ? <><CatBubble icon={cat.icon} color={cat.color} size={24} /><span className="min-w-0 flex-1 truncate">{parent ? `${parent.name} › ${cat.name}` : cat.name}</span></> : <span className="flex-1 text-muted/70">Seleziona</span>}
+          {cat ? <><CatBubble icon={cat.icon} color={cat.color} size={24} /><span className="min-w-0 flex-1 truncate">{parent ? `${parent.name} › ${cat.name}` : cat.name}</span></> : <span className="flex-1 text-muted/70">{t('Seleziona')}</span>}
           <ChevronRight size={16} className="shrink-0 text-muted" />
         </span>
       </Row>
@@ -104,17 +105,17 @@ export function TagsRow({ value, onChange }: { value: string[]; onChange: (tags:
   }
   const suggestions = allTags(db).filter((g) => !has(g) && (!text || g.toLowerCase().includes(text.toLowerCase().replace(/^#/, '')))).slice(0, 8)
   return (
-    <Row label="Tag">
+    <Row label={t('Tag')}>
       <div className="flex flex-wrap items-center gap-1.5 py-1">
         {value.map((g) => (
           <span key={g} className="inline-flex items-center gap-1 rounded-full bg-brand/15 py-1 pl-2.5 pr-1.5 text-sm font-medium text-brand">
             #{g}
-            <button type="button" aria-label={`Rimuovi il tag ${g}`} className="rounded-full p-0.5 hover:bg-brand/20" onClick={() => onChange(value.filter((x) => x !== g))}><X size={13} /></button>
+            <button type="button" aria-label={t('Rimuovi il tag {g}', { g })} className="rounded-full p-0.5 hover:bg-brand/20" onClick={() => onChange(value.filter((x) => x !== g))}><X size={13} /></button>
           </span>
         ))}
         <span className="flex min-w-[7rem] flex-1 items-center gap-1">
           <Plus size={14} className="shrink-0 text-muted" />
-          <input className={plain} placeholder="Aggiungi un tag" aria-label="Aggiungi un tag" value={text} enterKeyHint="done"
+          <input className={plain} placeholder={t('Aggiungi un tag')} aria-label={t('Aggiungi un tag')} value={text} enterKeyHint="done"
             onChange={(e) => { const v = e.target.value; if (v.includes(',')) { v.split(',').forEach((p, i, a) => i < a.length - 1 && add(p)); setText(v.split(',').pop() ?? '') } else setText(v) }}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(text) } else if (e.key === 'Backspace' && !text && value.length) onChange(value.slice(0, -1)) }}
             onBlur={() => text.trim() && add(text)} />
@@ -130,7 +131,7 @@ export function TagsRow({ value, onChange }: { value: string[]; onChange: (tags:
 }
 
 export const accountLabel = (a: Account, nameOf: (id: string | null) => string) =>
-  `${a.name}${a.members.length === 1 ? ` · ${nameOf(a.members[0])}` : a.members.length === 0 ? ' · Famiglia' : ' · condiviso'}${a.hidden ? ' (nascosto)' : ''}`
+  `${a.name}${a.members.length === 1 ? ` · ${nameOf(a.members[0])}` : a.members.length === 0 ? ' · ' + t('Famiglia') : ' · ' + t('condiviso')}${a.hidden ? ' ' + t('(nascosto)') : ''}`
 
 /** Menu a tendina nativo (comodo su mobile) con la freccia, in stile "valore a destra". */
 export function SelectField({ value, onChange, options, ariaLabel, className = plain }: {
@@ -152,11 +153,11 @@ export function TitleRow({ value, onChange, placeholder }: { value: string; onCh
   const [focus, setFocus] = useState(false)
   const list = useMemo(() => (focus ? titleSuggestions(db, value) : []), [db, value, focus])
   return (
-    <Row label="Titolo">
-      <input className={plain} placeholder={placeholder} value={value} autoComplete="off" autoCapitalize="sentences" role="combobox" aria-expanded={list.length > 0} aria-autocomplete="list" aria-label="Titolo"
+    <Row label={t('Titolo')}>
+      <input className={plain} placeholder={placeholder} value={value} autoComplete="off" autoCapitalize="sentences" role="combobox" aria-expanded={list.length > 0} aria-autocomplete="list" aria-label={t('Titolo')}
         onChange={(e) => onChange(e.target.value)} onFocus={() => setFocus(true)} onBlur={() => setFocus(false)} />
       {list.length > 0 && (
-        <ul role="listbox" aria-label="Titoli già usati" className="mt-1 overflow-hidden rounded-xl border border-line bg-bg">
+        <ul role="listbox" aria-label={t('Titoli già usati')} className="mt-1 overflow-hidden rounded-xl border border-line bg-bg">
           {list.map((t) => (
             <li key={t} role="option" aria-selected={false}>
               <button type="button" className="block w-full truncate px-3 py-2 text-left text-[15px] hover:bg-line/50 active:bg-line/70"

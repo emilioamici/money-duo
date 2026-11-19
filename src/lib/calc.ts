@@ -1,4 +1,5 @@
 import type { Account, Category, CategoryType, Db, Member, MemberId, Payment, Transaction, TxType } from '../types'
+import { t as tr } from '../i18n'
 
 /** all = tutti i conti che vedo · shared = conti con più membri · altrimenti id di un membro */
 export type Scope = 'all' | 'shared' | MemberId
@@ -189,7 +190,7 @@ export function categoryBreakdown(db: Db, txs: Transaction[], type: CategoryType
     const key = parent?.id ?? 'none'
     let item = top.get(key)
     if (!item) {
-      item = { id: key, name: parent?.name ?? 'Senza categoria', icon: parent?.icon ?? '❔', color: parent?.color ?? '#94a3b8', total: 0, children: [] }
+      item = { id: key, name: parent?.name ?? tr('Senza categoria'), icon: parent?.icon ?? '❔', color: parent?.color ?? '#94a3b8', total: 0, children: [] }
       top.set(key, item)
     }
     item.total += t.amount

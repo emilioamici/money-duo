@@ -1,3 +1,4 @@
+import { t } from '../i18n'
 /** Wrapper minimale della Drive REST API v3. */
 
 const API = 'https://www.googleapis.com/drive/v3'
@@ -122,7 +123,7 @@ export async function createFolder(token: string, name: string, parentId: string
 }
 
 export async function folderName(token: string, id: string): Promise<string> {
-  if (id === 'root') return 'Il mio Drive'
+  if (id === 'root') return t('Il mio Drive')
   return ((await (await call(token, `${API}/files/${enc(id)}?fields=name&supportsAllDrives=true`)).json()) as { name: string }).name
 }
 

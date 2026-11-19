@@ -9,6 +9,7 @@ import { FilterSheet } from '../components/FilterSheet'
 import { MascotPeek } from '../components/Mascots'
 import { EmptyState } from '../components/ui'
 import { NotificationBell } from '../components/Notifications'
+import { t } from '../i18n'
 
 export function HomePage({ onOpenSync }: { onOpenSync: () => void }) {
   const { db, view, setView, openTx, me } = useApp()
@@ -26,37 +27,37 @@ export function HomePage({ onOpenSync }: { onOpenSync: () => void }) {
           <div className="flex items-center gap-2">
             <SyncChip onClick={onOpenSync} />
             <NotificationBell />
-            <button className="relative rounded-full p-2 hover:bg-line/60" aria-label="Filtri" onClick={() => setFiltering(true)}>
+            <button className="relative rounded-full p-2 hover:bg-line/60" aria-label={t('Filtri')} onClick={() => setFiltering(true)}>
               <SlidersHorizontal size={20} />
               {nFilters > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[10px] font-bold text-onbrand">{nFilters}</span>}
             </button>
-            <button className="rounded-full p-2 hover:bg-line/60" aria-label="Cerca" onClick={() => { setSearch((s) => !s); if (search) setView({ q: '' }) }}>{search ? <X size={20} /> : <Search size={20} />}</button>
+            <button className="rounded-full p-2 hover:bg-line/60" aria-label={t('Cerca')} onClick={() => { setSearch((s) => !s); if (search) setView({ q: '' }) }}>{search ? <X size={20} /> : <Search size={20} />}</button>
           </div>
         </div>
         <MonthNav />
-        {search && <input autoFocus className="input" placeholder="Cerca per titolo, nota, categoria, conto, importo…" value={view.q} onChange={(e) => setView({ q: e.target.value })} />}
+        {search && <input autoFocus className="input" placeholder={t('Cerca per titolo, nota, categoria, conto, importo…')} value={view.q} onChange={(e) => setView({ q: e.target.value })} />}
         <ScopeChips />
       </div>
 
       <div className="space-y-3 px-4">
         <MascotPeek kind="mochi">
           <div className="card grid grid-cols-3 divide-x divide-line/70 py-3 text-center">
-            <div><p className="text-[11px] font-semibold uppercase text-muted">Entrate</p><p className="font-bold text-inc tabular-nums">{formatMoney(sum.income)}</p></div>
-            <div><p className="text-[11px] font-semibold uppercase text-muted">Uscite</p><p className="font-bold text-exp tabular-nums">{formatMoney(sum.expense)}</p></div>
-            <div><p className="text-[11px] font-semibold uppercase text-muted">Bilancio</p><p className={`font-bold tabular-nums ${sum.balance < 0 ? 'text-exp' : ''}`}>{formatMoney(sum.balance)}</p></div>
+            <div><p className="text-[11px] font-semibold uppercase text-muted">{t('Entrate')}</p><p className="font-bold text-inc tabular-nums">{formatMoney(sum.income)}</p></div>
+            <div><p className="text-[11px] font-semibold uppercase text-muted">{t('Uscite')}</p><p className="font-bold text-exp tabular-nums">{formatMoney(sum.expense)}</p></div>
+            <div><p className="text-[11px] font-semibold uppercase text-muted">{t('Bilancio')}</p><p className={`font-bold tabular-nums ${sum.balance < 0 ? 'text-exp' : ''}`}>{formatMoney(sum.balance)}</p></div>
           </div>
         </MascotPeek>
 
         {nFilters > 0 && (
           <div className="flex items-center justify-between rounded-xl bg-brand/10 px-3 py-2 text-sm">
-            <button className="font-semibold text-brand" onClick={() => setFiltering(true)}>{nFilters} {nFilters === 1 ? 'filtro attivo' : 'filtri attivi'}</button>
-            <button className="font-semibold text-muted" onClick={() => setView({ filters: emptyFilters() })}>Azzera</button>
+            <button className="font-semibold text-brand" onClick={() => setFiltering(true)}>{nFilters === 1 ? t('1 filtro attivo') : t('{n} filtri attivi', { n: nFilters })}</button>
+            <button className="font-semibold text-muted" onClick={() => setView({ filters: emptyFilters() })}>{t('Azzera')}</button>
           </div>
         )}
 
         {txs.length === 0 ? (
-          <div className="card"><EmptyState icon={<Receipt size={28} />} title="Nessuna transazione" text={view.q || nFilters ? 'Nessun risultato per questa ricerca o questi filtri.' : 'Non ci sono movimenti in questo periodo.'}
-            action={<button className="btn-primary" onClick={() => openTx()}>Aggiungi transazione</button>} /></div>
+          <div className="card"><EmptyState icon={<Receipt size={28} />} title={t('Nessuna transazione')} text={view.q || nFilters ? t('Nessun risultato per questa ricerca o questi filtri.') : t('Non ci sono movimenti in questo periodo.')}
+            action={<button className="btn-primary" onClick={() => openTx()}>{t('Aggiungi transazione')}</button>} /></div>
         ) : <TxGroups txs={txs} />}
       </div>
       {filtering && <FilterSheet onClose={() => setFiltering(false)} />}

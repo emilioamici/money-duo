@@ -3,6 +3,7 @@
  * ottiene token Google freschi da sola, senza popup né tocchi. Qui si conserva solo un identificativo di sessione casuale.
  */
 import { pushUrl } from './push'
+import { t } from '../i18n'
 
 const SID_KEY = 'moneyduo:session'
 const HASH = 'moneyduo_session='
@@ -49,7 +50,7 @@ export async function refreshAccessToken(): Promise<Refreshed | null> {
   if (!sid || !pushUrl()) return null
   const r = await fetch(pushUrl() + '/auth/refresh', { method: 'POST', headers: { Authorization: `Bearer ${sid}` }, body: '{}' })
   if (r.status === 401) { clearSession(); throw new SessionExpired('Sessione scaduta') }
-  if (!r.ok) throw new Error('Server di accesso non raggiungibile')
+  if (!r.ok) throw new Error(t('Server di accesso non raggiungibile'))
   const j = (await r.json()) as { access_token: string; expires_in: number; email: string }
   return { token: j.access_token, expiresIn: j.expires_in, email: j.email }
 }

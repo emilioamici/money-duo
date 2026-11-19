@@ -137,3 +137,26 @@ describe('saldo in evidenza', () => {
     expect(headlineDebt(list, null)?.debt.amount).toBe(900)
   })
 })
+
+import { applyLang } from '../i18n'
+import { centsToInput, formatMoney, parseAmount } from './format'
+describe('formati in inglese', () => {
+  it('importi: punto decimale, virgola per le migliaia', () => {
+    applyLang('en')
+    try {
+      expect(formatMoney(123456)).toBe('€1,234.56')
+      expect(centsToInput(1250)).toBe('12.50')
+      expect(centsToInput(1000)).toBe('10')
+      expect(parseAmount('1,234.56')).toBe(123456)
+      expect(parseAmount('12.5')).toBe(1250)
+      expect(parseAmount('1,234')).toBe(123400)        // in inglese la virgola con tre cifre = migliaia
+      expect(parseAmount('12,50')).toBe(1250)          // virgola con due cifre = decimali anche in inglese
+    } finally { applyLang('it') }
+  })
+  it('in italiano resta come prima', () => {
+    expect(parseAmount('1.234,56')).toBe(123456)
+    expect(parseAmount('12,5')).toBe(1250)
+    expect(parseAmount('1,234')).toBe(123)               // italiano: la virgola è sempre decimale
+    expect(centsToInput(1250)).toBe('12,50')
+  })
+})

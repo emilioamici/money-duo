@@ -2,20 +2,20 @@ import { useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Wallet } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
 import { liquiditySeries } from '../lib/calc'
-import { formatMoney, formatSigned } from '../lib/format'
+import { formatMoney, formatSigned, monthLong, monthShort } from '../lib/format'
 import { Panel } from './Panel'
+import { lang, t } from '../i18n'
 
 const W = 340
 const H = 150
 const PAD = { l: 38, r: 14, t: 14, b: 22 }
-const MONTHS = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic']
-const MONTHS_LONG = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno', 'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre']
 
 /** 12.345 € -> "12K"; sotto i mille, intero. Solo per le etichette dell'asse. */
 const compact = (cents: number) => {
   const v = cents / 100
   const a = Math.abs(v)
-  return a >= 1000 ? `${(v / 1000).toFixed(a >= 10000 ? 0 : 1).replace('.', ',').replace(',0', '')}K` : String(Math.round(v))
+  const dec = lang() === 'en' ? '.' : ','
+  return a >= 1000 ? `${(v / 1000).toFixed(a >= 10000 ? 0 : 1).replace('.', dec).replace(dec + '0', '')}K` : String(Math.round(v))
 }
 
 /** Valori "tondi" per le tacche dell'asse verticale. */
@@ -75,22 +75,22 @@ export function LiquidityChart({ embedded = false }: { embedded?: boolean }) {
   const empty = filled.length === 0
 
   return (
-    <section className={embedded ? '' : 'card p-4'} aria-label={`Andamento della liquidità nel ${year}`}>
+    <section className={embedded ? '' : 'card p-4'} aria-label={t('Andamento della liquidità nel {year}', { year })}>
       <div className="mb-2 flex items-start justify-between gap-2">
         <div>
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Liquidità nel {year}</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">{t('Liquidità nel {year}', { year })}</h2>
           <p className="text-2xl font-extrabold tabular-nums">{last ? formatMoney(last.value) : formatMoney(series.start)}</p>
-          {!empty && <p className={`text-xs font-semibold ${delta < 0 ? 'text-exp' : 'text-inc'}`}>{formatSigned(delta)} <span className="font-normal text-muted">da inizio anno</span></p>}
+          {!empty && <p className={`text-xs font-semibold ${delta < 0 ? 'text-exp' : 'text-inc'}`}>{formatSigned(delta)} <span className="font-normal text-muted">{t('da inizio anno')}</span></p>}
         </div>
         <div className="flex items-center">
-          <button className="rounded-full p-1.5 hover:bg-line/60" aria-label="Anno precedente" onClick={() => goYear(-1)}><ChevronLeft size={18} /></button>
-          <button className="rounded-full p-1.5 hover:bg-line/60" aria-label="Anno successivo" onClick={() => goYear(1)}><ChevronRight size={18} /></button>
+          <button className="rounded-full p-1.5 hover:bg-line/60" aria-label={t('Anno precedente')} onClick={() => goYear(-1)}><ChevronLeft size={18} /></button>
+          <button className="rounded-full p-1.5 hover:bg-line/60" aria-label={t('Anno successivo')} onClick={() => goYear(1)}><ChevronRight size={18} /></button>
         </div>
       </div>
 
       <div ref={box} className="relative touch-pan-y select-none" onPointerMove={(e) => pick(e.clientX)} onPointerDown={(e) => pick(e.clientX)} onPointerLeave={(e) => e.pointerType === 'mouse' && setActive(null)}>
         <svg viewBox={`0 0 ${W} ${H}`} className="block w-full outline-none" role="img" tabIndex={0} onKeyDown={onKey} onBlur={() => setActive(null)}
-          aria-label={empty ? 'Nessun dato per questo anno' : `Liquidità da ${formatMoney(series.start)} a inizio anno a ${formatMoney(last.value)}`}>
+          aria-label={empty ? t('Nessun dato per questo anno') : t('Liquidità da {from} a inizio anno a {to}', { from: formatMoney(series.start), to: formatMoney(last.value) })}>
           {/* griglia e asse Y: tratto sottile pieno, in secondo piano */}
           {ticks.map((t) => (
             <g key={t}>
@@ -98,7 +98,7 @@ export function LiquidityChart({ embedded = false }: { embedded?: boolean }) {
               <text x={PAD.l - 6} y={y(t) + 3} textAnchor="end" fontSize="9" fill="rgb(var(--muted))">{compact(t)}</text>
             </g>
           ))}
-          {MONTHS.map((m, i) => <text key={m} x={x(i)} y={H - 6} textAnchor="middle" fontSize="9" fill="rgb(var(--muted))">{m.charAt(0)}</text>)}
+          {Array.from({ length: 12 }, (_, i) => monthShort(i)).map((m, i) => <text key={i} x={x(i)} y={H - 6} textAnchor="middle" fontSize="9" fill="rgb(var(--muted))">{m.charAt(0)}</text>)}
 
           {area && <path d={area} fill="rgb(var(--chart-line) / 0.1)" />}
           {filled.length > 1 && <path d={line} fill="none" stroke="rgb(var(--chart-line))" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />}
@@ -113,24 +113,24 @@ export function LiquidityChart({ embedded = false }: { embedded?: boolean }) {
         {shown && (
           <div className="pointer-events-none absolute top-0 z-10 w-40 rounded-xl border border-line bg-surface p-2.5 text-xs shadow-lg"
             style={{ left: `${Math.min(Math.max((x(shown.month) / W) * 100, 24), 76)}%`, transform: 'translateX(-50%)' }} role="status">
-            <p className="text-muted">{MONTHS_LONG[shown.month]} {year}{shown.month === last?.month && year === new Date().getFullYear() ? ' (oggi)' : ''}</p>
+            <p className="text-muted">{monthLong(shown.month)} {year}{shown.month === last?.month && year === new Date().getFullYear() ? ' ' + t('(oggi)') : ''}</p>
             <p className="mt-0.5 flex items-center gap-1.5"><span className="inline-block h-0.5 w-3 rounded-full" style={{ background: 'rgb(var(--chart-line))' }} /><b className="text-sm tabular-nums">{formatMoney(shown.value)}</b></p>
-            <p className="mt-0.5 text-muted">{formatSigned(shown.value - prevValue)} nel mese</p>
+            <p className="mt-0.5 text-muted">{formatSigned(shown.value - prevValue)} {t('nel mese')}</p>
           </div>
         )}
       </div>
 
       <details className="mt-2 text-xs">
-        <summary className="cursor-pointer text-muted">Mostra tabella</summary>
+        <summary className="cursor-pointer text-muted">{t('Mostra tabella')}</summary>
         <table className="mt-2 w-full text-left">
-          <thead><tr className="text-muted"><th className="py-1 font-medium">Mese</th><th className="py-1 text-right font-medium">Liquidità a fine mese</th></tr></thead>
+          <thead><tr className="text-muted"><th className="py-1 font-medium">{t('Mese')}</th><th className="py-1 text-right font-medium">{t('Liquidità a fine mese')}</th></tr></thead>
           <tbody>
-            <tr><td className="py-0.5">Inizio anno</td><td className="py-0.5 text-right tabular-nums">{formatMoney(series.start)}</td></tr>
-            {pts.map((p) => <tr key={p.month}><td className="py-0.5">{MONTHS_LONG[p.month]}</td><td className="py-0.5 text-right tabular-nums">{p.value === null ? '—' : formatMoney(p.value)}</td></tr>)}
+            <tr><td className="py-0.5">{t('Inizio anno')}</td><td className="py-0.5 text-right tabular-nums">{formatMoney(series.start)}</td></tr>
+            {pts.map((p) => <tr key={p.month}><td className="py-0.5">{monthLong(p.month)}</td><td className="py-0.5 text-right tabular-nums">{p.value === null ? '—' : formatMoney(p.value)}</td></tr>)}
           </tbody>
         </table>
       </details>
-      <p className="mt-2 text-[11px] text-muted">Conti che contano nel totale: visibili a te, non nascosti e non esclusi.</p>
+      <p className="mt-2 text-[11px] text-muted">{t('Conti che contano nel totale: visibili a te, non nascosti e non esclusi.')}</p>
     </section>
   )
 }
@@ -143,8 +143,8 @@ export function LiquidityPanel() {
   const now = filled.length ? filled[filled.length - 1].value : series.start
   const delta = now - series.start
   return (
-    <Panel id="liquidity" label="Liquidità" icon={<Wallet size={22} />} headline={formatMoney(now)}
-      sub={filled.length ? <><span className={`font-semibold ${delta < 0 ? 'text-exp' : 'text-inc'}`}>{formatSigned(delta)}</span> <span className="text-muted">da inizio anno</span></> : undefined}>
+    <Panel id="liquidity" label={t('Liquidità')} icon={<Wallet size={22} />} headline={formatMoney(now)}
+      sub={filled.length ? <><span className={`font-semibold ${delta < 0 ? 'text-exp' : 'text-inc'}`}>{formatSigned(delta)}</span> <span className="text-muted">{t('da inizio anno')}</span></> : undefined}>
       <LiquidityChart embedded />
     </Panel>
   )

@@ -5,6 +5,7 @@ import { useApp } from '../store/AppProvider'
 import { allTags, childCategories, countFilters, emptyFilters, filterTransactions, periodRange, sortedAccounts, topCategories, visibleTo, type TxFilters } from '../lib/calc'
 import { centsToInput, parseAmount } from '../lib/format'
 import { Sheet, Toggle } from './ui'
+import { t } from '../i18n'
 
 const TYPES: Array<[TxType, string]> = [['expense', 'Uscite'], ['income', 'Entrate'], ['transfer', 'Trasferimenti']]
 
@@ -43,37 +44,37 @@ export function FilterSheet({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Sheet open onClose={onClose} title="Filtri"
+    <Sheet open onClose={onClose} title={t('Filtri')}
       footer={
         <div className="flex gap-2">
-          <button className="btn-soft" disabled={!countFilters(f)} onClick={() => { setView({ filters: emptyFilters() }); setMin(''); setMax('') }}>Azzera</button>
-          <button className="btn-primary flex-1" onClick={onClose}>Mostra {n} {n === 1 ? 'transazione' : 'transazioni'}</button>
+          <button className="btn-soft" disabled={!countFilters(f)} onClick={() => { setView({ filters: emptyFilters() }); setMin(''); setMax('') }}>{t('Azzera')}</button>
+          <button className="btn-primary flex-1" onClick={onClose}>{n === 1 ? t('Mostra 1 transazione') : t('Mostra {n} transazioni', { n })}</button>
         </div>
       }>
-      <Group title="Tipo" count={f.types.length ? f.types.length : undefined} open>
+      <Group title={t('Tipo')} count={f.types.length ? f.types.length : undefined} open>
         <div className="flex flex-wrap gap-2">
-          {TYPES.map(([t, label]) => <button key={t} type="button" className={`chip ${f.types.includes(t) ? 'chip-on' : ''}`} aria-pressed={f.types.includes(t)} onClick={() => set({ types: toggle(f.types, t) })}>{label}</button>)}
+          {TYPES.map(([ty, label]) => <button key={ty} type="button" className={`chip ${f.types.includes(ty) ? 'chip-on' : ''}`} aria-pressed={f.types.includes(ty)} onClick={() => set({ types: toggle(f.types, ty) })}>{t(label)}</button>)}
         </div>
       </Group>
 
-      <Group title="Conti" count={f.accountIds.length || undefined}>
+      <Group title={t('Conti')} count={f.accountIds.length || undefined}>
         <div className="flex flex-wrap gap-2">
           {accounts.map((a) => <button key={a.id} type="button" className={`chip ${f.accountIds.includes(a.id) ? 'chip-on' : ''}`} aria-pressed={f.accountIds.includes(a.id)} onClick={() => set({ accountIds: toggle(f.accountIds, a.id) })}>{a.name}</button>)}
         </div>
       </Group>
 
-      <Group title="Importo" count={f.min !== null || f.max !== null ? 1 : undefined}>
+      <Group title={t('Importo')} count={f.min !== null || f.max !== null ? 1 : undefined}>
         <div className="flex items-center gap-2">
-          <input className="input" inputMode="decimal" placeholder="Min €" aria-label="Importo minimo" value={min} onChange={(e) => amount(e.target.value, 'min')} />
+          <input className="input" inputMode="decimal" placeholder={t('Min €')} aria-label={t('Importo minimo')} value={min} onChange={(e) => amount(e.target.value, 'min')} />
           <span className="text-muted">–</span>
-          <input className="input" inputMode="decimal" placeholder="Max €" aria-label="Importo massimo" value={max} onChange={(e) => amount(e.target.value, 'max')} />
+          <input className="input" inputMode="decimal" placeholder={t('Max €')} aria-label={t('Importo massimo')} value={max} onChange={(e) => amount(e.target.value, 'max')} />
         </div>
       </Group>
 
-      <Group title="Categorie" count={f.categoryIds.length || undefined}>
+      <Group title={t('Categorie')} count={f.categoryIds.length || undefined}>
         {(['expense', 'income'] as const).map((type) => (
           <div key={type} className="mb-3">
-            <p className="label">{type === 'expense' ? 'Uscite' : 'Entrate'}</p>
+            <p className="label">{type === 'expense' ? t('Uscite') : t('Entrate')}</p>
             <div className="flex flex-wrap gap-2">
               {topCategories(db, type).map((c) => {
                 const subs = childCategories(db, c.id)
@@ -88,18 +89,18 @@ export function FilterSheet({ onClose }: { onClose: () => void }) {
             </div>
           </div>
         ))}
-        <p className="text-xs text-muted">Scegliendo una categoria principale sono incluse le sue sottocategorie.</p>
+        <p className="text-xs text-muted">{t('Scegliendo una categoria principale sono incluse le sue sottocategorie.')}</p>
       </Group>
 
       {tags.length > 0 && (
-        <Group title="Tag" count={f.tags.length || undefined}>
+        <Group title={t('Tag')} count={f.tags.length || undefined}>
           <div className="flex flex-wrap gap-2">
             {tags.map((g) => <button key={g} type="button" className={`chip ${f.tags.includes(g) ? 'chip-on' : ''}`} aria-pressed={f.tags.includes(g)} onClick={() => set({ tags: toggle(f.tags, g) })}>#{g}</button>)}
           </div>
         </Group>
       )}
 
-      <div className="pt-3"><Toggle checked={f.splitOnly} onChange={(v) => set({ splitOnly: v })} label="Solo spese condivise (split)" /></div>
+      <div className="pt-3"><Toggle checked={f.splitOnly} onChange={(v) => set({ splitOnly: v })} label={t('Solo spese condivise (split)')} /></div>
     </Sheet>
   )
 }

@@ -1,10 +1,11 @@
+import { t } from '../i18n'
 export function Donut({ slices, center, sub }: { slices: Array<{ color: string; value: number }>; center: string; sub: string }) {
   const total = slices.reduce((s, x) => s + x.value, 0)
   const r = 60
   const c = 2 * Math.PI * r
   let offset = 0
   return (
-    <svg viewBox="0 0 160 160" className="mx-auto h-52 w-52" role="img" aria-label="Ripartizione per categoria">
+    <svg viewBox="0 0 160 160" className="mx-auto h-52 w-52" role="img" aria-label={t('Ripartizione per categoria')}>
       <circle cx="80" cy="80" r={r} fill="none" stroke="rgb(var(--line))" strokeWidth="22" />
       {total > 0 && slices.map((s, i) => {
         const len = (s.value / total) * c
