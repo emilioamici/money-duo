@@ -2,6 +2,7 @@ import type { Db } from '../types'
 import { createFamilyDb, isPristine } from '../lib/defaults'
 import { mergeDb, parseDb, sameData } from '../lib/merge'
 import { nowIso } from '../lib/ids'
+import type { CacheState } from '../store/cache'
 import * as drive from './drive'
 import { DriveError } from './drive'
 import { GoogleAuthError, cachedToken, clearToken, requestToken, revokeToken, tokenRemainingMs, type Prompt } from './google'
@@ -42,6 +43,8 @@ export interface SyncState extends Persisted {
   error: string | null
   clientId: string
   signedIn: boolean
+  /** i dati locali sono stati allineati a Drive in questa sessione (false = la copia locale non è affidabile: niente invii) */
+  reconciled: boolean
 }
 
 export interface SyncHost {
@@ -83,6 +86,9 @@ export class SyncEngine {
   private dirtySeq = 0
   private started = false
   private renewing = false
+  private reconciled = true
+  /** come riallineare la copia locale alla prossima lettura di Drive: 'replace' = la copia manca, si adotta Drive; 'merge' = copia datata, si unisce */
+  private pullMode: 'merge' | 'replace' = 'merge'
   private lastRenewTry = 0
 
   constructor() {
@@ -98,7 +104,7 @@ export class SyncEngine {
   getSnapshot = (): SyncState => this.snapshot
 
   private rebuild(): void {
-    this.snapshot = { ...this.p, status: this.status, error: this.error, clientId: this.clientId, signedIn: !!cachedToken() }
+    this.snapshot = { ...this.p, status: this.status, error: this.error, clientId: this.clientId, signedIn: !!cachedToken(), reconciled: this.reconciled }
     this.listeners.forEach((l) => l())
   }
   private persist(): void {
@@ -122,6 +128,22 @@ export class SyncEngine {
     // il rinnovo silenzioso del token va chiesto durante un gesto dell'utente, altrimenti il browser blocca il popup
     document.addEventListener('pointerdown', () => void this.renewIfNeeded(), { capture: true, passive: true })
     void this.syncNow()
+  }
+
+  /**
+   * Da chiamare all'avvio con lo stato della copia locale. Se la copia manca o non corrisponde all'ultima versione di Drive
+   * si dimentica la versione ricordata, così il prossimo ciclo RILEGGE Drive; finché non è fatto non si invia nulla.
+   * (Prima si saltava la lettura quando la versione coincideva, e una copia vuota poteva sovrascrivere Drive.)
+   */
+  checkCache(state: CacheState): void {
+    if (!this.p.fileId) { this.reconciled = true; return this.rebuild() }
+    if (state === 'ok') { this.reconciled = true; return this.rebuild() }
+    this.reconciled = false
+    this.pullMode = state === 'missing' ? 'replace' : 'merge'
+    this.p.remoteVersion = null
+    if (state === 'missing') this.p.dirty = false // le modifiche locali non inviate stavano nella copia persa
+    this.persist()
+    this.rebuild()
   }
 
   setClientId(id: string): void {
@@ -201,6 +223,7 @@ export class SyncEngine {
     const f = await drive.createFile(token, JSON.stringify(db), `moneyduo-db-${slug}.json`, opts.folderId)
     // si riapplicano solo i metadati: eventuali modifiche fatte durante l'upload non vanno perse
     this.host!.applyDb((prev) => (isPristine(prev) ? db : { ...prev, family: db.family, meta: db.meta }), false)
+    this.reconciled = true
     this.p = { ...this.p, fileId: f.id, fileName: f.name, ownerEmail: this.p.email, canShare: true, remoteVersion: f.version, lastSyncAt: nowIso(), dirty: false }
     this.persist()
     this.set('synced')
@@ -218,6 +241,7 @@ export class SyncEngine {
   async link(file: drive.DriveFile, remote: Db, mode: 'merge' | 'replace'): Promise<void> {
     // replace: si adotta il file Drive così com'è (i dati locali non ancora sincronizzati vengono scartati)
     this.host!.applyDb((prev) => (mode === 'merge' ? mergeDb(prev, remote) : remote), false)
+    this.reconciled = true
     this.p = { ...this.p, fileId: file.id, fileName: file.name, ownerEmail: file.owners?.[0]?.emailAddress ?? null, canShare: !!(file.ownedByMe || file.capabilities?.canShare), remoteVersion: file.version, lastSyncAt: nowIso(), dirty: mode === 'merge' }
     this.persist()
     this.set(mode === 'merge' ? 'pending' : 'synced')
@@ -298,12 +322,20 @@ export class SyncEngine {
       if (owner !== this.p.ownerEmail || canShare !== this.p.canShare) { this.p.ownerEmail = owner; this.p.canShare = canShare; this.persist() }
       let needPush = this.p.dirty
 
-      if (meta.version !== this.p.remoteVersion) {
+      // si legge Drive se la versione è cambiata OPPURE se la copia locale non è affidabile (versione dimenticata)
+      if (this.p.remoteVersion === null || meta.version !== this.p.remoteVersion) {
         const remote = parseDb(await drive.download(token, id))
-        let merged = this.host.getDb()
-        this.host.applyDb((prev) => (merged = mergeDb(prev, remote)), false, 'remote')
-        if (!sameData(merged, remote)) needPush = true
+        if (this.pullMode === 'replace') {
+          this.host.applyDb(() => remote, false) // copia persa: si adotta Drive così com'è (senza notifiche)
+        } else {
+          let merged = this.host.getDb()
+          this.host.applyDb((prev) => (merged = mergeDb(prev, remote)), false, 'remote')
+          if (!sameData(merged, remote)) needPush = true
+        }
+        this.pullMode = 'merge'
+        this.reconciled = true
       }
+      if (!this.reconciled) throw new Error('Copia locale non allineata a Drive: invio annullato per non sovrascrivere i dati.')
 
       if (needPush) {
         const seq = this.dirtySeq

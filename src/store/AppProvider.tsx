@@ -3,24 +3,11 @@ import type { Db, Member, Transaction } from '../types'
 import type { Scope } from '../lib/calc'
 import { createDefaultDb } from '../lib/defaults'
 import { nowIso } from '../lib/ids'
-import { parseDb } from '../lib/merge'
 import { diffNotifications, mergeNotifications, type Notif } from '../lib/notifications'
 import { engine, type SyncState } from '../sync/engine'
+import { cacheState, getCacheHealth, getLoadedCache, subscribeCacheHealth, writeCache } from './cache'
 
-const DB_KEY = 'moneyduo:db:v1'
 const PREFS_KEY = 'moneyduo:prefs'
-
-function loadDb(): Db {
-  try {
-    const raw = localStorage.getItem(DB_KEY)
-    if (raw) return parseDb(JSON.parse(raw))
-  } catch { /* cache corrotta: si riparte dai dati neutri */ }
-  return createDefaultDb()
-}
-
-function saveDb(db: Db): void {
-  try { localStorage.setItem(DB_KEY, JSON.stringify(db)) } catch { /* quota / storage non disponibile */ }
-}
 
 export interface View {
   month: Date
@@ -69,6 +56,8 @@ interface AppCtx {
   dismissToast: () => void
   centerOpen: boolean
   setCenterOpen: (open: boolean) => void
+  /** false = non riesco a salvare la copia locale */
+  cacheOk: boolean
 }
 
 const NOTIF_PREFIX = 'moneyduo:notifs:'
@@ -92,7 +81,12 @@ const Ctx = createContext<AppCtx | null>(null)
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const dbRef = useRef<Db>(null as unknown as Db)
-  if (!dbRef.current) dbRef.current = loadDb()
+  if (!dbRef.current) {
+    const cached = getLoadedCache()
+    dbRef.current = cached.db ?? createDefaultDb()
+    // se la copia locale manca o è datata, il motore rilegge Drive prima di inviare qualsiasi cosa
+    engine.checkCache(cacheState(engine.getSnapshot().remoteVersion))
+  }
   // anche il DB è un "external store": così si aggiorna in modo sincrono insieme allo stato di sync (niente render con dati vecchi)
   const listeners = useRef(new Set<() => void>())
   const subscribeDb = useCallback((l: () => void) => { listeners.current.add(l); return () => { listeners.current.delete(l) } }, [])
@@ -107,7 +101,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (next === prev) return
     dbRef.current = next
     listeners.current.forEach((l) => l())
-    saveDb(next)
+    writeCache(next, engine.getSnapshot().remoteVersion)
     if (dirty) engine.markDirty()
     if (source === 'remote') onRemote.current(prev, next) // dati arrivati da altri: possibili notifiche
   }, [])
@@ -123,6 +117,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const resetLocal = useCallback(() => { engine.unlink(); apply(() => createDefaultDb(), false) }, [apply])
 
   const sync = useSyncExternalStore(engine.subscribe, engine.getSnapshot)
+  const cacheOk = useSyncExternalStore(subscribeCacheHealth, getCacheHealth)
+  // quando cambia la versione di Drive a cui corrisponde la copia, si aggiorna anche la copia
+  const lastVersion = useRef<string | null>(sync.remoteVersion)
+  useEffect(() => {
+    if (sync.remoteVersion !== lastVersion.current) { lastVersion.current = sync.remoteVersion; writeCache(dbRef.current, sync.remoteVersion) }
+  }, [sync.remoteVersion])
 
   const [view, setViewState] = useState<View>({ month: new Date(), scope: 'all', accountId: 'all', q: '' })
   const setView = useCallback((p: Partial<View>) => setViewState((v) => ({ ...v, ...p })), [])
@@ -183,8 +183,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const unread = useMemo(() => notifications.filter((n) => !n.read).length, [notifications])
 
   const value = useMemo<AppCtx>(
-    () => ({ db, commit, resetLocal, sync, view, setView, txForm, openTx, openSplit, closeTx, prefs, setPrefs, me, members, nameOf, notifications, unread, markRead, markAllRead, clearNotifications, toast, dismissToast, centerOpen, setCenterOpen }),
-    [db, commit, resetLocal, sync, view, setView, txForm, openTx, openSplit, closeTx, prefs, setPrefs, me, members, nameOf, notifications, unread, markRead, markAllRead, clearNotifications, toast, dismissToast, centerOpen],
+    () => ({ db, commit, resetLocal, sync, view, setView, txForm, openTx, openSplit, closeTx, prefs, setPrefs, me, members, nameOf, notifications, unread, markRead, markAllRead, clearNotifications, toast, dismissToast, centerOpen, setCenterOpen, cacheOk }),
+    [db, commit, resetLocal, sync, view, setView, txForm, openTx, openSplit, closeTx, prefs, setPrefs, me, members, nameOf, notifications, unread, markRead, markAllRead, clearNotifications, toast, dismissToast, centerOpen, cacheOk],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
