@@ -1,23 +1,24 @@
 import { useMemo, useState } from 'react'
 import { Eye, EyeOff, Plus, Wallet } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
-import { accountBalances, sortedAccounts, totalLiquidity } from '../lib/calc'
+import { accountBalances, isSharedAccount, sortedAccounts, totalLiquidity, visibleTo } from '../lib/calc'
 import { formatMoney } from '../lib/format'
 import { setAccountHidden } from '../lib/mutations'
 import { AccountForm, GROUP_LABEL } from '../components/AccountForm'
-import { EmptyState, OwnerBadge, Toggle } from '../components/ui'
-import type { Account, AccountGroup, ProfileId } from '../types'
+import { EmptyState, MembersBadge, Toggle } from '../components/ui'
+import type { Account, AccountGroup } from '../types'
 
 const GROUP_ORDER: AccountGroup[] = ['cash', 'bank', 'card', 'savings', 'investment', 'other']
 
 export function AccountsPage() {
-  const { db, commit, names } = useApp()
+  const { db, commit, me, members } = useApp()
   const [showHidden, setShowHidden] = useState(false)
   const [form, setForm] = useState<{ account?: Account } | null>(null)
   const bal = useMemo(() => accountBalances(db), [db])
-  const total = totalLiquidity(db, bal)
-  const list = sortedAccounts(db).filter((a) => showHidden || !a.hidden)
-  const hiddenCount = db.accounts.filter((a) => a.hidden).length
+  const mine = (a: Account) => visibleTo(db, a, me?.id ?? null)
+  const total = totalLiquidity(db, bal, mine)
+  const list = sortedAccounts(db).filter((a) => mine(a) && (showHidden || !a.hidden))
+  const hiddenCount = db.accounts.filter((a) => a.hidden && mine(a)).length
 
   return (
     <div>
@@ -26,15 +27,19 @@ export function AccountsPage() {
         <div className="card p-4">
           <p className="text-xs font-semibold uppercase text-muted">Liquidità totale</p>
           <p className={`text-3xl font-extrabold tabular-nums ${total < 0 ? 'text-exp' : ''}`}>{formatMoney(total)}</p>
-          <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-            {(['a', 'b', 'shared'] as ProfileId[]).map((p) => (
-              <div key={p} className="rounded-xl bg-bg py-2">
-                <p className="truncate px-1 text-[11px] font-semibold text-muted">{names[p]}</p>
-                <p className="text-sm font-bold tabular-nums">{formatMoney(totalLiquidity(db, bal, p))}</p>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-center sm:grid-cols-3">
+            <div className="rounded-xl bg-bg py-2">
+              <p className="truncate px-1 text-[11px] font-semibold text-muted">Condivisi</p>
+              <p className="text-sm font-bold tabular-nums">{formatMoney(totalLiquidity(db, bal, (a) => mine(a) && isSharedAccount(db, a)))}</p>
+            </div>
+            {members.map((m) => (
+              <div key={m.id} className="rounded-xl bg-bg py-2">
+                <p className="truncate px-1 text-[11px] font-semibold text-muted">{m.name}</p>
+                <p className="text-sm font-bold tabular-nums">{formatMoney(totalLiquidity(db, bal, (a) => mine(a) && a.members.length === 1 && a.members[0] === m.id))}</p>
               </div>
             ))}
           </div>
-          <p className="mt-2 text-xs text-muted">Esclusi dal totale: conti nascosti e conti marcati come investimenti/fondi vincolati.</p>
+          <p className="mt-2 text-xs text-muted">Conti personali per membro; esclusi dal totale: conti nascosti e conti marcati come investimenti/fondi vincolati. Vedi solo i conti tuoi o condivisi con te.</p>
         </div>
 
         {list.length === 0 && <div className="card"><EmptyState icon={<Wallet size={28} />} title="Nessun conto" text="Aggiungi il tuo primo conto." /></div>}
@@ -51,7 +56,7 @@ export function AccountsPage() {
                     <button className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left" onClick={() => setForm({ account: a })}>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-semibold">{a.name}</span>
-                        <span className="mt-0.5 flex items-center gap-1.5"><OwnerBadge owner={a.owner} />{a.excludeFromTotal && <span className="text-[11px] text-muted">fuori dal totale</span>}</span>
+                        <span className="mt-0.5 flex items-center gap-1.5"><MembersBadge ids={a.members} />{a.excludeFromTotal && <span className="text-[11px] text-muted">fuori dal totale</span>}</span>
                       </span>
                       <span className={`font-bold tabular-nums ${(bal[a.id] ?? 0) < 0 ? 'text-exp' : ''}`}>{formatMoney(bal[a.id] ?? 0)}</span>
                     </button>

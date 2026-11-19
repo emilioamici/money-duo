@@ -1,19 +1,27 @@
-/** Schema del database condiviso (file JSON su Google Drive + cache locale). */
+/** Schema del database di famiglia (file JSON su Google Drive + cache locale). */
 
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 
-/** a = primo profilo, b = secondo profilo, shared = area in comune */
-export type ProfileId = 'a' | 'b' | 'shared'
+export type MemberId = string
 export type TxType = 'expense' | 'income' | 'transfer'
-/** personal = spesa solo mia · equal = 50/50 con l'altro · advance = anticipata al 100% per l'altro */
-export type SplitMode = 'personal' | 'equal' | 'advance'
 export type AccountGroup = 'cash' | 'bank' | 'card' | 'savings' | 'investment' | 'other'
 export type CategoryType = 'expense' | 'income'
 
-export interface Profiles {
-  a: string
-  b: string
-  shared: string
+export interface Family {
+  name: string
+  updatedAt: string
+}
+
+export interface Member {
+  id: MemberId
+  name: string
+  /** account Google con cui la persona accede; null finché non è stato associato */
+  email: string | null
+  color: string
+  /** false = rimosso dalla famiglia (resta nello storico) */
+  active: boolean
+  /** quando la persona ha aperto l'app per la prima volta (null = solo invitata) */
+  joinedAt: string | null
   updatedAt: string
 }
 
@@ -21,7 +29,8 @@ export interface Account {
   id: string
   name: string
   group: AccountGroup
-  owner: ProfileId
+  /** membri che vedono e usano il conto; [] = tutta la famiglia. Un solo membro = conto personale */
+  members: MemberId[]
   /** centesimi (può essere negativo) */
   initialBalance: number
   /** escluso dal totale liquidità (investimenti, fondi vincolati…) */
@@ -58,8 +67,10 @@ export interface Transaction {
   categoryId: string | null
   title: string
   note: string
-  paidBy: ProfileId
-  split: SplitMode
+  /** chi ha pagato/incassato; null = conto condiviso (nessun debito tra membri) */
+  paidBy: MemberId | null
+  /** membri che si dividono la spesa in parti uguali; [] = spesa personale */
+  participants: MemberId[]
   createdAt: string
   updatedAt: string
 }
@@ -76,7 +87,8 @@ export interface DbMeta {
 export interface Db {
   schemaVersion: number
   meta: DbMeta
-  profiles: Profiles
+  family: Family
+  members: Member[]
   accounts: Account[]
   categories: Category[]
   transactions: Transaction[]

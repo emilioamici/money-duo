@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ChevronDown, Handshake } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
-import { categoryBreakdown, coupleBalance, filterTransactions, monthRange, sortedAccounts, summarize } from '../lib/calc'
+import { categoryBreakdown, familyBalances, filterTransactions, monthRange, sortedAccounts, summarize, type Debt } from '../lib/calc'
 import { formatMoney } from '../lib/format'
 import { MonthNav, ScopeChips } from '../components/Nav'
 import { Donut } from '../components/Donut'
@@ -9,32 +9,39 @@ import { CatBubble, Segmented } from '../components/ui'
 import type { CategoryType } from '../types'
 
 export function StatsPage() {
-  const { db, view, names, openTx } = useApp()
+  const { db, view, nameOf, openTx, me } = useApp()
   const [type, setType] = useState<CategoryType>('expense')
   const [open, setOpen] = useState<string | null>(null)
   const { from, to } = monthRange(view.month)
-  const txs = useMemo(() => filterTransactions(db, { from, to, scope: view.scope, accountId: view.accountId, q: '' }), [db, view.scope, view.accountId, from.getTime()]) // eslint-disable-line react-hooks/exhaustive-deps
+  const txs = useMemo(() => filterTransactions(db, { from, to, scope: view.scope, accountId: view.accountId, q: '', me: me?.id ?? null }), [db, view.scope, view.accountId, me, from.getTime()]) // eslint-disable-line react-hooks/exhaustive-deps
   const items = useMemo(() => categoryBreakdown(db, txs, type), [db, txs, type])
   const total = items.reduce((s, i) => s + i.total, 0)
   const sum = summarize(txs)
 
-  // bilancio di coppia: sempre su tutte le transazioni (ignora il filtro ambito), mese e totale
-  const all = (f: Date | null, t: Date | null) => db.transactions.filter((x) => (!f || new Date(x.date) >= f) && (!t || new Date(x.date) < t))
-  const monthNet = coupleBalance(db, all(from, to))
-  const totalNet = coupleBalance(db, all(null, null))
+  // saldi tra membri: su tutte le transazioni (ignora il filtro d'ambito), del mese e complessivi
+  const monthDebts = useMemo(() => familyBalances(db, db.transactions.filter((x) => { const d = new Date(x.date); return d >= from && d < to })), [db, from.getTime()]) // eslint-disable-line react-hooks/exhaustive-deps
+  const totalDebts = useMemo(() => familyBalances(db, db.transactions), [db])
 
-  const line = (net: number) => net === 0 ? 'Siete in pari' : net > 0 ? `${names.b} deve a ${names.a}` : `${names.a} deve a ${names.b}`
-
-  const settle = () => {
-    if (totalNet === 0) return
-    const debtor = totalNet > 0 ? 'b' : 'a'
-    const creditor = totalNet > 0 ? 'a' : 'b'
+  const settle = (d: Debt) => {
     const accs = sortedAccounts(db).filter((a) => !a.hidden)
-    openTx({ initial: {
-      type: 'transfer', amount: Math.abs(totalNet), title: 'Rimborso spese di coppia',
-      accountId: accs.find((a) => a.owner === debtor)?.id ?? accs[0]?.id, toAccountId: accs.find((a) => a.owner === creditor)?.id ?? null,
-    } })
+    const personal = (id: string) => accs.find((a) => a.members.length === 1 && a.members[0] === id) ?? accs.find((a) => a.members.includes(id))
+    openTx({ initial: { type: 'transfer', amount: d.amount, title: 'Rimborso spese', accountId: personal(d.debtor)?.id, toAccountId: personal(d.creditor)?.id ?? null } })
   }
+
+  const DebtList = ({ list, actions }: { list: Debt[]; actions?: boolean }) =>
+    list.length === 0 ? <p className="py-2 text-sm text-muted">Siete in pari</p> : (
+      <ul className="space-y-2">
+        {[...list].sort((a, b) => Number(b.debtor === me?.id || b.creditor === me?.id) - Number(a.debtor === me?.id || a.creditor === me?.id)).map((d) => (
+          <li key={d.debtor + d.creditor} className="flex items-center justify-between gap-2 rounded-xl bg-bg px-3 py-2 text-sm">
+            <span><b>{nameOf(d.debtor)}</b> deve a <b>{nameOf(d.creditor)}</b></span>
+            <span className="flex items-center gap-2">
+              <b className="tabular-nums">{formatMoney(d.amount)}</b>
+              {actions && <button className="btn-soft !px-2.5 !py-1 !text-xs" onClick={() => settle(d)}>Rimborsa</button>}
+            </span>
+          </li>
+        ))}
+      </ul>
+    )
 
   return (
     <div>
@@ -79,18 +86,12 @@ export function StatsPage() {
         </div>
 
         <div className="card p-4">
-          <div className="mb-3 flex items-center gap-2 font-bold"><Handshake size={20} className="text-brand" />Bilancio di coppia</div>
-          <div className="grid grid-cols-2 gap-3 text-center">
-            {[['Questo mese', monthNet], ['Complessivo', totalNet]].map(([l, n]) => (
-              <div key={l as string} className="rounded-xl bg-bg p-3">
-                <p className="text-[11px] font-semibold uppercase text-muted">{l as string}</p>
-                <p className="mt-1 text-lg font-extrabold tabular-nums">{formatMoney(Math.abs(n as number))}</p>
-                <p className="text-xs text-muted">{line(n as number)}</p>
-              </div>
-            ))}
-          </div>
-          <p className="mt-3 text-xs text-muted">Calcolato sulle spese pagate da una persona con divisione 50/50 o anticipata; i giroconti tra conti dei due profili contano come rimborsi.</p>
-          {totalNet !== 0 && <button className="btn-soft mt-3 w-full" onClick={settle}>Registra rimborso ({formatMoney(Math.abs(totalNet))})</button>}
+          <div className="mb-3 flex items-center gap-2 font-bold"><Handshake size={20} className="text-brand" />Saldi tra i membri</div>
+          <p className="mb-1 text-[11px] font-semibold uppercase text-muted">Questo mese</p>
+          <DebtList list={monthDebts} />
+          <p className="mb-1 mt-4 text-[11px] font-semibold uppercase text-muted">Complessivo</p>
+          <DebtList list={totalDebts} actions />
+          <p className="mt-3 text-xs text-muted">Calcolato sulle spese pagate da un membro e divise con altri; i giroconti tra conti personali di membri diversi contano come rimborsi. Le spese pagate dal «conto condiviso» non generano debiti.</p>
         </div>
       </div>
     </div>

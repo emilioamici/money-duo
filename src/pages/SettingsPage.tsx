@@ -2,10 +2,9 @@ import { useRef, useState } from 'react'
 import { ChevronRight, Download, RotateCcw, ShieldCheck, Tags, Upload } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
 import { SyncCard } from '../components/SyncCard'
-import { Field } from '../components/ui'
+import { FamilyCard } from '../components/FamilyCard'
 import { ask } from '../components/dialogs'
 import { CategoriesPage } from './CategoriesPage'
-import { saveProfiles } from '../lib/mutations'
 import { mergeDb, parseDb, replaceData } from '../lib/merge'
 
 export function SettingsPage({ syncRef }: { syncRef: React.RefObject<HTMLDivElement> }) {
@@ -15,8 +14,6 @@ export function SettingsPage({ syncRef }: { syncRef: React.RefObject<HTMLDivElem
   const file = useRef<HTMLInputElement>(null)
 
   if (sub === 'cats') return <CategoriesPage onBack={() => setSub(null)} />
-
-  const setName = (k: 'a' | 'b' | 'shared', v: string) => commit((d) => saveProfiles(d, { a: d.profiles.a, b: d.profiles.b, shared: d.profiles.shared, [k]: v }))
 
   const exportJson = () => {
     const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' })
@@ -51,12 +48,7 @@ export function SettingsPage({ syncRef }: { syncRef: React.RefObject<HTMLDivElem
     <div>
       <div className="px-4 pb-3 pt-safe"><h1 className="pt-3 text-xl font-extrabold tracking-tight">Impostazioni</h1></div>
       <div className="space-y-4 px-4">
-        <section className="card p-4">
-          <h2 className="mb-3 font-bold">Profili</h2>
-          <Field label="Primo profilo"><input className="input" value={db.profiles.a} onChange={(e) => setName('a', e.target.value)} /></Field>
-          <Field label="Secondo profilo"><input className="input" value={db.profiles.b} onChange={(e) => setName('b', e.target.value)} /></Field>
-          <Field label="Area condivisa"><input className="input" value={db.profiles.shared} onChange={(e) => setName('shared', e.target.value)} /></Field>
-        </section>
+        <FamilyCard />
 
         <div ref={syncRef}><SyncCard /></div>
 

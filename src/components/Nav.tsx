@@ -17,8 +17,8 @@ export function MonthNav() {
 }
 
 export function ScopeChips() {
-  const { view, setView, names } = useApp()
-  const items: Array<[Scope, string]> = [['all', 'Tutti'], ['shared', names.shared], ['a', names.a], ['b', names.b]]
+  const { view, setView, members } = useApp()
+  const items: Array<[Scope, string]> = [['all', 'Tutti'], ['shared', 'Condivisi'], ...members.map((m): [Scope, string] => [m.id, m.name])]
   return (
     <div className="no-scrollbar flex gap-2 overflow-x-auto">
       {items.map(([k, l]) => <button key={k} onClick={() => setView({ scope: k })} className={`chip ${view.scope === k ? 'chip-on' : ''}`}>{l}</button>)}

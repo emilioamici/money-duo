@@ -1,0 +1,158 @@
+import { useEffect, useRef, useState } from 'react'
+import { Folder, Loader2, RefreshCw, UserRound, Users } from 'lucide-react'
+import { useApp } from '../store/AppProvider'
+import { engine } from '../sync/engine'
+import { isDatabaseFile, parseFileId, type DriveFile } from '../sync/drive'
+import { dateTimeLabel } from '../lib/format'
+import { linkDatabase } from './linkFlow'
+import { FolderPicker, type PickedFolder } from './FolderPicker'
+
+type Phase = 'login' | 'searching' | 'choose' | 'none'
+const msg = (e: unknown) => (e instanceof Error ? e.message : String(e))
+
+/** Schermata iniziale: accesso con Google, poi la famiglia viene trovata e collegata in automatico (o se ne crea una). */
+export function Gate() {
+  const { sync, db } = useApp()
+  const [phase, setPhase] = useState<Phase>(sync.signedIn ? 'searching' : 'login')
+  const [dbs, setDbs] = useState<DriveFile[]>([])
+  const [others, setOthers] = useState<DriveFile[]>([])
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const [link, setLink] = useState('')
+  const [familyName, setFamilyName] = useState('Famiglia')
+  const [myName, setMyName] = useState(sync.name ?? '')
+  const [folder, setFolder] = useState<PickedFolder>({ id: 'root', name: 'Il mio Drive' })
+  const [picking, setPicking] = useState(false)
+  const started = useRef(false)
+
+  const guard = async (fn: () => Promise<void>) => {
+    setBusy(true); setErr('')
+    try { await fn() } catch (e) { setErr(msg(e)) } finally { setBusy(false) }
+  }
+
+  const connect = async (id: string) => {
+    const ok = await linkDatabase(db, id)
+    if (!ok) setPhase('choose')
+  }
+
+  const search = async () => {
+    setPhase('searching'); setErr('')
+    try {
+      const all = await engine.listCandidates()
+      const found = all.filter(isDatabaseFile)
+      setDbs(found); setOthers(all.filter((f) => !isDatabaseFile(f)))
+      if (found.length === 1) return await connect(found[0].id) // una sola famiglia: collegamento automatico
+      setPhase(found.length > 1 ? 'choose' : 'none')
+    } catch (e) {
+      setErr(msg(e)); setPhase('none')
+    }
+  }
+
+  // appena si è autenticati si cerca il database (una sola volta, anche con StrictMode)
+  useEffect(() => {
+    if (sync.signedIn && !started.current) { started.current = true; void search() }
+  }, [sync.signedIn]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!myName && sync.name) setMyName(sync.name) }, [sync.name]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const login = (selectAccount = false) => guard(async () => { started.current = false; await engine.signIn({ selectAccount }) })
+  const create = () => guard(() => engine.createFamily({ familyName, memberName: myName || sync.email || '', folderId: folder.id === 'root' ? null : folder.id }))
+
+  return (
+    <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-5 py-10">
+      <div className="mb-8 text-center">
+        <img src="./icon.svg" alt="" className="mx-auto mb-4 h-20 w-20 rounded-3xl shadow-lg" />
+        <h1 className="text-3xl font-extrabold tracking-tight">Money<span className="text-brand">Duo</span></h1>
+        <p className="mt-2 text-sm text-muted">Spese personali e conti di famiglia, nel tuo Google Drive.</p>
+      </div>
+
+      <div className="card space-y-4 p-5">
+        {err && <p className="rounded-xl bg-exp/10 p-3 text-sm text-exp">{err}</p>}
+
+        {phase === 'login' && (
+          <>
+            <p className="text-sm text-muted">Accedi con il <b>tuo account Google</b>. Se qualcuno ti ha invitato in una famiglia, la ritrovo io; altrimenti puoi crearne una nuova.</p>
+            {!sync.clientId && (
+              <div className="rounded-xl bg-brand/10 p-3 text-sm">
+                <p className="mb-2">Manca il Client ID OAuth di Google Cloud (vedi README).</p>
+                <input className="input" placeholder="xxxx.apps.googleusercontent.com" onBlur={(e) => engine.setClientId(e.target.value)} />
+              </div>
+            )}
+            <button className="btn-primary w-full" disabled={busy || !sync.clientId} onClick={() => void login()}>
+              {busy ? <Loader2 size={18} className="animate-spin" /> : <UserRound size={18} />}Accedi con Google
+            </button>
+          </>
+        )}
+
+        {phase === 'searching' && (
+          <div className="flex flex-col items-center gap-3 py-6 text-sm text-muted">
+            <Loader2 className="animate-spin text-brand" />Cerco la tua famiglia su Drive…
+          </div>
+        )}
+
+        {phase === 'choose' && (
+          <>
+            <p className="text-sm text-muted">Hai accesso a più famiglie. Quale vuoi aprire?</p>
+            <FileList files={dbs} busy={busy} onPick={(id) => void guard(() => connect(id))} />
+          </>
+        )}
+
+        {phase === 'none' && (
+          <>
+            <p className="text-sm">Nessuna famiglia trovata per <b>{sync.email ?? 'questo account'}</b>.</p>
+
+            <div className="space-y-3 rounded-2xl border border-line p-3">
+              <p className="flex items-center gap-2 text-sm font-semibold"><Users size={16} className="text-brand" />Crea la tua famiglia</p>
+              <p className="text-xs text-muted">Il database sarà un file nel tuo Drive: tu sei il capofamiglia e inviti gli altri membri dalle Impostazioni.</p>
+              <input className="input" placeholder="Nome della famiglia" value={familyName} onChange={(e) => setFamilyName(e.target.value)} />
+              <input className="input" placeholder="Il tuo nome" value={myName} onChange={(e) => setMyName(e.target.value)} />
+              <button type="button" className="flex w-full items-center gap-3 rounded-xl border border-line px-3 py-2.5 text-left text-sm hover:bg-line/40" onClick={() => setPicking(true)}>
+                <Folder size={18} className="shrink-0 text-brand" />
+                <span className="min-w-0 flex-1"><span className="block text-xs text-muted">Cartella del database</span><span className="block truncate font-semibold">{folder.name}</span></span>
+                <span className="text-xs font-semibold text-brand">Cambia</span>
+              </button>
+              <button className="btn-primary w-full" disabled={busy || !familyName.trim()} onClick={() => void create()}>{busy ? <Loader2 size={18} className="animate-spin" /> : <Users size={18} />}Crea famiglia</button>
+            </div>
+
+            <div className="rounded-xl bg-brand/10 p-3 text-sm text-muted">
+              Aspetti un invito? Chiedi al capofamiglia di aggiungere <b className="text-ink">{sync.email ?? 'questa email'}</b> tra i membri, poi
+              <button className="ml-1 inline-flex items-center gap-1 font-semibold text-brand" disabled={busy} onClick={() => void search()}><RefreshCw size={14} />cerca di nuovo</button>.
+            </div>
+
+            {others.length > 0 && (
+              <details className="text-sm">
+                <summary className="cursor-pointer text-muted">Altri file con «moneyduo» nel nome</summary>
+                <div className="mt-2"><FileList files={others} busy={busy} onPick={(id) => void guard(() => connect(id))} /></div>
+              </details>
+            )}
+            <details className="text-sm">
+              <summary className="cursor-pointer text-muted">Ho il link o l'ID del file</summary>
+              <div className="mt-2 flex gap-2">
+                <input className="input" placeholder="Link o ID del file Drive" value={link} onChange={(e) => setLink(e.target.value)} />
+                <button className="btn-primary" disabled={busy || !parseFileId(link)} onClick={() => void guard(() => connect(parseFileId(link)!))}>Collega</button>
+              </div>
+            </details>
+          </>
+        )}
+
+        {phase !== 'login' && phase !== 'searching' && (
+          <button className="btn-ghost w-full !text-xs" disabled={busy} onClick={() => void login(true)}>Usa un altro account Google</button>
+        )}
+      </div>
+      <p className="mt-6 text-center text-xs text-muted">I dati restano nel Drive del capofamiglia e in questo browser: nessun server di terze parti.</p>
+      {picking && <FolderPicker onClose={() => setPicking(false)} onPick={(f) => { setFolder(f); setPicking(false) }} />}
+    </div>
+  )
+}
+
+function FileList({ files, busy, onPick }: { files: DriveFile[]; busy: boolean; onPick: (id: string) => void }) {
+  return (
+    <div className="space-y-2">
+      {files.map((f) => (
+        <button key={f.id} disabled={busy} onClick={() => onPick(f.id)} className="w-full rounded-xl border border-line p-3 text-left text-sm hover:bg-line/40">
+          <p className="font-semibold">{f.name}</p>
+          <p className="text-xs text-muted">{f.ownedByMe ? 'Creato da te' : `Capofamiglia: ${f.owners?.[0]?.emailAddress ?? 'altro account'}`} · {dateTimeLabel(f.modifiedTime)}</p>
+        </button>
+      ))}
+    </div>
+  )
+}

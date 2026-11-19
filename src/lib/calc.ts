@@ -1,9 +1,12 @@
-import type { Account, Category, CategoryType, Db, ProfileId, Transaction } from '../types'
+import type { Account, Category, CategoryType, Db, Member, MemberId, Transaction } from '../types'
 
-export type Scope = 'all' | ProfileId
+/** all = tutti i conti che vedo · shared = conti con più membri · altrimenti id di un membro */
+export type Scope = 'all' | 'shared' | MemberId
 
 export const accountById = (db: Db): Map<string, Account> => new Map(db.accounts.map((a) => [a.id, a]))
 export const categoryById = (db: Db): Map<string, Category> => new Map(db.categories.map((c) => [c.id, c]))
+export const memberById = (db: Db): Map<string, Member> => new Map(db.members.map((m) => [m.id, m]))
+export const activeMembers = (db: Db): Member[] => db.members.filter((m) => m.active)
 
 export const sortedAccounts = (db: Db): Account[] => [...db.accounts].sort((a, b) => a.order - b.order)
 
@@ -13,6 +16,19 @@ export function topCategories(db: Db, type: CategoryType, includeHidden = false)
 export function childCategories(db: Db, parentId: string, includeHidden = false): Category[] {
   return db.categories.filter((c) => c.parentId === parentId && (includeHidden || !c.hidden)).sort((a, b) => a.order - b.order)
 }
+
+// ---------- visibilità dei conti ----------
+
+/** Membri che usano il conto: la lista scelta, oppure tutti i membri attivi se la lista è vuota. */
+export function accountMemberIds(db: Db, acc: Account): MemberId[] {
+  return acc.members.length ? acc.members : activeMembers(db).map((m) => m.id)
+}
+/** Conto condiviso = usato da più di un membro. */
+export const isSharedAccount = (db: Db, acc: Account): boolean => accountMemberIds(db, acc).length > 1
+/** Il membro `me` vede il conto? (`me` null = identità non ancora nota: si vede tutto). La visibilità è un filtro dell'app, non un controllo d'accesso. */
+export const visibleTo = (db: Db, acc: Account, me: MemberId | null): boolean => !me || accountMemberIds(db, acc).includes(me)
+
+// ---------- saldi ----------
 
 /** Saldo per conto (centesimi): saldo iniziale + entrate − uscite ± giroconti. Include sempre lo storico, anche dei conti nascosti. */
 export function accountBalances(db: Db): Record<string, number> {
@@ -29,17 +45,19 @@ export function accountBalances(db: Db): Record<string, number> {
   return bal
 }
 
-/** Totale liquidità: conti visibili e non esclusi (investimenti / fondi vincolati). `scope` limita al proprietario. */
-export function totalLiquidity(db: Db, bal: Record<string, number>, scope: Scope = 'all'): number {
-  return db.accounts
-    .filter((a) => !a.hidden && !a.excludeFromTotal && (scope === 'all' || a.owner === scope))
-    .reduce((s, a) => s + (bal[a.id] ?? 0), 0)
+/** Totale liquidità: conti visibili, non nascosti e non esclusi; `include` restringe ulteriormente (es. per membro). */
+export function totalLiquidity(db: Db, bal: Record<string, number>, include: (a: Account) => boolean = () => true): number {
+  return db.accounts.filter((a) => !a.hidden && !a.excludeFromTotal && include(a)).reduce((s, a) => s + (bal[a.id] ?? 0), 0)
 }
 
-/** Ambito di una transazione = proprietario del conto (per i giroconti: di uno qualsiasi dei due conti). */
-export function inScope(accs: Map<string, Account>, tx: Transaction, scope: Scope): boolean {
+// ---------- filtri ----------
+
+export function inScope(db: Db, accs: Map<string, Account>, tx: Transaction, scope: Scope, me: MemberId | null): boolean {
+  const involved = [tx.accountId, tx.toAccountId].map((id) => (id ? accs.get(id) : undefined)).filter((a): a is Account => !!a)
+  if (!involved.some((a) => visibleTo(db, a, me))) return false
   if (scope === 'all') return true
-  return accs.get(tx.accountId)?.owner === scope || (!!tx.toAccountId && accs.get(tx.toAccountId)?.owner === scope)
+  if (scope === 'shared') return involved.some((a) => isSharedAccount(db, a))
+  return involved.some((a) => accountMemberIds(db, a).includes(scope))
 }
 
 export interface Filters {
@@ -48,6 +66,7 @@ export interface Filters {
   scope: Scope
   accountId: string // 'all' oppure id
   q: string
+  me: MemberId | null
 }
 
 export function monthRange(d: Date): { from: Date; to: Date } {
@@ -64,7 +83,7 @@ export function filterTransactions(db: Db, f: Filters): Transaction[] {
     .filter((t) => {
       const ts = new Date(t.date).getTime()
       if (ts < from || ts >= to) return false
-      if (!inScope(accs, t, f.scope)) return false
+      if (!inScope(db, accs, t, f.scope, f.me)) return false
       if (f.accountId !== 'all' && t.accountId !== f.accountId && t.toAccountId !== f.accountId) return false
       if (q) {
         const hay = [t.title, t.note, cats.get(t.categoryId ?? '')?.name, accs.get(t.accountId)?.name, accs.get(t.toAccountId ?? '')?.name, (t.amount / 100).toFixed(2).replace('.', ',')]
@@ -121,26 +140,49 @@ export function categoryBreakdown(db: Db, txs: Transaction[], type: CategoryType
   return out
 }
 
+// ---------- divisione spese e saldi tra membri ----------
+
+/** Quota a carico di ogni partecipante (parti uguali; il resto in centesimi va ai primi, in ordine di id: deterministico). */
+export function expenseShares(tx: Transaction): Array<{ member: MemberId; amount: number }> {
+  const ids = [...new Set(tx.participants)].sort()
+  if (!ids.length) return []
+  const base = Math.floor(tx.amount / ids.length)
+  const rest = tx.amount - base * ids.length
+  return ids.map((member, i) => ({ member, amount: base + (i < rest ? 1 : 0) }))
+}
+
+export interface Debt {
+  debtor: MemberId
+  creditor: MemberId
+  amount: number
+}
+
 /**
- * Bilancio di coppia: valore > 0 ⇒ B deve ad A; < 0 ⇒ A deve a B.
- * - spesa pagata da A: 50/50 ⇒ B deve metà · anticipata ⇒ B deve tutto · personale ⇒ nulla (idem per B)
- * - spese pagate da "In Comune" non generano debiti
- * - giroconto tra un conto di B e uno di A = rimborso (riduce il debito di B); da A a B lo aumenta
+ * Saldo netto tra ogni coppia di membri.
+ * - spesa pagata da X e divisa tra i partecipanti: ognuno ≠ X deve la sua quota a X (X non partecipa = anticipo per gli altri)
+ * - spesa senza pagatore (conto condiviso) o senza partecipanti: nessun debito
+ * - giroconto tra due conti PERSONALI di membri diversi = rimborso (da X a Y riduce il debito di X verso Y)
  */
-export function coupleBalance(db: Db, txs: Transaction[]): number {
+export function familyBalances(db: Db, txs: Transaction[]): Debt[] {
   const accs = accountById(db)
-  let net = 0
+  const owe = new Map<string, number>() // "debitore>creditore" -> importo
+  const add = (d: MemberId, c: MemberId, v: number) => owe.set(`${d}>${c}`, (owe.get(`${d}>${c}`) ?? 0) + v)
   for (const t of txs) {
-    if (t.type === 'expense') {
-      if (t.paidBy === 'shared' || t.split === 'personal') continue
-      const share = t.split === 'equal' ? Math.round(t.amount / 2) : t.amount
-      net += t.paidBy === 'a' ? share : -share
+    if (t.type === 'expense' && t.paidBy) {
+      for (const s of expenseShares(t)) if (s.member !== t.paidBy) add(s.member, t.paidBy, s.amount)
     } else if (t.type === 'transfer' && t.toAccountId) {
-      const from = accs.get(t.accountId)?.owner
-      const to = accs.get(t.toAccountId)?.owner
-      if (from === 'b' && to === 'a') net -= t.amount
-      else if (from === 'a' && to === 'b') net += t.amount
+      const from = accs.get(t.accountId)
+      const to = accs.get(t.toAccountId)
+      if (from?.members.length === 1 && to?.members.length === 1 && from.members[0] !== to.members[0]) add(from.members[0], to.members[0], -t.amount)
     }
   }
-  return net
+  const ids = [...new Set([...owe.keys()].flatMap((k) => k.split('>')))].sort()
+  const out: Debt[] = []
+  for (let i = 0; i < ids.length; i++)
+    for (let j = i + 1; j < ids.length; j++) {
+      const net = (owe.get(`${ids[i]}>${ids[j]}`) ?? 0) - (owe.get(`${ids[j]}>${ids[i]}`) ?? 0)
+      if (net > 0) out.push({ debtor: ids[i], creditor: ids[j], amount: net })
+      else if (net < 0) out.push({ debtor: ids[j], creditor: ids[i], amount: -net })
+    }
+  return out.sort((a, b) => b.amount - a.amount)
 }

@@ -1,7 +1,6 @@
 import { useEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, X } from 'lucide-react'
-import type { ProfileId } from '../types'
 import { useApp } from '../store/AppProvider'
 
 export function Sheet({ open, onClose, title, children, footer }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode }) {
@@ -67,25 +66,46 @@ export function Toggle({ checked, onChange, label, hint }: { checked: boolean; o
   )
 }
 
-export function ProfileChips({ value, onChange, includeShared = true }: { value: ProfileId; onChange: (v: ProfileId) => void; includeShared?: boolean }) {
-  const { names } = useApp()
-  const list: ProfileId[] = includeShared ? ['a', 'b', 'shared'] : ['a', 'b']
+export function MemberAvatar({ name, color, size = 32 }: { name: string; color: string; size?: number }) {
+  return (
+    <span className="flex shrink-0 items-center justify-center rounded-full font-bold text-white" style={{ width: size, height: size, background: color, fontSize: size * 0.42 }}>
+      {name.trim().charAt(0).toUpperCase() || '?'}
+    </span>
+  )
+}
+
+/** Scelta di uno o più membri attivi (+ eventuale opzione "nessuno" per il pagatore). */
+export function MemberChips({ value, onChange, multi = false, nullLabel, includeIds = [] }: {
+  value: string | string[] | null
+  onChange: (v: any) => void // eslint-disable-line @typescript-eslint/no-explicit-any
+  multi?: boolean
+  nullLabel?: string
+  includeIds?: string[] // membri non attivi da mostrare comunque (storico)
+}) {
+  const { db } = useApp()
+  const list = db.members.filter((m) => m.active || includeIds.includes(m.id))
+  const sel = (id: string) => (multi ? (value as string[]).includes(id) : value === id)
+  const toggle = (id: string) => (multi ? onChange(sel(id) ? (value as string[]).filter((x) => x !== id) : [...(value as string[]), id]) : onChange(id))
   return (
     <div className="flex flex-wrap gap-2">
-      {list.map((p) => (
-        <button key={p} type="button" onClick={() => onChange(p)} className={`chip ${value === p ? 'chip-on' : ''}`}>
-          {value === p && <Check size={14} />}{names[p]}
+      {nullLabel && (
+        <button type="button" onClick={() => onChange(null)} className={`chip ${!multi && value === null ? 'chip-on' : ''}`}>{!multi && value === null && <Check size={14} />}{nullLabel}</button>
+      )}
+      {list.map((m) => (
+        <button key={m.id} type="button" onClick={() => toggle(m.id)} className={`chip ${sel(m.id) ? 'chip-on' : ''}`}>
+          {sel(m.id) ? <Check size={14} /> : <span className="h-2.5 w-2.5 rounded-full" style={{ background: m.color }} />}{m.name}{!m.active && ' (ex)'}
         </button>
       ))}
     </div>
   )
 }
 
-const OWNER_STYLE: Record<ProfileId, string> = { a: 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-300', b: 'bg-pink-500/15 text-pink-600 dark:text-pink-300', shared: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-300' }
-
-export function OwnerBadge({ owner }: { owner: ProfileId }) {
-  const { names } = useApp()
-  return <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${OWNER_STYLE[owner]}`}>{names[owner]}</span>
+/** Etichetta dei membri di un conto: "Famiglia", il nome se personale, oppure i nomi. */
+export function MembersBadge({ ids }: { ids: string[] }) {
+  const { db } = useApp()
+  const text = ids.length === 0 ? 'Tutta la famiglia' : ids.map((id) => db.members.find((m) => m.id === id)?.name ?? '?').join(', ')
+  const shared = ids.length !== 1
+  return <span className={`max-w-[12rem] truncate rounded-full px-2 py-0.5 text-[11px] font-semibold ${shared ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-300' : 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-300'}`}>{text}</span>
 }
 
 export function EmptyState({ icon, title, text, action }: { icon: ReactNode; title: string; text?: string; action?: ReactNode }) {
