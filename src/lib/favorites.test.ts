@@ -119,3 +119,21 @@ describe('filtri avanzati', () => {
   it('solo spese condivise', () => { expect(ids({ splitOnly: true })).toBe('e') })
   it('i criteri si combinano', () => { expect(ids({ types: ['expense'], min: 3000 })).toBe('e'); expect(countFilters({ ...emptyFilters(), types: ['expense'], min: 1, splitOnly: true })).toBe(3) })
 })
+
+import { debtTone, headlineDebt } from './calc'
+describe('saldo in evidenza', () => {
+  const d = (debtor: string, creditor: string, amount: number) => ({ debtor, creditor, amount })
+  it('verde se mi devono, rosso se devo, neutro se non mi riguarda', () => {
+    expect(debtTone(d('b', 'a', 100), 'a')).toBe('credit')
+    expect(debtTone(d('a', 'b', 100), 'a')).toBe('debit')
+    expect(debtTone(d('b', 'c', 100), 'a')).toBe('neutral')
+    expect(debtTone(d('a', 'b', 100), null)).toBe('neutral')
+  })
+  it('nessun saldo = tutto in ordine', () => { expect(headlineDebt([], 'a')).toBeNull() })
+  it('in evidenza il saldo più grande tra quelli che mi riguardano, altrimenti il più grande', () => {
+    const list = [d('b', 'c', 900), d('a', 'b', 50), d('c', 'a', 30)]
+    expect(headlineDebt(list, 'a')).toEqual({ debt: d('a', 'b', 50), tone: 'debit' })
+    expect(headlineDebt(list, 'z')).toEqual({ debt: d('b', 'c', 900), tone: 'neutral' })
+    expect(headlineDebt(list, null)?.debt.amount).toBe(900)
+  })
+})

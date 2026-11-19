@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
-import { ChevronDown, Handshake } from 'lucide-react'
+import { ChevronDown, CircleCheck, Handshake } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
 import { NotificationBell } from '../components/Notifications'
-import { categoryBreakdown, familyBalances, filterTransactions, periodRange, sortedAccounts, summarize, type Debt } from '../lib/calc'
+import { categoryBreakdown, debtTone, headlineDebt, familyBalances, filterTransactions, periodRange, sortedAccounts, summarize, type Debt } from '../lib/calc'
 import { formatMoney } from '../lib/format'
 import { paypalUrl } from '../lib/paypal'
 import { MonthNav, ScopeChips } from '../components/Nav'
@@ -12,6 +12,8 @@ import { MascotPeek } from '../components/Mascots'
 import { Donut } from '../components/Donut'
 import { CatBubble, Segmented } from '../components/ui'
 import type { CategoryType } from '../types'
+
+const TONE = { credit: 'text-inc', debit: 'text-exp', neutral: 'text-ink' } as const
 
 export function StatsPage() {
   const { db, view, nameOf, openTx, me } = useApp()
@@ -26,7 +28,7 @@ export function StatsPage() {
   // saldi tra membri: su tutte le transazioni (ignora il filtro d'ambito), del mese e complessivi
   const monthDebts = useMemo(() => familyBalances(db, db.transactions.filter((x) => { const d = new Date(x.date); return d >= from && d < to })), [db, from.getTime()]) // eslint-disable-line react-hooks/exhaustive-deps
   const totalDebts = useMemo(() => familyBalances(db, db.transactions), [db])
-  const top = totalDebts[0]
+  const head = headlineDebt(totalDebts, me?.id)
 
   const settle = (d: Debt) => {
     const accs = sortedAccounts(db).filter((a) => !a.hidden)
@@ -44,13 +46,13 @@ export function StatsPage() {
   }
 
   const DebtList = ({ list, actions }: { list: Debt[]; actions?: boolean }) =>
-    list.length === 0 ? <p className="py-2 text-sm text-muted">Siete in pari</p> : (
+    list.length === 0 ? <p className="flex items-center gap-1.5 py-2 text-sm text-muted"><CircleCheck size={16} aria-hidden />Siete in pari</p> : (
       <ul className="space-y-2">
         {[...list].sort((a, b) => Number(b.debtor === me?.id || b.creditor === me?.id) - Number(a.debtor === me?.id || a.creditor === me?.id)).map((d) => (
           <li key={d.debtor + d.creditor} className="flex items-center justify-between gap-2 rounded-xl bg-bg px-3 py-2 text-sm">
             <span><b>{nameOf(d.debtor)}</b> deve a <b>{nameOf(d.creditor)}</b></span>
             <span className="flex items-center gap-2">
-              <b className="tabular-nums">{formatMoney(d.amount)}</b>
+              <b className={`tabular-nums ${TONE[debtTone(d, me?.id)]}`}>{formatMoney(d.amount)}</b>
               {actions && <button className="btn-soft !px-2.5 !py-1 !text-xs" onClick={() => settle(d)}>Rimborsa</button>}
               {actions && d.debtor === me?.id && payTo(d.creditor) && <button className="btn-soft !px-2.5 !py-1 !text-xs !text-trf" onClick={() => payPaypal(d)} aria-label={`Paga ${nameOf(d.creditor)} con PayPal`}>PayPal</button>}
             </span>
@@ -65,7 +67,9 @@ export function StatsPage() {
         <div className="flex items-center justify-between pt-3"><h1 className="text-xl font-extrabold tracking-tight">Statistiche</h1><NotificationBell /></div>
         <MascotPeek kind="zenitsu" side="left">
           <Panel id="debts" label="Saldi tra i membri" icon={<Handshake size={22} />}
-            headline={top ? <><b>{nameOf(top.debtor)}</b> deve a <b>{nameOf(top.creditor)}</b> · <span className="text-exp">{formatMoney(top.amount)}</span></> : 'Siete in pari'}
+            headline={head
+              ? <span className={TONE[head.tone]} data-tone={head.tone}><b>{nameOf(head.debt.debtor)}</b> deve a <b>{nameOf(head.debt.creditor)}</b> · {formatMoney(head.debt.amount)}</span>
+              : <span className="inline-flex items-center gap-1.5 text-ink" data-tone="ok"><CircleCheck size={20} aria-hidden />Tutti i saldi tra i membri sono in ordine</span>}
             sub={totalDebts.length > 1 ? <span className="text-muted">+ {totalDebts.length - 1} {totalDebts.length === 2 ? 'altro saldo' : 'altri saldi'}</span> : undefined}>
             <p className="mb-1 text-[11px] font-semibold uppercase text-muted">{view.period === 'year' ? 'Quest\'anno' : 'Questo mese'}</p>
             <DebtList list={monthDebts} />
