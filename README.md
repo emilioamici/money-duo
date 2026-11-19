@@ -95,6 +95,8 @@ Limite: PayPal.Me non permette di preselezionare «Per amici e familiari» da li
 
 **Icona e stile.** L'icona dell'app (due gattini salvadanaio) e la palette derivano dall'immagine scelta: menta, crema e beige, con il marrone caldo del contorno per il testo e un verde-menta scuro come colore principale (chiaro in modalità scura). Tutti i colori del testo rispettano il contrasto minimo 4,5:1. Angoli più morbidi e carattere arrotondato dove il sistema lo offre (iPhone). Le icone (`public/icon-*.png`, `apple-touch-icon.png`, versione adattiva per Android) sono ricavate dall'immagine originale.
 
+**Dividere una spesa già inserita.** Aprendo una spesa (uscita) in modifica, «Dividi questa spesa» la trasforma in uno split: importo, titolo, note, tag e conto restano, comprese le modifiche non ancora salvate; nel form dello split scegli chi ha pagato e come dividere. È la stessa transazione (non se ne crea una nuova).
+
 ## Schema del JSON (`schemaVersion: 2`)
 ```jsonc
 {
