@@ -9,6 +9,7 @@ import { AccountForm, GROUP_LABEL } from '../components/AccountForm'
 import { EmptyState, MembersBadge, Toggle } from '../components/ui'
 import { SwipeRow } from '../components/SwipeRow'
 import { AccountDetail } from '../components/AccountDetail'
+import { MascotPeek } from '../components/Mascots'
 import type { Account, AccountGroup } from '../types'
 
 const GROUP_ORDER: AccountGroup[] = ['cash', 'bank', 'card', 'savings', 'investment', 'other']
@@ -38,6 +39,7 @@ export function AccountsPage() {
     <div>
       <div className="px-4 pb-3 pt-safe"><div className="flex items-center justify-between pt-3"><h1 className="text-xl font-extrabold tracking-tight">Conti</h1><NotificationBell /></div></div>
       <div className="space-y-3 px-4">
+        <MascotPeek kind="mochi">
         <div className="card p-4">
           <p className="text-xs font-semibold uppercase text-muted">Liquidità totale</p>
           <p className={`text-3xl font-extrabold tabular-nums ${total < 0 ? 'text-exp' : ''}`}>{formatMoney(total)}</p>
@@ -55,6 +57,7 @@ export function AccountsPage() {
           </div>
           <p className="mt-2 text-xs text-muted">Conti personali per membro; esclusi dal totale: conti nascosti e conti marcati come investimenti/fondi vincolati. Vedi solo i conti tuoi o condivisi con te.</p>
         </div>
+        </MascotPeek>
 
         {list.length === 0 && <div className="card"><EmptyState icon={<Wallet size={28} />} title="Nessun conto" text="Aggiungi il tuo primo conto." /></div>}
 

@@ -1,11 +1,12 @@
 import { useMemo } from 'react'
-import { ArrowLeftRight, Star, Trash2 } from 'lucide-react'
+import { ArrowLeftRight, Trash2 } from 'lucide-react'
 import type { Favorite } from '../types'
 import { useApp } from '../store/AppProvider'
 import { accountById, categoryById, isSplit, visibleTo } from '../lib/calc'
 import { formatMoney } from '../lib/format'
 import { copyOf, deleteFavorite } from '../lib/mutations'
 import { CatBubble, Sheet } from './ui'
+import { MascotImg } from './Mascots'
 import { ask } from './dialogs'
 
 /** Elenco dei preferiti: toccandone uno si apre il form di una nuova transazione con quei dati e la data di adesso. */
@@ -27,7 +28,7 @@ export function FavoritesSheet({ onClose }: { onClose: () => void }) {
     <Sheet open onClose={onClose} title="Preferiti">
       {mine.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-10 text-center text-muted">
-          <Star size={28} />
+          <MascotImg kind="zenitsu" className="h-20 w-auto" />
           <p className="font-semibold text-ink">Nessun preferito</p>
           <p className="max-w-xs text-sm">Apri una transazione e tocca la stella, oppure scorri una riga verso sinistra: la ritroverai qui, pronta da copiare con la data di oggi.</p>
         </div>

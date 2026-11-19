@@ -6,7 +6,9 @@ import { categoryBreakdown, familyBalances, filterTransactions, periodRange, sor
 import { formatMoney } from '../lib/format'
 import { paypalUrl } from '../lib/paypal'
 import { MonthNav, ScopeChips } from '../components/Nav'
-import { LiquidityChart } from '../components/LiquidityChart'
+import { LiquidityPanel } from '../components/LiquidityChart'
+import { Panel } from '../components/Panel'
+import { MascotPeek } from '../components/Mascots'
 import { Donut } from '../components/Donut'
 import { CatBubble, Segmented } from '../components/ui'
 import type { CategoryType } from '../types'
@@ -24,6 +26,7 @@ export function StatsPage() {
   // saldi tra membri: su tutte le transazioni (ignora il filtro d'ambito), del mese e complessivi
   const monthDebts = useMemo(() => familyBalances(db, db.transactions.filter((x) => { const d = new Date(x.date); return d >= from && d < to })), [db, from.getTime()]) // eslint-disable-line react-hooks/exhaustive-deps
   const totalDebts = useMemo(() => familyBalances(db, db.transactions), [db])
+  const top = totalDebts[0]
 
   const settle = (d: Debt) => {
     const accs = sortedAccounts(db).filter((a) => !a.hidden)
@@ -60,7 +63,18 @@ export function StatsPage() {
     <div>
       <div className="space-y-3 px-4 pt-safe">
         <div className="flex items-center justify-between pt-3"><h1 className="text-xl font-extrabold tracking-tight">Statistiche</h1><NotificationBell /></div>
-        <LiquidityChart />
+        <MascotPeek kind="zenitsu" side="left">
+          <Panel id="debts" label="Saldi tra i membri" icon={<Handshake size={22} />}
+            headline={top ? <><b>{nameOf(top.debtor)}</b> deve a <b>{nameOf(top.creditor)}</b> · <span className="text-exp">{formatMoney(top.amount)}</span></> : 'Siete in pari'}
+            sub={totalDebts.length > 1 ? <span className="text-muted">+ {totalDebts.length - 1} {totalDebts.length === 2 ? 'altro saldo' : 'altri saldi'}</span> : undefined}>
+            <p className="mb-1 text-[11px] font-semibold uppercase text-muted">{view.period === 'year' ? 'Quest\'anno' : 'Questo mese'}</p>
+            <DebtList list={monthDebts} />
+            <p className="mb-1 mt-4 text-[11px] font-semibold uppercase text-muted">Complessivo</p>
+            <DebtList list={totalDebts} actions />
+            <p className="mt-3 text-xs text-muted">Calcolato sulle spese pagate da un membro e divise con altri; i trasferimenti tra conti personali di membri diversi contano come rimborsi. Le spese pagate dal «conto condiviso» non generano debiti.</p>
+          </Panel>
+        </MascotPeek>
+        <LiquidityPanel />
       </div>
       <div className="sticky top-0 z-10 mt-3 space-y-3 bg-bg/90 px-4 pb-3 pt-2 backdrop-blur">
         <MonthNav />
@@ -101,14 +115,6 @@ export function StatsPage() {
           <p className="mt-2 text-center text-xs text-muted">Periodo: entrate {formatMoney(sum.income)} · uscite {formatMoney(sum.expense)} (trasferimenti esclusi)</p>
         </div>
 
-        <div className="card p-4">
-          <div className="mb-3 flex items-center gap-2 font-bold"><Handshake size={20} className="text-brand" />Saldi tra i membri</div>
-          <p className="mb-1 text-[11px] font-semibold uppercase text-muted">{view.period === 'year' ? 'Quest\'anno' : 'Questo mese'}</p>
-          <DebtList list={monthDebts} />
-          <p className="mb-1 mt-4 text-[11px] font-semibold uppercase text-muted">Complessivo</p>
-          <DebtList list={totalDebts} actions />
-          <p className="mt-3 text-xs text-muted">Calcolato sulle spese pagate da un membro e divise con altri; i trasferimenti tra conti personali di membri diversi contano come rimborsi. Le spese pagate dal «conto condiviso» non generano debiti.</p>
-        </div>
       </div>
     </div>
   )

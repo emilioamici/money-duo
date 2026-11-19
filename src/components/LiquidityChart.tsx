@@ -1,8 +1,9 @@
 import { useMemo, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Wallet } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
 import { liquiditySeries } from '../lib/calc'
 import { formatMoney, formatSigned } from '../lib/format'
+import { Panel } from './Panel'
 
 const W = 340
 const H = 150
@@ -30,7 +31,7 @@ function niceTicks(min: number, max: number, n = 3): number[] {
 }
 
 /** Andamento della liquidità nell'anno: fine di ogni mese, sui conti che contano nel totale. */
-export function LiquidityChart() {
+export function LiquidityChart({ embedded = false }: { embedded?: boolean }) {
   const { db, me, view, setView } = useApp()
   const year = view.month.getFullYear()
   const series = useMemo(() => liquiditySeries(db, year, me?.id ?? null), [db, year, me])
@@ -74,7 +75,7 @@ export function LiquidityChart() {
   const empty = filled.length === 0
 
   return (
-    <section className="card p-4" aria-label={`Andamento della liquidità nel ${year}`}>
+    <section className={embedded ? '' : 'card p-4'} aria-label={`Andamento della liquidità nel ${year}`}>
       <div className="mb-2 flex items-start justify-between gap-2">
         <div>
           <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Liquidità nel {year}</h2>
@@ -131,5 +132,20 @@ export function LiquidityChart() {
       </details>
       <p className="mt-2 text-[11px] text-muted">Conti che contano nel totale: visibili a te, non nascosti e non esclusi.</p>
     </section>
+  )
+}
+
+/** Scheda a scomparsa: da chiusa mostra la liquidità di adesso e quanto è cambiata da inizio anno; aperta, il grafico dell'anno. */
+export function LiquidityPanel() {
+  const { db, me } = useApp()
+  const series = useMemo(() => liquiditySeries(db, new Date().getFullYear(), me?.id ?? null), [db, me])
+  const filled = series.points.filter((p) => p.value !== null) as Array<{ month: number; value: number }>
+  const now = filled.length ? filled[filled.length - 1].value : series.start
+  const delta = now - series.start
+  return (
+    <Panel id="liquidity" label="Liquidità" icon={<Wallet size={22} />} headline={formatMoney(now)}
+      sub={filled.length ? <><span className={`font-semibold ${delta < 0 ? 'text-exp' : 'text-inc'}`}>{formatSigned(delta)}</span> <span className="text-muted">da inizio anno</span></> : undefined}>
+      <LiquidityChart embedded />
+    </Panel>
   )
 }

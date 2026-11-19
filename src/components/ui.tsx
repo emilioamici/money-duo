@@ -2,6 +2,7 @@ import { useEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, ChevronDown, X } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
+import { MascotImg } from './Mascots'
 
 /** Finestre aperte, dalla più vecchia alla più recente: Esc chiude solo l'ultima. */
 const sheetStack: symbol[] = []
@@ -117,10 +118,10 @@ export function MembersBadge({ ids }: { ids: string[] }) {
   return <span className={`max-w-[12rem] truncate rounded-full px-2 py-0.5 text-[11px] font-semibold ${shared ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-300' : 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-300'}`}>{text}</span>
 }
 
-export function EmptyState({ icon, title, text, action }: { icon: ReactNode; title: string; text?: string; action?: ReactNode }) {
+export function EmptyState({ title, text, action }: { icon?: ReactNode; title: string; text?: string; action?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center px-6 py-14 text-center">
-      <div className="mb-3 rounded-full bg-brand/10 p-4 text-brand">{icon}</div>
+    <div className="flex flex-col items-center px-6 py-10 text-center">
+      <MascotImg kind="pair" className="mb-3 w-36" />
       <p className="font-semibold">{title}</p>
       {text && <p className="mt-1 max-w-xs text-sm text-muted">{text}</p>}
       {action && <div className="mt-4">{action}</div>}

@@ -1,3 +1,4 @@
+import { MascotImg } from './Mascots'
 import { useEffect, useRef, useState } from 'react'
 import { Folder, Loader2, RefreshCw, UserRound, Users } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
@@ -61,7 +62,7 @@ export function Gate({ reconnect = false }: { reconnect?: boolean }) {
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-5 py-10">
       <div className="mb-8 text-center">
-        <img src="./icon-192.png" alt="" className="mx-auto mb-4 h-24 w-24 rounded-[1.6rem] shadow-lg" />
+        <MascotImg kind="pair" className="mx-auto mb-3 w-44" />
         <h1 className="text-3xl font-extrabold tracking-tight">Money<span className="text-brand">Duo</span></h1>
         <p className="mt-2 text-sm text-muted">Spese personali e conti di famiglia, nel tuo Google Drive.</p>
       </div>

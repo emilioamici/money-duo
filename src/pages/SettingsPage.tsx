@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { BellRing, ChevronRight, Cloud, Database, Download, RotateCcw, ShieldCheck, Tags, Upload, Users } from 'lucide-react'
+import { BellRing, ChevronRight, Cloud, Database, Download, Palette, RotateCcw, ShieldCheck, Tags, Upload, Users } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
 import { NotificationBell } from '../components/Notifications'
 import { SyncCard, STATUS_LABEL } from '../components/SyncCard'
 import { Accordion } from '../components/ui'
+import { MascotPeek } from '../components/Mascots'
+import { AppearanceCard } from '../components/AppearanceCard'
+import { THEME_NAME, getTheme } from '../lib/theme'
 import { FamilyCard } from '../components/FamilyCard'
 import { NotificationsCard } from '../components/NotificationsCard'
 import { ask } from '../components/dialogs'
@@ -11,7 +14,7 @@ import { CategoriesPage } from './CategoriesPage'
 import { mergeDb, parseDb, replaceData } from '../lib/merge'
 
 const OPEN_KEY = 'moneyduo:settingsOpen'
-type Section = 'family' | 'sync' | 'notif' | 'data'
+type Section = 'look' | 'family' | 'sync' | 'notif' | 'data'
 const loadOpen = (): Partial<Record<Section, boolean>> => { try { return JSON.parse(localStorage.getItem(OPEN_KEY) ?? '{}') } catch { return {} } }
 
 /** Impostazioni a schede: ognuna si apre e si chiude (lo stato si ricorda su questo dispositivo). `openSync` aumenta quando si arriva dal pulsante di sincronizzazione. */
@@ -59,6 +62,12 @@ export function SettingsPage({ syncRef, openSync = 0 }: { syncRef: React.RefObje
     <div>
       <div className="px-4 pb-3 pt-safe"><div className="flex items-center justify-between pt-3"><h1 className="text-xl font-extrabold tracking-tight">Impostazioni</h1><NotificationBell /></div></div>
       <div className="space-y-3 px-4">
+        <MascotPeek kind="pair">
+          <Accordion title="Aspetto" icon={<Palette size={20} />} open={!!open.look} onToggle={() => flip('look')} summary={THEME_NAME[getTheme()]}>
+            <AppearanceCard />
+          </Accordion>
+        </MascotPeek>
+
         <Accordion title="Famiglia" icon={<Users size={20} />} open={!!open.family} onToggle={() => flip('family')}
           summary={`${db.family.name} · ${db.members.filter((m) => m.active).length} ${db.members.filter((m) => m.active).length === 1 ? 'membro' : 'membri'}`}>
           <FamilyCard />
