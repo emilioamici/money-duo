@@ -68,7 +68,7 @@ Come funziona, senza server: ogni dispositivo confronta i dati appena ricevuti d
 - **Nell'app:** campanella con contatore, elenco (tocco = apre la transazione o i Conti) e un avviso quando arrivano con l'app in primo piano. Sono salvate per famiglia e per membro su quel dispositivo.
 - **Del dispositivo:** si attivano in *Impostazioni → Notifiche* (Android, desktop; su iPhone serve iOS 16.4+ con l'app aggiunta alla schermata Home) e partono solo se l'app è in background.
 
-> **Limite:** il sito è statico e non ha un server, quindi non c'è un push che sveglia il telefono ad app chiusa. L'app sincronizza ogni ~45 secondi finché è aperta o in background (i browser possono rallentare o sospendere i timer) e la sessione Google dura circa un'ora. Un push vero richiederebbe un piccolo backend (Web Push + notifiche di modifica di Drive).
+> **Limite:** il sito è statico e non ha un server, quindi non c'è un push che sveglia il telefono ad app chiusa. L'app controlla Drive ogni 2 minuti finché è aperta o in background (i browser possono rallentare o sospendere i timer) e la sessione Google dura 1 ora (vedi «Sessione Google»). Un push vero richiederebbe un piccolo backend (Web Push + notifiche di modifica di Drive).
 
 ## Schema del JSON (`schemaVersion: 2`)
 ```jsonc
@@ -94,8 +94,13 @@ Gli importi sono **interi in centesimi**. `deleted` contiene le lapidi che perme
 
 Il file su Drive è marcato con la proprietà pubblica `moneyduo=db` (e nominato `moneyduo-db-<famiglia>.json`), così l'app lo ritrova anche quando è condiviso da altri.
 
+## Sessione Google
+Il token d'accesso di Google dura **1 ora** e non si può allungare: un token di rinnovo richiederebbe un server che custodisca il client secret (e, con l'app in modalità *Testing*, scadrebbe comunque dopo 7 giorni). Nella cache del dispositivo restano invece la famiglia collegata, i dati e l'email, quindi l'app si apre subito con i tuoi dati anche offline.
+
+Per ridurre l'attrito l'app **rinnova il token in silenzio**: ai tocchi dell'utente, negli ultimi 15 minuti di validità (o dopo la scadenza), chiede un nuovo token senza schermate (`prompt: 'none'`, funziona se sei ancora collegato a Google e hai già dato il consenso). Il browser può mostrare un popup che si chiude subito. Se non è possibile, compare «Riconnetti». Il token resta in `sessionStorage` (non in `localStorage`, condiviso da tutte le pagine di `<utente>.github.io`), quindi riaprendo l'app il primo tocco lo rinnova.
+
 ## Come funziona la sincronizzazione
-- Ogni modifica è salvata subito in locale e inviata a Drive dopo ~2 s; si controlla anche ogni 45 s, al ritorno in primo piano e alla riconnessione.
+- Ogni modifica è salvata subito in locale e inviata a Drive dopo ~2 s; si controlla anche ogni 2 minuti, al ritorno in primo piano e alla riconnessione.
 - Ciclo: legge la `version` del file → se è cambiata scarica e fa **merge per record** (vince l'`updatedAt` più recente; un'eliminazione più recente batte una modifica) → carica solo se ci sono differenze → memorizza la nuova `version`. Non c'è sovrascrittura cieca dell'intero file.
 - Stati visibili: *Sincronizzato, Da inviare, Sync…, Offline, Riconnetti, Errore*. Offline le modifiche restano in cache e partono al ritorno della rete.
 - **Limiti noti**: (1) il token Google dura circa 1 ora e un sito statico non può rinnovarlo in background: allo scadere compare "Riconnetti" (un tap) e nel frattempo i dati restano al sicuro in locale; (2) due scritture nello stesso istante possono teoricamente incrociarsi, ma il merge per record lo rende molto improbabile e Drive conserva la **cronologia versioni** del file per recuperare eventuali errori.

@@ -45,8 +45,8 @@ export function NotificationsCard() {
         </>
       )}
       <p className="mt-3 text-xs text-muted">
-        Il sito non ha un server che possa svegliare il telefono: le notifiche arrivano mentre l'app è aperta o in background (si sincronizza ogni ~45 secondi),
-        e quelle perse mentre era chiusa le trovi alla riapertura. La sessione Google dura circa un'ora: dopo, serve un tocco su «Riconnetti».
+        Il sito non ha un server che possa svegliare il telefono: le notifiche arrivano mentre l'app è aperta o in background (si controlla ogni 2 minuti),
+        e quelle perse mentre era chiusa le trovi alla riapertura. La sessione Google dura 1 ora: finché usi l'app si rinnova da sola; se resta in background senza essere toccata, dopo un'ora le notifiche si fermano finché non la riapri.
       </p>
     </section>
   )

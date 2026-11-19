@@ -4,12 +4,18 @@ import { mergeDb, parseDb, sameData } from '../lib/merge'
 import { nowIso } from '../lib/ids'
 import * as drive from './drive'
 import { DriveError } from './drive'
-import { GoogleAuthError, cachedToken, clearToken, requestToken, revokeToken, type Prompt } from './google'
+import { GoogleAuthError, cachedToken, clearToken, requestToken, revokeToken, tokenRemainingMs, type Prompt } from './google'
 
 /**
  * Motore di sincronizzazione con un file JSON su Google Drive.
  * Ciclo: leggi `version` remota → se cambiata scarica+merge per record → carica solo se serve.
  */
+
+/** ogni quanto si controlla se ci sono novità su Drive (anche in background) */
+export const SYNC_EVERY_MS = 120_000
+/** il token Google dura 1 ora: si prova a rinnovarlo (in silenzio) negli ultimi 15 minuti o dopo la scadenza */
+const RENEW_WINDOW_MS = 15 * 60_000
+const RENEW_RETRY_MS = 10 * 60_000
 
 const KEY = 'moneyduo:sync'
 const CLIENT_KEY = 'moneyduo:clientId'
@@ -76,6 +82,8 @@ export class SyncEngine {
   private rerun = false
   private dirtySeq = 0
   private started = false
+  private renewing = false
+  private lastRenewTry = 0
 
   constructor() {
     this.status = this.p.fileId ? (cachedToken() ? (this.p.dirty ? 'pending' : 'synced') : 'auth') : 'off'
@@ -110,7 +118,9 @@ export class SyncEngine {
     window.addEventListener('online', () => void this.syncNow())
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') void this.syncNow() })
     // anche con l'app in background (i browser rallentano i timer): serve a ricevere le notifiche
-    setInterval(() => void this.syncNow(), 45_000)
+    setInterval(() => void this.syncNow(), SYNC_EVERY_MS)
+    // il rinnovo silenzioso del token va chiesto durante un gesto dell'utente, altrimenti il browser blocca il popup
+    document.addEventListener('pointerdown', () => void this.renewIfNeeded(), { capture: true, passive: true })
     void this.syncNow()
   }
 
@@ -142,6 +152,28 @@ export class SyncEngine {
     if (this.status === 'auth') this.set(this.p.dirty ? 'pending' : 'synced')
     else this.rebuild()
     if (this.p.fileId) void this.syncNow()
+  }
+
+  /**
+   * Rinnovo silenzioso del token (`prompt: 'none'`, senza schermate se l'utente è ancora collegato a Google e ha già dato il consenso).
+   * Si chiama a ogni tocco dell'utente: così, finché usi l'app, la sessione non scade mai; se il rinnovo non è possibile
+   * (sessione Google chiusa, consenso da rifare, popup bloccato) non succede nulla e resta il pulsante «Riconnetti».
+   */
+  async renewIfNeeded(): Promise<void> {
+    if (!this.p.fileId || !this.p.email || this.renewing || !this.clientId) return
+    if (tokenRemainingMs() > RENEW_WINDOW_MS) return
+    if (Date.now() - this.lastRenewTry < RENEW_RETRY_MS) return
+    this.renewing = true
+    this.lastRenewTry = Date.now()
+    try {
+      await requestToken(this.clientId, { prompt: 'none', hint: this.p.email })
+      this.lastRenewTry = 0 // riuscito: nessun ritardo per il prossimo rinnovo
+      if (this.status === 'auth') this.set(this.p.dirty ? 'pending' : 'synced')
+      else this.rebuild()
+      void this.syncNow()
+    } catch { /* non riuscito: si riprova più tardi; alla scadenza compare «Riconnetti» */ } finally {
+      this.renewing = false
+    }
   }
 
   async signOut(): Promise<void> {

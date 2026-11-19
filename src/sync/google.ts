@@ -42,6 +42,11 @@ export function cachedToken(): string | null {
   return tok && tok.exp - Date.now() > 60_000 ? tok.value : null
 }
 
+/** Millisecondi di validità residua del token (0 se assente o scaduto). */
+export function tokenRemainingMs(): number {
+  return tok ? Math.max(0, tok.exp - Date.now()) : 0
+}
+
 export function clearToken(): void {
   tok = null
   try { sessionStorage.removeItem(SK) } catch { /* noop */ }
