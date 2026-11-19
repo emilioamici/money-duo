@@ -5,7 +5,7 @@ import { createDefaultDb } from '../lib/defaults'
 import { nowIso } from '../lib/ids'
 import { diffNotifications, mergeNotifications, type Notif } from '../lib/notifications'
 import { engine, type SyncState } from '../sync/engine'
-import { PushHttpError, pushConfigured, refreshPush, sendPush } from '../sync/push'
+import { PushHttpError, enablePush, pushConfigured, pushSupported, refreshPush, sendPush } from '../sync/push'
 import { enqueue, flushQueue, type QueuedPush, type SendResult } from '../sync/pushQueue'
 import { cacheState, getCacheHealth, getLoadedCache, subscribeCacheHealth, writeCache } from './cache'
 
@@ -213,6 +213,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (t) void refreshPush(sync.fileId, t).catch(() => undefined)
     }
   }, [prefs.pushEnabled, sync.fileId, sync.signedIn])
+  // notifiche già attive su questo dispositivo ma senza push (il server è stato configurato dopo): le iscrive da sole, una volta per apertura
+  const autoPush = useRef(false)
+  useEffect(() => {
+    if (autoPush.current || !prefs.systemNotif || prefs.pushEnabled || !sync.fileId || !sync.signedIn || !pushConfigured() || !pushSupported()) return
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+    const t = engine.currentToken()
+    if (!t) return
+    autoPush.current = true
+    void enablePush(sync.fileId, t).then(() => setPrefs({ pushEnabled: true })).catch(() => undefined)
+  }, [prefs.systemNotif, prefs.pushEnabled, sync.fileId, sync.signedIn, setPrefs])
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return
     const onMsg = (e: MessageEvent) => { if (e.data?.type === 'moneyduo-push') void engine.syncNow() }

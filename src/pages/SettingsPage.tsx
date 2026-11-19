@@ -81,7 +81,7 @@ export function SettingsPage({ syncRef, openSync = 0 }: { syncRef: React.RefObje
         </div>
 
         <Accordion title="Notifiche" icon={<BellRing size={20} />} open={!!open.notif} onToggle={() => flip('notif')}
-          summary={prefs.pushEnabled ? 'Push attive su questo dispositivo' : prefs.systemNotif ? 'Notifiche del dispositivo attive' : 'Solo la campanella'}>
+          summary={prefs.systemNotif || prefs.pushEnabled ? 'Attive su questo dispositivo' : 'Disattivate (solo la campanella)'}>
           <NotificationsCard />
         </Accordion>
 

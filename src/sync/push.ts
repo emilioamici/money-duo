@@ -9,9 +9,12 @@ const VAPID_KEY = 'moneyduo:vapidKey'
 const read = (k: string): string => { try { return localStorage.getItem(k) || '' } catch { return '' } }
 const strip = (s: string) => s.trim().replace(/\/+$/, '')
 
-/** Indirizzo del server: dalla build (VITE_PUSH_URL) oppure inserito nell'app. */
-export const pushUrl = (): string => strip(read(URL_KEY) || (import.meta.env.VITE_PUSH_URL as string | undefined) || '')
-export const vapidPublicKey = (): string => read(VAPID_KEY) || (import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined) || ''
+/**
+ * Indirizzo del server e chiave pubblica: vengono dalla build (variabili VITE_PUSH_URL e VITE_VAPID_PUBLIC_KEY del repository) e hanno la precedenza,
+ * così un valore vecchio salvato sul dispositivo non può più fare danni. Solo in sviluppo (senza variabili) si usano quelli salvati in `localStorage`.
+ */
+export const pushUrl = (): string => strip((import.meta.env.VITE_PUSH_URL as string | undefined) || read(URL_KEY) || '')
+export const vapidPublicKey = (): string => (import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined) || read(VAPID_KEY) || ''
 export const pushConfigured = (): boolean => !!pushUrl() && !!vapidPublicKey()
 
 /** Controlla il formato dei due valori di configurazione; ritorna un messaggio in italiano, oppure null se vanno bene. */

@@ -67,7 +67,7 @@ Le tue modifiche non notificano mai, e nemmeno i conti personali degli altri. La
 
 Come funziona, senza server: ogni dispositivo confronta i dati appena ricevuti da Drive con quelli che aveva e ne ricava le notifiche (`src/lib/notifications.ts`, funzione pura e testata). Il collegamento iniziale a un database non genera notifiche. Quelle perse con l'app chiusa compaiono alla riapertura, alla prima sincronizzazione.
 - **Nell'app:** campanella con contatore, elenco (tocco = apre la transazione o i Conti) e un avviso quando arrivano con l'app in primo piano. Sono salvate per famiglia e per membro su quel dispositivo.
-- **Del dispositivo:** si attivano in *Impostazioni → Notifiche* (Android, desktop; su iPhone serve iOS 16.4+ con l'app aggiunta alla schermata Home) e partono solo se l'app è in background.
+- **Del dispositivo:** si attivano in *Impostazioni → Notifiche → Attiva notifiche* (un solo interruttore) (Android, desktop; su iPhone serve iOS 16.4+ con l'app aggiunta alla schermata Home) e partono solo se l'app è in background.
 
 > **Limite (senza server push):** il sito è statico e non ha un server, quindi non c'è un push che sveglia il telefono ad app chiusa. Per averlo, vedi «Server delle notifiche push» qui sotto. L'app controlla Drive ogni 2 minuti finché è aperta o in background (i browser possono rallentare o sospendere i timer) e la sessione Google dura 1 ora (vedi «Sessione Google»). Un push vero richiederebbe un piccolo backend (Web Push + notifiche di modifica di Drive).
 

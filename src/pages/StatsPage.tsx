@@ -25,8 +25,6 @@ export function StatsPage() {
   const total = items.reduce((s, i) => s + i.total, 0)
   const sum = summarize(txs)
 
-  // saldi tra membri: su tutte le transazioni (ignora il filtro d'ambito), del mese e complessivi
-  const monthDebts = useMemo(() => familyBalances(db, db.transactions.filter((x) => { const d = new Date(x.date); return d >= from && d < to })), [db, from.getTime()]) // eslint-disable-line react-hooks/exhaustive-deps
   const totalDebts = useMemo(() => familyBalances(db, db.transactions), [db])
   const head = headlineDebt(totalDebts, me?.id)
 
@@ -68,15 +66,12 @@ export function StatsPage() {
         <MascotPeek kind="zenitsu" side="left">
           <Panel id="debts" label="Saldi tra i membri" icon={<Handshake size={22} />}
             headline={head
-              ? <span className={TONE[head.tone]} data-tone={head.tone}><b>{nameOf(head.debt.debtor)}</b> deve a <b>{nameOf(head.debt.creditor)}</b> · {formatMoney(head.debt.amount)}</span>
+              ? <><b>{nameOf(head.debt.debtor)}</b> deve a <b>{nameOf(head.debt.creditor)}</b> · <span className={TONE[head.tone]} data-tone={head.tone}>{formatMoney(head.debt.amount)}</span></>
               : <span className="inline-flex items-center gap-1.5 text-ink" data-tone="ok"><CircleCheck size={20} aria-hidden />Tutti i saldi tra i membri sono in ordine</span>}
             quick={head && head.tone === 'debit' && payTo(head.debt.creditor)
               ? <button className="btn-soft w-full" onClick={() => payPaypal(head.debt)} aria-label={`Paga ${nameOf(head.debt.creditor)} con PayPal`}><Wallet size={18} />Paga {nameOf(head.debt.creditor)} con PayPal · {formatMoney(head.debt.amount)}</button>
               : undefined}
             sub={totalDebts.length > 1 ? <span className="text-muted">+ {totalDebts.length - 1} {totalDebts.length === 2 ? 'altro saldo' : 'altri saldi'}</span> : undefined}>
-            <p className="mb-1 text-[11px] font-semibold uppercase text-muted">{view.period === 'year' ? 'Quest\'anno' : 'Questo mese'}</p>
-            <DebtList list={monthDebts} />
-            <p className="mb-1 mt-4 text-[11px] font-semibold uppercase text-muted">Complessivo</p>
             <DebtList list={totalDebts} actions />
             <p className="mt-3 text-xs text-muted">Calcolato sulle spese pagate da un membro e divise con altri; i trasferimenti tra conti personali di membri diversi contano come rimborsi. Le spese pagate dal «conto condiviso» non generano debiti.</p>
           </Panel>

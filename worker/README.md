@@ -55,13 +55,10 @@ Dalla cartella del progetto:
    Alla fine stampa l'indirizzo, per esempio `https://moneyduo-push.tuo-nome.workers.dev`. Aprendo `…/health` nel browser deve comparire `{"ok":true}`.
 
 ## Collegare l'app
-Due possibilità (basta una):
-
-- **Nel sito pubblicato, senza ricostruirlo:** in *Impostazioni → Notifiche → Notifiche push* incolla l'indirizzo del server e la **chiave pubblica** VAPID.
-- **Per tutti i dispositivi, in modo permanente:** in GitHub, *Settings → Secrets and variables → Actions → Variables*, crea `VITE_PUSH_URL` (indirizzo del server, senza `/` finale) e `VITE_VAPID_PUBLIC_KEY` (la chiave pubblica). Poi rilancia il deploy (*Actions → Deploy su GitHub Pages → Run workflow*).
+In GitHub, *Settings → Secrets and variables → Actions → Variables*, crea `VITE_PUSH_URL` (indirizzo del server, senza `/` finale) e `VITE_VAPID_PUBLIC_KEY` (la chiave pubblica). Poi rilancia il deploy (*Actions → Deploy su GitHub Pages → Run workflow*). Sono valori pubblici e vengono inseriti nell'app alla pubblicazione: nessun utente deve inserire nulla. Non c'è più un campo nell'app per modificarli.
 
 ## Attivarle sui dispositivi
-Su ogni telefono o computer: *Impostazioni → Notifiche → Ricevi le notifiche anche con l'app chiusa*, poi concedi il permesso. Premi *Invia una notifica push di prova* per verificare.
+Su ogni telefono o computer: *Impostazioni → Notifiche → Attiva notifiche* (un solo interruttore: attiva sia le notifiche del dispositivo sia, se il server è configurato, il push anche con l'app chiusa), poi concedi il permesso. Premi *Invia una notifica di prova* per verificare. Chi aveva già le notifiche attive viene iscritto al server da solo alla prima apertura dopo la configurazione; se il server non risponde compare «Riprova ad attivarle anche con l'app chiusa».
 
 - **iPhone:** serve iOS 16.4 o successivo e l'app **aggiunta alla schermata Home** (Safari → Condividi → Aggiungi a Home). Dalle semplici pagine di Safari il push non funziona.
 - **Android e computer:** funziona anche da browser.
