@@ -20,7 +20,7 @@ self.addEventListener('fetch', (e) => {
 
   // navigazione: rete prima, cache come ripiego offline
   if (req.mode === 'navigate') {
-    e.respondWith(fetch(req).then((r) => { const copy = r.clone(); caches.open(CACHE).then((c) => c.put('./', copy)); return r }).catch(() => caches.match('./')))
+    e.respondWith(fetch(req).then((r) => { if (!/privacy\.html$/.test(new URL(req.url).pathname)) { const copy = r.clone(); caches.open(CACHE).then((c) => c.put('./', copy)) } return r }).catch(() => caches.match('./')))
     return
   }
   // asset (hash nel nome): stale-while-revalidate
