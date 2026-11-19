@@ -78,6 +78,7 @@ export function createDefaultDb(): Db {
     accounts: defaultAccounts(),
     categories: defaultCategories(),
     transactions: [],
+    favorites: [],
     deleted: {},
   }
 }

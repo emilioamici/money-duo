@@ -25,6 +25,8 @@ export interface TxFormState {
   initial?: Partial<Transaction>
   /** quale form aprire per una nuova voce (modificando si sceglie in base alla transazione) */
   kind?: 'normal' | 'split'
+  /** cambia a ogni apertura: forza un form nuovo anche se ne è già aperto uno (es. copia o preferito) */
+  nonce?: number
 }
 
 interface Prefs {
@@ -177,8 +179,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const setView = useCallback((p: Partial<View>) => setViewState((v) => ({ ...v, ...p })), [])
 
   const [txForm, setTxForm] = useState<TxFormState | null>(null)
-  const openTx = useCallback((s: TxFormState = {}) => setTxForm(s), [])
-  const openSplit = useCallback((s: TxFormState = {}) => setTxForm({ ...s, kind: 'split' }), [])
+  const formNonce = useRef(0)
+  const openTx = useCallback((s: TxFormState = {}) => setTxForm({ ...s, nonce: ++formNonce.current }), [])
+  const openSplit = useCallback((s: TxFormState = {}) => setTxForm({ ...s, kind: 'split', nonce: ++formNonce.current }), [])
   const closeTx = useCallback(() => setTxForm(null), [])
 
   const [prefs, setPrefsState] = useState<Prefs>(() => {

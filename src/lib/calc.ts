@@ -20,7 +20,7 @@ export const txPayerIds = (tx: Transaction): MemberId[] => [...new Set(txPayment
 export const involvedAccountIds = (tx: Transaction): string[] =>
   [...new Set([...(tx.type === 'expense' ? txPayments(tx).map((p) => p.accountId) : [tx.accountId]), tx.toAccountId].filter((x): x is string => !!x))]
 /** Una spesa condivisa ("split"): ha dei partecipanti o più pagamenti. */
-export const isSplit = (tx: Transaction): boolean => tx.type === 'expense' && (tx.participants.length > 0 || (tx.payments?.length ?? 0) > 1)
+export const isSplit = (tx: Pick<Transaction, 'type' | 'participants' | 'payments'>): boolean => tx.type === 'expense' && (tx.participants.length > 0 || (tx.payments?.length ?? 0) > 1)
 
 export const sortedAccounts = (db: Db): Account[] => [...db.accounts].sort((a, b) => a.order - b.order)
 
@@ -268,6 +268,30 @@ export function allTags(db: Db): string[] {
   const n = new Map<string, number>()
   for (const t of db.transactions) for (const g of t.tags ?? []) n.set(g, (n.get(g) ?? 0) + 1)
   return [...n].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([g]) => g)
+}
+
+/**
+ * Titoli già usati che corrispondono al testo digitato: prima quelli che iniziano con il testo, poi quelli che lo contengono;
+ * a parità, i più usati e i più recenti. Il titolo identico a quello digitato non si propone.
+ */
+export function titleSuggestions(db: Db, text: string, limit = 5): string[] {
+  const q = text.trim().toLowerCase()
+  if (!q) return []
+  const seen = new Map<string, { title: string; n: number; last: string }>()
+  for (const t of db.transactions) {
+    const title = t.title.trim()
+    if (!title) continue
+    const k = title.toLowerCase()
+    const e = seen.get(k)
+    if (!e) seen.set(k, { title, n: 1, last: t.date })
+    else { e.n++; if (t.date > e.last) { e.last = t.date; e.title = title } }
+  }
+  const rank = (k: string) => (k.startsWith(q) ? 0 : k.split(/\s+/).some((w) => w.startsWith(q)) ? 1 : 2)
+  return [...seen.entries()]
+    .filter(([k]) => k.includes(q) && k !== q)
+    .sort((a, b) => rank(a[0]) - rank(b[0]) || b[1].n - a[1].n || (a[1].last < b[1].last ? 1 : -1) || a[0].localeCompare(b[0]))
+    .slice(0, limit)
+    .map(([, e]) => e.title)
 }
 
 // ---------- andamento della liquidità

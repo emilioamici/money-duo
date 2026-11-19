@@ -1,4 +1,4 @@
-import type { Account, Category, Db, Member, Transaction } from '../types'
+import type { Account, Category, Db, Favorite, Member, Transaction } from '../types'
 import { nowIso, uid } from './ids'
 import { MEMBER_COLORS } from './defaults'
 
@@ -103,3 +103,37 @@ export function deactivateMember(db: Db, id: string): Db {
 }
 
 export const nextOrder = (items: Array<{ order: number }>): number => items.reduce((m, x) => Math.max(m, x.order), -1) + 1
+
+// ---------- copia e preferiti ----------
+
+/** Campi di una transazione che si portano in una copia o in un preferito (niente id, date, autore). */
+export function templateOf(tx: Transaction | Favorite): Partial<Transaction> {
+  return {
+    type: tx.type, amount: tx.amount, accountId: tx.accountId, toAccountId: tx.toAccountId, categoryId: tx.categoryId,
+    title: tx.title, note: tx.note, paidBy: tx.paidBy, participants: [...tx.participants],
+    splitMode: tx.splitMode ?? 'equal', splitValues: tx.splitValues ? { ...tx.splitValues } : null,
+    payments: tx.payments ? tx.payments.map((p) => ({ ...p })) : null, tags: [...(tx.tags ?? [])],
+  }
+}
+
+/** Stato iniziale del form per una copia: stessi dati, data e ora di adesso. */
+export const copyOf = (tx: Transaction | Favorite): Partial<Transaction> => ({ ...templateOf(tx), date: nowIso() })
+
+/** Impronta per riconoscere lo stesso modello (tipo, importo, conti, categoria, titolo, partecipanti, pagamenti). */
+const sig = (x: Transaction | Favorite) => JSON.stringify([x.type, x.amount, x.accountId, x.toAccountId, x.categoryId, x.title.trim().toLowerCase(), x.participants, x.payments ?? null])
+
+/** Il preferito (di questo membro) che corrisponde a una transazione, se c'è. */
+export function findFavorite(db: Db, tx: Transaction, me: string | null): Favorite | undefined {
+  return db.favorites.find((f) => f.by === me && sig(f) === sig(tx))
+}
+
+export function addFavorite(db: Db, tx: Transaction, me: string | null): Db {
+  if (findFavorite(db, tx, me)) return db
+  const t = nowIso()
+  const fav: Favorite = { id: uid(), by: me, ...(templateOf(tx) as Omit<Favorite, 'id' | 'by' | 'createdAt' | 'updatedAt'>), createdAt: t, updatedAt: t }
+  return { ...db, favorites: [...db.favorites, fav] }
+}
+
+export function deleteFavorite(db: Db, id: string): Db {
+  return { ...db, favorites: db.favorites.filter((f) => f.id !== id), deleted: { ...db.deleted, [id]: nowIso() } }
+}

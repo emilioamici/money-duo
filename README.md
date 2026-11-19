@@ -78,6 +78,13 @@ La notifica push parte **dopo che i dati sono arrivati su Drive** (anche per le 
 
 **Mese o anno.** Toccando il mese in alto (Transazioni e Statistiche) si apre un selettore con i 12 mesi: scegli un mese, oppure tocca l'**anno** per selezionare l'intero anno. In vista annuale le frecce scorrono di anno e le statistiche sommano tutto l'anno.
 
+**Copia, preferiti, swipe e proposte.**
+- **Swipe sulla riga** (Transazioni): scorrendo verso sinistra compaiono *Modifica*, *Copia* ed *Elimina* (l'eliminazione chiede conferma). Si richiude toccando altrove.
+- **Copia:** apre una nuova transazione con gli stessi dati (anche split e pagamenti multipli) e la **data di adesso**; si può copiare anche dal form di modifica.
+- **Preferiti:** nel form di modifica la stella aggiunge (o toglie) la transazione ai preferiti. Dal menu **+ → Preferiti** (sul computer: *Preferiti* nella barra laterale) si sceglie un preferito e si apre il form di copia con la data di oggi. I preferiti sono **personali** (ognuno vede i suoi, quindi i conti privati restano tali) e vivono nel file di Drive, quindi su tutti i dispositivi.
+- **Titoli già usati:** mentre scrivi il titolo compaiono le proposte (prima quelli che iniziano con il testo, poi quelli che lo contengono).
+- **Comportamento da app su mobile:** la pagina non scorre né rimbalza in orizzontale.
+
 ## Schema del JSON (`schemaVersion: 2`)
 ```jsonc
 {
@@ -98,6 +105,8 @@ La notifica push parte **dopo che i dati sono arrivati su Drive** (anche per le 
                      "tags": ["vacanza"],
                      "splitMode": "equal|amount|percent", "splitValues": { "<id membro>": 5000 } /* centesimi (amount) o centesimi di punto, 5000 = 50% (percent); null se equal */,
                      "by": "<id membro che l'ha aggiunta>", "createdAt", "updatedAt" }],
+  "favorites": [{ "id", "by": "<id membro: i preferiti sono personali>", "type", "amount", "accountId", "toAccountId", "categoryId", "title", "note",
+                  "paidBy", "participants", "splitMode", "splitValues", "payments", "tags", "createdAt", "updatedAt" }] /* modelli di transazione; assente nei file più vecchi (si legge come []) */,
   "deleted": { "<id>": "ISO" }
 }
 ```

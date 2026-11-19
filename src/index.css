@@ -34,11 +34,18 @@
 }
 
 html, body, #root { height: 100%; }
+/* comportamento da app: la pagina scorre solo in verticale, niente "elastico" laterale né trascinamento orizzontale
+   (le liste che scorrono di lato, come i filtri, restano libere: sono contenitori di scorrimento a sé) */
+html { overscroll-behavior: none; }
 body {
   @apply bg-bg text-ink font-sans antialiased;
   -webkit-tap-highlight-color: transparent;
-  overscroll-behavior-y: none;
+  -webkit-touch-callout: none;
+  overscroll-behavior: none;
+  overflow-x: hidden;
+  touch-action: pan-y pinch-zoom;
 }
+input, textarea { -webkit-touch-callout: default; }
 button { @apply select-none; }
 
 @layer components {

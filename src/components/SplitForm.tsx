@@ -8,7 +8,8 @@ import { nowIso, uid } from '../lib/ids'
 import { deleteTransaction, saveTransaction } from '../lib/mutations'
 import { Sheet } from './ui'
 import { ask } from './dialogs'
-import { CategoryRow, Row, SelectField, TagsRow, accountLabel, plain } from './formParts'
+import { TxFooterActions } from './txActions'
+import { CategoryRow, Row, SelectField, TagsRow, TitleRow, accountLabel, plain } from './formParts'
 import { SplitEditor, resolveSplit, type SplitState } from './SplitEditor'
 
 interface PayerRow { key: string; member: string; accountId: string; amount: string }
@@ -140,6 +141,7 @@ export function SplitForm({ state, onClose }: { state: TxFormState; onClose: () 
       footer={
         <div className="flex gap-2">
           {tx && <button className="btn-danger" onClick={remove} aria-label="Elimina"><Trash2 size={18} /></button>}
+          {tx && <TxFooterActions tx={tx} />}
           <button className="btn-primary flex-1" onClick={save}>Salva</button>
         </div>
       }>
@@ -152,7 +154,7 @@ export function SplitForm({ state, onClose }: { state: TxFormState; onClose: () 
       <div className="-mx-1">
         <Row label="Data"><input type="datetime-local" className={plain} value={date} onChange={(e) => setDate(e.target.value)} /></Row>
         <CategoryRow type="expense" value={categoryId} onChange={setCategoryId} />
-        <Row label="Titolo"><input className={plain} placeholder="Es. Cena di sabato" value={title} onChange={(e) => setTitle(e.target.value)} /></Row>
+        <TitleRow value={title} onChange={setTitle} placeholder={'Es. Cena di sabato'} />
         <Row label="Note"><textarea className={`${plain} resize-none`} rows={1} value={note} onChange={(e) => setNote(e.target.value)} /></Row>
         <TagsRow value={tags} onChange={setTags} />
       </div>
