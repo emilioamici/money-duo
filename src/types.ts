@@ -37,6 +37,8 @@ export interface Account {
   excludeFromTotal: boolean
   hidden: boolean
   order: number
+  /** membro che ha creato / modificato per ultimo il conto (serve alle notifiche) */
+  by?: MemberId | null
   createdAt: string
   updatedAt: string
 }
@@ -71,6 +73,8 @@ export interface Transaction {
   paidBy: MemberId | null
   /** membri che si dividono la spesa in parti uguali; [] = spesa personale */
   participants: MemberId[]
+  /** membro che ha aggiunto / modificato per ultimo la transazione (serve alle notifiche) */
+  by?: MemberId | null
   createdAt: string
   updatedAt: string
 }

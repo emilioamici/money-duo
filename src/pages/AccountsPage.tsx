@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Eye, EyeOff, Plus, Wallet } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
+import { NotificationBell } from '../components/Notifications'
 import { accountBalances, isSharedAccount, sortedAccounts, totalLiquidity, visibleTo } from '../lib/calc'
 import { formatMoney } from '../lib/format'
 import { setAccountHidden } from '../lib/mutations'
@@ -22,7 +23,7 @@ export function AccountsPage() {
 
   return (
     <div>
-      <div className="px-4 pb-3 pt-safe"><h1 className="pt-3 text-xl font-extrabold tracking-tight">Conti</h1></div>
+      <div className="px-4 pb-3 pt-safe"><div className="flex items-center justify-between pt-3"><h1 className="text-xl font-extrabold tracking-tight">Conti</h1><NotificationBell /></div></div>
       <div className="space-y-3 px-4">
         <div className="card p-4">
           <p className="text-xs font-semibold uppercase text-muted">Liquidità totale</p>

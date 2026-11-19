@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ChevronDown, Handshake } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
+import { NotificationBell } from '../components/Notifications'
 import { categoryBreakdown, familyBalances, filterTransactions, monthRange, sortedAccounts, summarize, type Debt } from '../lib/calc'
 import { formatMoney } from '../lib/format'
 import { MonthNav, ScopeChips } from '../components/Nav'
@@ -46,7 +47,7 @@ export function StatsPage() {
   return (
     <div>
       <div className="sticky top-0 z-10 space-y-3 bg-bg/90 px-4 pb-3 pt-safe backdrop-blur">
-        <h1 className="pt-3 text-xl font-extrabold tracking-tight">Statistiche</h1>
+        <div className="flex items-center justify-between pt-3"><h1 className="text-xl font-extrabold tracking-tight">Statistiche</h1><NotificationBell /></div>
         <MonthNav />
         <ScopeChips />
       </div>

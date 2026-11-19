@@ -6,6 +6,7 @@ import { dayKey, dayLabel, formatMoney } from '../lib/format'
 import { MonthNav, ScopeChips, SyncChip } from '../components/Nav'
 import { TransactionRow } from '../components/TransactionRow'
 import { EmptyState } from '../components/ui'
+import { NotificationBell } from '../components/Notifications'
 import type { Transaction } from '../types'
 
 export function HomePage({ onOpenSync }: { onOpenSync: () => void }) {
@@ -27,6 +28,7 @@ export function HomePage({ onOpenSync }: { onOpenSync: () => void }) {
           <h1 className="text-xl font-extrabold tracking-tight">Money<span className="text-brand">Duo</span></h1>
           <div className="flex items-center gap-2">
             <SyncChip onClick={onOpenSync} />
+            <NotificationBell />
             <button className="rounded-full p-2 hover:bg-line/60" aria-label="Cerca" onClick={() => { setSearch((s) => !s); if (search) setView({ q: '' }) }}>{search ? <X size={20} /> : <Search size={20} />}</button>
           </div>
         </div>

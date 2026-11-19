@@ -15,6 +15,7 @@ React + TypeScript + Vite + Tailwind CSS. Il database è un file JSON nel **Goog
 - **Categorie** e sottocategorie con icona e colore, aggiungi / nascondi / mostra (cascata sui figli).
 - **Transazioni:** uscite, entrate e giroconti; chi ha pagato e **con chi dividere la spesa** (parti uguali tra i membri scelti, oppure anticipo per altri); modifica/eliminazione con ricalcolo immediato dei saldi.
 - **Dashboard:** navigazione mensile, filtri (Tutti / Condivisi / singolo membro), conto e ricerca testuale; statistiche per categoria; **saldi tra i membri** con registrazione del rimborso.
+- **Notifiche:** quando un altro membro aggiunge una transazione che ti riguarda, un conto in comune, o condivide un conto con te (vedi sotto).
 - Esporta / Importa JSON (unisci o sostituisci; i file del formato precedente vengono migrati). Interfaccia in italiano, tema chiaro/scuro automatico.
 
 > **Visibilità dei conti = filtro dell'app, non sicurezza.** Il database è un unico file condiviso con tutta la famiglia: l'app mostra a ciascuno solo i conti suoi o condivisi con lui, ma chi ha accesso al file può aprirlo da Drive e leggere tutto. Invita solo persone di cui ti fidi.
@@ -55,6 +56,20 @@ L'app si apre sulla schermata **Accedi con Google**: nessun profilo da creare n�
 
 > **Modalità Testing di Google:** finché l'app OAuth non è pubblicata, **ogni email invitata va aggiunta anche tra gli *utenti di prova*** in Google Cloud Console (*Pubblico → Utenti di prova*), altrimenti la persona riceve `access_denied`. Pubblicare l'app richiede la verifica di Google, e lo scope `drive` è "ristretto" (di norma serve una valutazione di sicurezza).
 
+## Notifiche
+Ricevi una notifica quando **un altro membro**:
+1. aggiunge una **transazione** su un conto in comune o condiviso con te, oppure una spesa **divisa con te** (con la tua quota);
+2. aggiunge un **conto in comune**;
+3. **condivide con te un conto** (nuovo, oppure un conto esistente che ora ti include).
+
+Le tue modifiche non notificano mai, e nemmeno i conti personali degli altri. La transazione divisa con te è visibile nel tuo elenco anche se è su un conto che non vedi.
+
+Come funziona, senza server: ogni dispositivo confronta i dati appena ricevuti da Drive con quelli che aveva e ne ricava le notifiche (`src/lib/notifications.ts`, funzione pura e testata). Il collegamento iniziale a un database non genera notifiche. Quelle perse con l'app chiusa compaiono alla riapertura, alla prima sincronizzazione.
+- **Nell'app:** campanella con contatore, elenco (tocco = apre la transazione o i Conti) e un avviso quando arrivano con l'app in primo piano. Sono salvate per famiglia e per membro su quel dispositivo.
+- **Del dispositivo:** si attivano in *Impostazioni → Notifiche* (Android, desktop; su iPhone serve iOS 16.4+ con l'app aggiunta alla schermata Home) e partono solo se l'app è in background.
+
+> **Limite:** il sito è statico e non ha un server, quindi non c'è un push che sveglia il telefono ad app chiusa. L'app sincronizza ogni ~45 secondi finché è aperta o in background (i browser possono rallentare o sospendere i timer) e la sessione Google dura circa un'ora. Un push vero richiederebbe un piccolo backend (Web Push + notifiche di modifica di Drive).
+
 ## Schema del JSON (`schemaVersion: 2`)
 ```jsonc
 {
@@ -64,13 +79,14 @@ L'app si apre sulla schermata **Accedi con Google**: nessun profilo da creare n�
   "members": [{ "id", "name", "email": "account Google | null", "color": "#6366f1", "active": true, "joinedAt": "ISO | null", "updatedAt" }],
   "accounts": [{ "id", "name", "group": "cash|bank|card|savings|investment|other",
                  "members": ["<id membro>"] /* [] = tutta la famiglia, 1 = personale */,
-                 "initialBalance": 0, "excludeFromTotal": false, "hidden": false, "order": 0, "createdAt", "updatedAt" }],
+                 "initialBalance": 0, "excludeFromTotal": false, "hidden": false, "order": 0, "by": "<id membro>", "createdAt", "updatedAt" }],
   "categories": [{ "id", "name", "type": "expense|income", "parentId": null, "icon": "🛒", "color": "#f97316",
                    "hidden": false, "order": 0, "updatedAt" }],
   "transactions": [{ "id", "type": "expense|income|transfer", "amount": 1250, "date": "ISO",
                      "accountId", "toAccountId": null, "categoryId": null, "title": "", "note": "",
                      "paidBy": "<id membro> | null" /* null = conto condiviso */,
-                     "participants": ["<id membro>"] /* chi si divide la spesa; [] = personale */, "createdAt", "updatedAt" }],
+                     "participants": ["<id membro>"] /* chi si divide la spesa; [] = personale */,
+                     "by": "<id membro che l'ha aggiunta>", "createdAt", "updatedAt" }],
   "deleted": { "<id>": "ISO" }
 }
 ```
@@ -93,6 +109,6 @@ src/types.ts        schema tipizzato
 src/lib/            defaults neutri, calcoli (saldi, statistiche, pareggio), merge/validazione, mutazioni pure
 src/sync/           google.ts (token GIS) · drive.ts (REST) · engine.ts (ciclo di sync)
 src/store/          stato + cache locale
-src/components/     UI riusabile, form, Gate (login + ricerca/creazione della famiglia), FamilyCard, FolderPicker
+src/components/     UI riusabile, form, Gate (login + ricerca/creazione della famiglia), FamilyCard, FolderPicker, Notifications
 src/pages/          Transazioni, Statistiche, Conti, Impostazioni, Categorie
 ```

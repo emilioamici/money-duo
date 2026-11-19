@@ -143,6 +143,7 @@ export function parseDb(input: unknown): Db {
     excludeFromTotal: bool(x.excludeFromTotal),
     hidden: bool(x.hidden),
     order: num(x.order, i),
+    by: typeof x.by === 'string' ? x.by : null,
     createdAt: str(x.createdAt, EPOCH),
     updatedAt: str(x.updatedAt, EPOCH),
   }))
@@ -171,6 +172,7 @@ export function parseDb(input: unknown): Db {
     note: str(x.note),
     paidBy: typeof x.paidBy === 'string' ? x.paidBy : null,
     participants: strArr(x.participants),
+    by: typeof x.by === 'string' ? x.by : null,
     createdAt: str(x.createdAt, EPOCH),
     updatedAt: str(x.updatedAt, EPOCH),
   }))

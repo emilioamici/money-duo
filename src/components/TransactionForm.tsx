@@ -108,7 +108,7 @@ export function TransactionForm({ state, onClose }: { state: TxFormState; onClos
       id: tx?.id ?? uid(), type, amount: cents, date: fromLocalInput(date || toLocalInput(nowIso())), accountId,
       toAccountId: type === 'transfer' ? toAccountId : null, categoryId: type === 'transfer' ? null : categoryId,
       title: title.trim(), note: note.trim(), paidBy: type === 'transfer' ? payerFor(accountId) : paidBy,
-      participants: type === 'expense' ? effParticipants : [], createdAt: tx?.createdAt ?? nowIso(), updatedAt: nowIso(),
+      participants: type === 'expense' ? effParticipants : [], by: me?.id ?? null, createdAt: tx?.createdAt ?? nowIso(), updatedAt: nowIso(),
     }
     commit((d) => saveTransaction(d, t))
     setPrefs({ lastAccountId: accountId })

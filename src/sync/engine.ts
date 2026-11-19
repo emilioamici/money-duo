@@ -41,7 +41,8 @@ export interface SyncState extends Persisted {
 export interface SyncHost {
   getDb: () => Db
   /** applica una trasformazione al DB; `dirty` = va poi sincronizzato */
-  applyDb: (fn: (prev: Db) => Db, dirty: boolean) => void
+  /** `source: 'remote'` = dati arrivati da un altro dispositivo/membro (da cui si ricavano le notifiche) */
+  applyDb: (fn: (prev: Db) => Db, dirty: boolean, source?: 'remote') => void
 }
 
 const EMPTY: Persisted = { fileId: null, fileName: null, email: null, name: null, ownerEmail: null, canShare: false, remoteVersion: null, lastSyncAt: null, dirty: false }
@@ -108,7 +109,8 @@ export class SyncEngine {
     this.started = true
     window.addEventListener('online', () => void this.syncNow())
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') void this.syncNow() })
-    setInterval(() => { if (document.visibilityState === 'visible') void this.syncNow() }, 45_000)
+    // anche con l'app in background (i browser rallentano i timer): serve a ricevere le notifiche
+    setInterval(() => void this.syncNow(), 45_000)
     void this.syncNow()
   }
 
@@ -267,7 +269,7 @@ export class SyncEngine {
       if (meta.version !== this.p.remoteVersion) {
         const remote = parseDb(await drive.download(token, id))
         let merged = this.host.getDb()
-        this.host.applyDb((prev) => (merged = mergeDb(prev, remote)), false)
+        this.host.applyDb((prev) => (merged = mergeDb(prev, remote)), false, 'remote')
         if (!sameData(merged, remote)) needPush = true
       }
 

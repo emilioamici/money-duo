@@ -1,0 +1,88 @@
+import { Bell, Receipt, Wallet, X } from 'lucide-react'
+import { useApp } from '../store/AppProvider'
+import { Sheet } from './ui'
+import type { Notif } from '../lib/notifications'
+
+export function NotificationBell() {
+  const { unread, setCenterOpen } = useApp()
+  return (
+    <button className="relative rounded-full p-2 hover:bg-line/60" aria-label={unread ? `Notifiche (${unread} non lette)` : 'Notifiche'} onClick={() => setCenterOpen(true)}>
+      <Bell size={20} />
+      {unread > 0 && <span className="absolute right-0.5 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-exp px-1 text-[10px] font-bold text-white">{unread > 9 ? '9+' : unread}</span>}
+    </button>
+  )
+}
+
+const ago = (iso: string): string => {
+  const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000)
+  if (m < 1) return 'ora'
+  if (m < 60) return `${m} min fa`
+  if (m < 1440) return `${Math.round(m / 60)} h fa`
+  return new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'short' }).format(new Date(iso))
+}
+
+const Icon = ({ n }: { n: Notif }) => (
+  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${n.kind === 'tx' ? 'bg-brand/15 text-brand' : 'bg-emerald-500/15 text-emerald-600'}`}>
+    {n.kind === 'tx' ? <Receipt size={18} /> : <Wallet size={18} />}
+  </span>
+)
+
+/** Elenco delle notifiche; toccandone una si apre la transazione o la pagina Conti. */
+export function NotificationCenter({ onOpenAccounts }: { onOpenAccounts: () => void }) {
+  const { notifications, centerOpen, setCenterOpen, markRead, markAllRead, clearNotifications, db, openTx, unread } = useApp()
+  const open = (n: Notif) => {
+    markRead(n.id)
+    const tx = n.txId ? db.transactions.find((t) => t.id === n.txId) : undefined
+    if (tx) { setCenterOpen(false); openTx({ tx }) } else if (n.accountId) { setCenterOpen(false); onOpenAccounts() }
+  }
+  return (
+    <Sheet open={centerOpen} onClose={() => setCenterOpen(false)} title="Notifiche"
+      footer={notifications.length > 0 ? (
+        <div className="flex gap-2">
+          <button className="btn-soft flex-1" disabled={unread === 0} onClick={markAllRead}>Segna tutte come lette</button>
+          <button className="btn-ghost" onClick={clearNotifications}>Svuota</button>
+        </div>
+      ) : undefined}>
+      {notifications.length === 0 ? (
+        <div className="py-10 text-center text-sm text-muted">
+          <Bell className="mx-auto mb-3 text-brand" />
+          <p className="font-semibold text-ink">Nessuna notifica</p>
+          <p className="mx-auto mt-1 max-w-xs">Ti avviso quando un altro membro aggiunge una transazione che ti riguarda o un conto in comune, o condivide un conto con te.</p>
+        </div>
+      ) : (
+        <ul className="-mx-2 divide-y divide-line/50">
+          {notifications.map((n) => (
+            <li key={n.id}>
+              <button className="flex w-full items-start gap-3 rounded-xl px-2 py-3 text-left hover:bg-line/30" onClick={() => open(n)}>
+                <Icon n={n} />
+                <span className="min-w-0 flex-1">
+                  <span className={`block text-sm ${n.read ? 'font-medium' : 'font-bold'}`}>{n.title}</span>
+                  <span className="block text-xs text-muted">{n.body}</span>
+                  <span className="mt-0.5 block text-[11px] text-muted">{ago(n.at)}</span>
+                </span>
+                {!n.read && <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-brand" aria-label="Non letta" />}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Sheet>
+  )
+}
+
+/** Avviso in primo piano quando arriva una nuova notifica mentre l'app è aperta. */
+export function NotificationToast() {
+  const { toast, dismissToast, setCenterOpen } = useApp()
+  if (!toast) return null
+  return (
+    <div className="pt-safe fixed inset-x-0 top-0 z-[60] flex justify-center px-3 pt-3" role="status" aria-live="polite">
+      <div className="flex w-full max-w-md animate-sheet items-start gap-3 rounded-2xl border border-line bg-surface p-3 shadow-xl">
+        <button className="flex min-w-0 flex-1 items-start gap-3 text-left" onClick={() => { dismissToast(); setCenterOpen(true) }}>
+          <Icon n={toast} />
+          <span className="min-w-0"><span className="block text-sm font-bold">{toast.title}</span><span className="block truncate text-xs text-muted">{toast.body}</span></span>
+        </button>
+        <button className="rounded-full p-1 text-muted hover:bg-line/60" aria-label="Chiudi" onClick={dismissToast}><X size={16} /></button>
+      </div>
+    </div>
+  )
+}

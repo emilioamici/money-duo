@@ -54,7 +54,9 @@ export function totalLiquidity(db: Db, bal: Record<string, number>, include: (a:
 
 export function inScope(db: Db, accs: Map<string, Account>, tx: Transaction, scope: Scope, me: MemberId | null): boolean {
   const involved = [tx.accountId, tx.toAccountId].map((id) => (id ? accs.get(id) : undefined)).filter((a): a is Account => !!a)
-  if (!involved.some((a) => visibleTo(db, a, me))) return false
+  // visibile se vedo uno dei conti coinvolti oppure se la transazione mi riguarda (pago io o sono tra chi si divide la spesa)
+  const concerns = !!me && (tx.paidBy === me || tx.participants.includes(me))
+  if (!concerns && !involved.some((a) => visibleTo(db, a, me))) return false
   if (scope === 'all') return true
   if (scope === 'shared') return involved.some((a) => isSharedAccount(db, a))
   return involved.some((a) => accountMemberIds(db, a).includes(scope))
