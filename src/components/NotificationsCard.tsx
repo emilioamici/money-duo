@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { BellRing } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
 import { engine } from '../sync/engine'
-import { disablePush, enablePush, pushConfigured, pushSupported, savePushConfig, pushUrl, vapidPublicKey, sendPush } from '../sync/push'
+import { configError, disablePush, enablePush, pushConfigured, pushSupported, savePushConfig, pushUrl, vapidPublicKey, sendPush } from '../sync/push'
 import { Toggle } from './ui'
 
 /** Impostazioni delle notifiche di sistema di questo dispositivo (le notifiche nell'app sono sempre attive). */
@@ -78,6 +78,13 @@ export function NotificationsCard() {
             <p>Serve il piccolo server di notifiche (guida in <b>worker/README.md</b>). Quando è pronto, inserisci qui i due valori.</p>
             <input className="input" placeholder="Indirizzo del server (https://….workers.dev)" defaultValue={pushUrl()} onBlur={(e) => { savePushConfig(e.target.value, vapidPublicKey()); bump((n) => n + 1) }} />
             <input className="input" placeholder="Chiave pubblica VAPID" defaultValue={vapidPublicKey()} onBlur={(e) => { savePushConfig(pushUrl(), e.target.value); bump((n) => n + 1) }} />
+            {configError() && <p className="text-exp">{configError()}</p>}
+          </div>
+        ) : configError() ? (
+          <div className="space-y-2 text-xs">
+            <p className="text-exp">{configError()}</p>
+            <input className="input" placeholder="Indirizzo del server (https://….workers.dev)" defaultValue={pushUrl()} onBlur={(e) => { savePushConfig(e.target.value, vapidPublicKey()); bump((n) => n + 1) }} />
+            <input className="input" placeholder="Chiave pubblica VAPID" defaultValue={vapidPublicKey()} onBlur={(e) => { savePushConfig(pushUrl(), e.target.value); bump((n) => n + 1) }} />
           </div>
         ) : !pushSupported() ? (
           <p className="text-xs text-muted">Questo browser non supporta le notifiche push. Su iPhone servono iOS 16.4+ e l'app aggiunta alla schermata Home.</p>
@@ -86,6 +93,16 @@ export function NotificationsCard() {
             <Toggle checked={prefs.pushEnabled} onChange={(v) => void togglePush(v)} label="Ricevi le notifiche anche con l'app chiusa" hint="Su questo dispositivo" />
             {prefs.pushEnabled && <button className="btn-soft w-full" disabled={pushBusy} onClick={() => void testPush()}>Invia una notifica push di prova</button>}
           </>
+        )}
+        {pushConfigured() && (
+          <details className="mt-3 text-xs">
+            <summary className="cursor-pointer text-muted">Impostazioni del server (modifica o rimuovi)</summary>
+            <div className="mt-2 space-y-2">
+              <input className="input" aria-label="Indirizzo del server" placeholder="Indirizzo del server (https://….workers.dev)" defaultValue={pushUrl()} onBlur={(e) => { savePushConfig(e.target.value, vapidPublicKey()); setPushMsg('Salvato. Se avevi già attivato le notifiche, disattiva e riattiva l\'interruttore per iscrivere di nuovo il dispositivo.'); bump((n) => n + 1) }} />
+              <input className="input" aria-label="Chiave pubblica VAPID" placeholder="Chiave pubblica VAPID" defaultValue={vapidPublicKey()} onBlur={(e) => { savePushConfig(pushUrl(), e.target.value); setPushMsg('Salvato. Se avevi già attivato le notifiche, disattiva e riattiva l\'interruttore per iscrivere di nuovo il dispositivo.'); bump((n) => n + 1) }} />
+              <button className="btn-danger w-full" onClick={() => { if (sync.fileId && prefs.pushEnabled) void disablePush(sync.fileId, engine.currentToken()); setPrefs({ pushEnabled: false }); savePushConfig('', ''); setPushMsg('Configurazione rimossa.'); bump((n) => n + 1) }}>Rimuovi la configurazione del server</button>
+            </div>
+          </details>
         )}
         {pushMsg && <p className="mt-2 text-sm text-muted">{pushMsg}</p>}
       </div>
