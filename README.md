@@ -104,7 +104,7 @@ Il file su Drive è marcato con la proprietà pubblica `moneyduo=db` (e nominato
 ## Sessione Google
 Il token d'accesso di Google dura **1 ora** e non si può allungare dal solo sito statico. Nella cache del dispositivo restano la famiglia collegata, i dati e l'email, quindi l'app si apre subito con i tuoi dati anche offline.
 
-**Senza server:** l'app **rinnova il token in silenzio** ai tocchi dell'utente, negli ultimi 15 minuti di validità (o dopo la scadenza), con `prompt: 'none'` (funziona se sei ancora collegato a Google e hai già dato il consenso; il browser può mostrare un popup che si chiude subito). Se non è possibile compare «Riconnetti». Il token resta in `sessionStorage`.
+**Senza server:** l'app **rinnova il token in silenzio** ai tocchi dell'utente, negli ultimi 15 minuti di validità (o dopo la scadenza), con `prompt: 'none'` (funziona se sei ancora collegato a Google e hai già dato il consenso; il browser può mostrare un popup che si chiude subito). Se non è possibile, o la sessione è scaduta, compare **a tutto schermo la schermata di accesso** e i dati restano nascosti finché non accedi di nuovo (l'app resta montata sotto, inerte: quello che stavi scrivendo non si perde). Offline, o con il server di accesso non raggiungibile, si restano sui dati locali. Il token resta in `sessionStorage`.
 
 **Con il server (facoltativo): accesso persistente.** Il Worker Cloudflare conserva, cifrato, un token di rinnovo e l'app ottiene token freschi da sola, **senza popup e anche in background**. Richiede il client secret nel Worker e di pubblicare l'app OAuth in produzione (in *Testing* i token di rinnovo scadono dopo 7 giorni): la guida con i compromessi di sicurezza è in [`worker/README.md`](worker/README.md#accesso-persistente-facoltativo).
 

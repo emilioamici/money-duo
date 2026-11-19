@@ -11,9 +11,9 @@ type Phase = 'login' | 'searching' | 'choose' | 'none'
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
 /** Schermata iniziale: accesso con Google, poi la famiglia viene trovata e collegata in automatico (o se ne crea una). */
-export function Gate() {
+export function Gate({ reconnect = false }: { reconnect?: boolean }) {
   const { sync, db } = useApp()
-  const [phase, setPhase] = useState<Phase>(sync.signedIn ? 'searching' : 'login')
+  const [phase, setPhase] = useState<Phase>(!reconnect && sync.signedIn ? 'searching' : 'login')
   const [dbs, setDbs] = useState<DriveFile[]>([])
   const [others, setOthers] = useState<DriveFile[]>([])
   const [busy, setBusy] = useState(false)
@@ -50,7 +50,8 @@ export function Gate() {
 
   // appena si è autenticati si cerca il database (una sola volta, anche con StrictMode)
   useEffect(() => {
-    if (sync.signedIn && !started.current) { started.current = true; void search() }
+    // in riconnessione la famiglia è già collegata: basta rifare l'accesso, non si cerca nulla
+    if (!reconnect && sync.signedIn && !started.current) { started.current = true; void search() }
   }, [sync.signedIn]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!myName && sync.name) setMyName(sync.name) }, [sync.name]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -68,7 +69,19 @@ export function Gate() {
       <div className="card space-y-4 p-5">
         {err && <p className="rounded-xl bg-exp/10 p-3 text-sm text-exp">{err}</p>}
 
-        {phase === 'login' && (
+        {phase === 'login' && reconnect && (
+          <>
+            <h2 className="text-lg font-bold">Sessione Google scaduta</h2>
+            <p className="text-sm text-muted">Per continuare accedi di nuovo{sync.email ? <> come <b className="text-ink">{sync.email}</b></> : ' con il tuo account Google'}. I tuoi dati sono al sicuro su Drive e rimangono nascosti finché non accedi.</p>
+            <button className="btn-primary w-full" disabled={busy} onClick={() => void login()}>
+              {busy ? <Loader2 size={18} className="animate-spin" /> : <UserRound size={18} />}Accedi con Google
+            </button>
+            <button className="btn-ghost w-full !text-xs" disabled={busy} onClick={() => void login(true)}>Usa un altro account Google</button>
+            <button className="btn-ghost w-full !text-xs" disabled={busy} onClick={() => engine.unlink()}>Scollega questa famiglia</button>
+          </>
+        )}
+
+        {phase === 'login' && !reconnect && (
           <>
             <p className="text-sm text-muted">Accedi con il <b>tuo account Google</b>. Se qualcuno ti ha invitato in una famiglia, la ritrovo io; altrimenti puoi crearne una nuova.</p>
             {!sync.clientId && (
@@ -134,7 +147,7 @@ export function Gate() {
           </>
         )}
 
-        {phase !== 'login' && phase !== 'searching' && (
+        {!reconnect && phase !== 'login' && phase !== 'searching' && (
           <button className="btn-ghost w-full !text-xs" disabled={busy} onClick={() => void login(true)}>Usa un altro account Google</button>
         )}
       </div>

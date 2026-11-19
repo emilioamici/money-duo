@@ -97,7 +97,12 @@ export class SyncEngine {
   private lastRenewTry = 0
 
   constructor() {
-    this.status = this.p.fileId ? (cachedToken() ? (this.p.dirty ? 'pending' : 'synced') : 'auth') : 'off'
+    // all'avvio: con la sessione persistente il rinnovo è in corso (niente schermata di accesso); offline si resta sui dati locali
+    this.status = !this.p.fileId ? 'off'
+      : cachedToken() ? (this.p.dirty ? 'pending' : 'synced')
+      : hasSession() ? 'syncing'
+      : typeof navigator !== 'undefined' && !navigator.onLine ? 'offline'
+      : 'auth'
     this.rebuild()
   }
 
@@ -177,8 +182,12 @@ export class SyncEngine {
         else this.rebuild()
         return true
       } catch (e) {
-        if (e instanceof SessionExpired) this.rebuild()
-        return !!cachedToken() // rete assente o server non raggiungibile: si riprova al prossimo giro
+        if (!cachedToken()) {
+          // sessione revocata o scaduta: serve un nuovo accesso; server non raggiungibile: si resta sui dati locali e si riprova
+          if (e instanceof SessionExpired) this.set('auth')
+          else if (this.p.fileId) this.set('offline')
+        } else this.rebuild()
+        return !!cachedToken()
       } finally { this.brokerBusy = null }
     })()
     return this.brokerBusy
@@ -222,6 +231,7 @@ export class SyncEngine {
    */
   async renewIfNeeded(): Promise<void> {
     if (hasSession()) return // ci pensa il rinnovo con la sessione persistente
+    if (this.status === 'auth') return // sessione scaduta: l'accesso lo avvia il pulsante nella schermata di login (evita due popup)
     if (!this.p.fileId || !this.p.email || this.renewing || !this.clientId) return
     if (tokenRemainingMs() > RENEW_WINDOW_MS) return
     if (Date.now() - this.lastRenewTry < RENEW_RETRY_MS) return
@@ -230,10 +240,9 @@ export class SyncEngine {
     try {
       await requestToken(this.clientId, { prompt: 'none', hint: this.p.email })
       this.lastRenewTry = 0 // riuscito: nessun ritardo per il prossimo rinnovo
-      if (this.status === 'auth') this.set(this.p.dirty ? 'pending' : 'synced')
-      else this.rebuild()
+      this.rebuild()
       void this.syncNow()
-    } catch { /* non riuscito: si riprova più tardi; alla scadenza compare «Riconnetti» */ } finally {
+    } catch { /* non riuscito: si riprova più tardi; alla scadenza compare la schermata di accesso */ } finally {
       this.renewing = false
     }
   }
@@ -350,7 +359,11 @@ export class SyncEngine {
     if (!navigator.onLine) return this.set('offline')
     let token = cachedToken()
     if (!token && hasSession()) { await this.brokerRenew(); token = cachedToken() }
-    if (!token) return this.set('auth')
+    if (!token) {
+      // server di accesso non raggiungibile (non sessione revocata): si resta sui dati locali, senza schermata di accesso
+      if (hasSession() && (this.status as SyncStatus) === 'offline') return
+      return this.set('auth')
+    }
 
     this.running = true
     clearTimeout(this.debounce)
