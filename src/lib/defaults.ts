@@ -1,3 +1,4 @@
+import { t } from '../i18n'
 import type { Account, Category, Db } from '../types'
 import { SCHEMA_VERSION } from '../types'
 import { nowIso, uid } from './ids'
@@ -42,15 +43,15 @@ const INCOME: Seed[] = [
 ]
 
 export function defaultCategories(): Category[] {
-  const t = SEED_TIME
+  const seedTime = SEED_TIME
   const out: Category[] = []
   let order = 0
   const push = (type: Category['type'], seeds: Seed[]) => {
     for (const s of seeds) {
       const id = `cat-${s.id}`
-      out.push({ id, name: s.name, type, parentId: null, icon: s.icon, color: s.color, hidden: false, order: order++, updatedAt: t })
+      out.push({ id, name: t(s.name), type, parentId: null, icon: s.icon, color: s.color, hidden: false, order: order++, updatedAt: seedTime })
       s.subs?.forEach(([name, icon], i) =>
-        out.push({ id: `${id}-${i}`, name, type, parentId: id, icon, color: s.color, hidden: false, order: order++, updatedAt: t }),
+        out.push({ id: `${id}-${i}`, name: t(name), type, parentId: id, icon, color: s.color, hidden: false, order: order++, updatedAt: seedTime }),
       )
     }
   }
@@ -60,20 +61,20 @@ export function defaultCategories(): Category[] {
 }
 
 export function defaultAccounts(): Account[] {
-  const t = SEED_TIME
+  const seedTime = SEED_TIME
   return [
-    { id: 'acc-cash', name: 'Contanti', group: 'cash', members: [], initialBalance: 0, excludeFromTotal: false, hidden: false, order: 0, createdAt: t, updatedAt: t },
-    { id: 'acc-shared', name: 'Conto Comune', group: 'bank', members: [], initialBalance: 0, excludeFromTotal: false, hidden: false, order: 1, createdAt: t, updatedAt: t },
+    { id: 'acc-cash', name: t('Contanti'), group: 'cash', members: [], initialBalance: 0, excludeFromTotal: false, hidden: false, order: 0, createdAt: seedTime, updatedAt: seedTime },
+    { id: 'acc-shared', name: t('Conto Comune'), group: 'bank', members: [], initialBalance: 0, excludeFromTotal: false, hidden: false, order: 1, createdAt: seedTime, updatedAt: seedTime },
   ]
 }
 
 /** DB locale vuoto (prima del login): nessun membro, dati di esempio mai modificati. */
 export function createDefaultDb(): Db {
-  const t = nowIso()
+  const now = nowIso()
   return {
     schemaVersion: SCHEMA_VERSION,
-    meta: { dbId: uid(), createdAt: t, updatedAt: t, updatedBy: '', revision: 0 },
-    family: { name: 'Famiglia', updatedAt: SEED_TIME },
+    meta: { dbId: uid(), createdAt: now, updatedAt: now, updatedBy: '', revision: 0 },
+    family: { name: t('Famiglia'), updatedAt: SEED_TIME },
     members: [],
     accounts: defaultAccounts(),
     categories: defaultCategories(),
@@ -85,13 +86,13 @@ export function createDefaultDb(): Db {
 
 /** Nuovo database per una famiglia appena creata: il creatore è il primo membro. */
 export function createFamilyDb(familyName: string, me: { name: string; email: string }): Db {
-  const t = nowIso()
+  const now = nowIso()
   const id = uid()
-  const accounts = defaultAccounts().map((a) => (a.id === 'acc-cash' ? { ...a, members: [id], updatedAt: t } : a))
+  const accounts = defaultAccounts().map((a) => (a.id === 'acc-cash' ? { ...a, members: [id], updatedAt: now } : a))
   return {
     ...createDefaultDb(),
-    family: { name: familyName.trim() || 'Famiglia', updatedAt: t },
-    members: [{ id, name: me.name.trim() || me.email.split('@')[0], email: me.email, color: MEMBER_COLORS[0], active: true, joinedAt: t, updatedAt: t }],
+    family: { name: familyName.trim() || t('Famiglia'), updatedAt: now },
+    members: [{ id, name: me.name.trim() || me.email.split('@')[0], email: me.email, color: MEMBER_COLORS[0], active: true, joinedAt: now, updatedAt: now }],
     accounts,
   }
 }

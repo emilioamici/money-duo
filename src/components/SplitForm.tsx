@@ -11,6 +11,8 @@ import { ask } from './dialogs'
 import { TxFooterActions } from './txActions'
 import { CategoryRow, Row, SelectField, TagsRow, TitleRow, accountLabel, plain } from './formParts'
 import { SplitEditor, resolveSplit, type SplitState } from './SplitEditor'
+import { t } from '../i18n'
+import { tb } from '../i18n/rich'
 
 interface PayerRow { key: string; member: string; accountId: string; amount: string }
 let rowKey = 0
@@ -86,17 +88,17 @@ export function SplitForm({ state, onClose }: { state: TxFormState; onClose: () 
 
   /** Pagamenti validi oppure messaggio d'errore. */
   const buildPayments = (): Payment[] | string => {
-    if (!cents || cents <= 0) return 'Inserisci un importo maggiore di zero.'
+    if (!cents || cents <= 0) return t('Inserisci un importo maggiore di zero.')
     const out: Payment[] = []
     for (const r of rows) {
-      if (!r.member) return 'Scegli chi ha pagato.'
-      if (!r.accountId) return `${nameOf(r.member)} non ha un conto da cui pagare: scegline un altro oppure aggiungi un conto condiviso con te.`
+      if (!r.member) return t('Scegli chi ha pagato.')
+      if (!r.accountId) return t('{name} non ha un conto da cui pagare: scegline un altro oppure aggiungi un conto condiviso con te.', { name: nameOf(r.member) })
       const v = rows.length === 1 ? cents : parseAmount(r.amount)
-      if (v === null || v <= 0) return `Inserisci quanto ha pagato ${nameOf(r.member)}.`
+      if (v === null || v <= 0) return t('Inserisci quanto ha pagato {name}.', { name: nameOf(r.member) })
       out.push({ member: r.member, accountId: r.accountId, amount: v })
     }
     const sum = out.reduce((a, p) => a + p.amount, 0)
-    if (sum !== cents) return `I pagamenti sommano ${formatMoney(sum)}, ma la spesa è di ${formatMoney(cents)}.`
+    if (sum !== cents) return t('I pagamenti sommano {sum}, ma la spesa è di {total}.', { sum: formatMoney(sum), total: formatMoney(cents) })
     return out
   }
 
@@ -131,7 +133,7 @@ export function SplitForm({ state, onClose }: { state: TxFormState; onClose: () 
 
   const remove = async () => {
     if (!tx) return
-    if (await ask({ title: 'Eliminare la spesa condivisa?', message: 'I saldi e i debiti verranno ricalcolati.', ok: 'Elimina', danger: true })) {
+    if (await ask({ title: t('Eliminare la spesa condivisa?'), message: t('I saldi e i debiti verranno ricalcolati.'), ok: t('Elimina'), danger: true })) {
       commit((d) => deleteTransaction(d, tx.id))
       onClose()
     }
@@ -142,50 +144,50 @@ export function SplitForm({ state, onClose }: { state: TxFormState; onClose: () 
   const allFilled = rows.every((r) => (parseAmount(r.amount) ?? 0) > 0)
 
   return (
-    <Sheet open onClose={onClose} title={tx ? 'Modifica split' : 'Nuovo split'}
+    <Sheet open onClose={onClose} title={tx ? t('Modifica split') : t('Nuovo split')}
       footer={
         <div className="flex gap-2">
-          {tx && <button className="btn-danger" onClick={remove} aria-label="Elimina"><Trash2 size={18} /></button>}
+          {tx && <button className="btn-danger" onClick={remove} aria-label={t('Elimina')}><Trash2 size={18} /></button>}
           {tx && <TxFooterActions tx={tx} />}
-          <button className="btn-primary flex-1" onClick={save}>Salva</button>
+          <button className="btn-primary flex-1" onClick={save}>{t('Salva')}</button>
         </div>
       }>
       <div className="mb-4 rounded-2xl bg-bg p-4 text-center">
-        <input inputMode="decimal" autoFocus={!tx} placeholder="0,00" value={amount} onChange={(e) => { setAmount(e.target.value); setError('') }}
+        <input inputMode="decimal" autoFocus={!tx} placeholder={t('0,00')} value={amount} onChange={(e) => { setAmount(e.target.value); setError('') }}
           className="w-full bg-transparent text-center text-4xl font-bold text-exp outline-none placeholder:text-line" />
-        <span className="text-xs text-muted">Importo totale della spesa, in euro</span>
+        <span className="text-xs text-muted">{t('Importo totale della spesa, in euro')}</span>
       </div>
 
       <div className="-mx-1">
-        <Row label="Data"><input type="datetime-local" className={plain} value={date} onChange={(e) => setDate(e.target.value)} /></Row>
+        <Row label={t('Data')}><input type="datetime-local" className={plain} value={date} onChange={(e) => setDate(e.target.value)} /></Row>
         <CategoryRow type="expense" value={categoryId} onChange={setCategoryId} />
-        <TitleRow value={title} onChange={setTitle} placeholder={'Es. Cena di sabato'} />
-        <Row label="Note"><textarea className={`${plain} resize-none`} rows={1} value={note} onChange={(e) => setNote(e.target.value)} /></Row>
+        <TitleRow value={title} onChange={setTitle} placeholder={t('Es. Cena di sabato')} />
+        <Row label={t('Note')}><textarea className={`${plain} resize-none`} rows={1} value={note} onChange={(e) => setNote(e.target.value)} /></Row>
         <TagsRow value={tags} onChange={setTags} />
       </div>
 
-      <h3 className="label mt-5">Pagato da</h3>
+      <h3 className="label mt-5">{t('Pagato da')}</h3>
       <div className="space-y-2">
         {rows.map((r) => {
           const list = eligible(r.member, r.accountId)
           return (
             <div key={r.key} className="rounded-2xl bg-bg p-3" data-testid="payer">
               <div className="flex items-center gap-2">
-                <div className="flex-1"><SelectField ariaLabel="Chi ha pagato" className={`${plain} font-semibold`} value={r.member} onChange={(v) => changePayer(r.key, v)} options={payerOptions} /></div>
-                {multi && <button type="button" aria-label="Rimuovi questo pagamento" className="rounded-full p-1.5 text-muted hover:bg-line/60" onClick={() => setRows(rows.filter((x) => x.key !== r.key))}><X size={16} /></button>}
+                <div className="flex-1"><SelectField ariaLabel={t('Chi ha pagato')} className={`${plain} font-semibold`} value={r.member} onChange={(v) => changePayer(r.key, v)} options={payerOptions} /></div>
+                {multi && <button type="button" aria-label={t('Rimuovi questo pagamento')} className="rounded-full p-1.5 text-muted hover:bg-line/60" onClick={() => setRows(rows.filter((x) => x.key !== r.key))}><X size={16} /></button>}
               </div>
               <div className="flex items-center gap-2 border-t border-line/60 pt-1">
-                <span className="shrink-0 text-xs text-muted">dal conto</span>
+                <span className="shrink-0 text-xs text-muted">{t('dal conto')}</span>
                 <div className="min-w-0 flex-1">
-                  <SelectField ariaLabel={`Conto di ${nameOf(r.member)}`} className={`${plain} !text-sm`} value={r.accountId} onChange={(v) => setRow(r.key, { accountId: v })}
-                    options={list.length ? list.map((a) => ({ value: a.id, label: accountLabel(a, nameOf) })) : [{ value: '', label: `Nessun conto di ${nameOf(r.member)} visibile a te`, disabled: true }]} />
+                  <SelectField ariaLabel={t('Conto di {name}', { name: nameOf(r.member) })} className={`${plain} !text-sm`} value={r.accountId} onChange={(v) => setRow(r.key, { accountId: v })}
+                    options={list.length ? list.map((a) => ({ value: a.id, label: accountLabel(a, nameOf) })) : [{ value: '', label: t('Nessun conto di {name} visibile a te', { name: nameOf(r.member) }), disabled: true }]} />
                 </div>
               </div>
               {multi && (
                 <div className="flex items-center gap-2 border-t border-line/60 pt-1">
-                  <span className="shrink-0 text-xs text-muted">ha pagato</span>
+                  <span className="shrink-0 text-xs text-muted">{t('ha pagato')}</span>
                   <span className="flex flex-1 items-center justify-end">
-                    <input inputMode="decimal" aria-label={`Importo pagato da ${nameOf(r.member)}`} placeholder="0,00" className="w-28 bg-transparent py-1.5 text-right text-[15px] outline-none"
+                    <input inputMode="decimal" aria-label={t('Importo pagato da {name}', { name: nameOf(r.member) })} placeholder={t('0,00')} className="w-28 bg-transparent py-1.5 text-right text-[15px] outline-none"
                       value={r.amount} onChange={(e) => { setRow(r.key, { amount: e.target.value }); setError('') }} />
                     <span className="pl-1 text-sm text-muted">€</span>
                   </span>
@@ -197,19 +199,19 @@ export function SplitForm({ state, onClose }: { state: TxFormState; onClose: () 
       </div>
       {multi && (
         <p className={`mt-1.5 text-xs ${left === 0 && allFilled ? 'font-semibold text-inc' : left < 0 ? 'font-semibold text-exp' : 'text-muted'}`}>
-          {left === 0 && allFilled ? 'Pagamenti completi' : left < 0 ? `Superato di ${formatMoney(-left)}` : !allFilled ? 'Inserisci quanto ha pagato ciascuno' : `Restano ${formatMoney(left)} da attribuire ai pagamenti`}
+          {left === 0 && allFilled ? t('Pagamenti completi') : left < 0 ? t('Superato di {v}', { v: formatMoney(-left) }) : !allFilled ? t('Inserisci quanto ha pagato ciascuno') : t('Restano {v} da attribuire ai pagamenti', { v: formatMoney(left) })}
         </p>
       )}
-      <button type="button" className="btn-soft mt-2 w-full" onClick={addPayer}><Plus size={16} />Aggiungi chi ha pagato</button>
+      <button type="button" className="btn-soft mt-2 w-full" onClick={addPayer}><Plus size={16} />{t('Aggiungi chi ha pagato')}</button>
 
-      <h3 className="label mt-5">Divisione</h3>
+      <h3 className="label mt-5">{t('Divisione')}</h3>
       <SplitEditor state={split} onChange={(s) => { setSplit(s); setError('') }} members={splitMembers} cents={cents} payerIds={rows.map((r) => r.member)} />
 
       {preview && (
         <div className="mt-3 rounded-xl bg-brand/10 p-3 text-sm">
           {preview.debts.length === 0
-            ? <p className="text-muted">Nessun debito: ognuno ha pagato esattamente la sua quota.</p>
-            : <ul className="space-y-1">{preview.debts.map((d) => <li key={d.debtor + d.creditor}><b>{nameOf(d.debtor)}</b> deve a <b>{nameOf(d.creditor)}</b> <b className="tabular-nums">{formatMoney(d.amount)}</b></li>)}</ul>}
+            ? <p className="text-muted">{t('Nessun debito: ognuno ha pagato esattamente la sua quota.')}</p>
+            : <ul className="space-y-1">{preview.debts.map((d) => <li key={d.debtor + d.creditor}>{tb('<b>{a}</b> deve a <b>{b}</b>', { a: nameOf(d.debtor), b: nameOf(d.creditor) })} <b className="tabular-nums">{formatMoney(d.amount)}</b></li>)}</ul>}
         </div>
       )}
       {error && <p className="mt-3 text-sm font-medium text-exp">{error}</p>}

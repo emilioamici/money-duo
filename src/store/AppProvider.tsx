@@ -8,6 +8,7 @@ import { engine, type SyncState } from '../sync/engine'
 import { PushHttpError, enablePush, pushConfigured, pushSupported, refreshPush, sendPush } from '../sync/push'
 import { enqueue, flushQueue, type QueuedPush, type SendResult } from '../sync/pushQueue'
 import { cacheState, getCacheHealth, getLoadedCache, subscribeCacheHealth, writeCache } from './cache'
+import { t } from '../i18n'
 
 const PREFS_KEY = 'moneyduo:prefs'
 
@@ -204,7 +205,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [db.members, sync.email])
   meIdRef.current = me?.id ?? null
   meRef.current = me
-  const nameOf = useCallback((id: string | null) => (id ? db.members.find((m) => m.id === id)?.name ?? 'Ex membro' : 'Conto condiviso'), [db.members])
+  const nameOf = useCallback((id: string | null) => (id ? db.members.find((m) => m.id === id)?.name ?? t('Ex membro') : t('Conto condiviso')), [db.members])
 
   // push: a ogni apertura si rinnova l'iscrizione; un messaggio dal service worker (app in primo piano) fa sincronizzare subito
   useEffect(() => {

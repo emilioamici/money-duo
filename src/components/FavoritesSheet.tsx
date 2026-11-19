@@ -8,6 +8,7 @@ import { copyOf, deleteFavorite } from '../lib/mutations'
 import { CatBubble, Sheet } from './ui'
 import { MascotImg } from './Mascots'
 import { ask } from './dialogs'
+import { t } from '../i18n'
 
 /** Elenco dei preferiti: toccandone uno si apre il form di una nuova transazione con quei dati e la data di adesso. */
 export function FavoritesSheet({ onClose }: { onClose: () => void }) {
@@ -21,16 +22,16 @@ export function FavoritesSheet({ onClose }: { onClose: () => void }) {
 
   const use = (f: Favorite) => { onClose(); (isSplit(f) ? openSplit : openTx)({ initial: copyOf(f) }) }
   const remove = async (f: Favorite) => {
-    if (await ask({ title: 'Rimuovere dai preferiti?', message: 'Le transazioni già inserite non cambiano.', ok: 'Rimuovi', danger: true })) commit((d) => deleteFavorite(d, f.id))
+    if (await ask({ title: t('Rimuovere dai preferiti?'), message: t('Le transazioni già inserite non cambiano.'), ok: t('Rimuovi'), danger: true })) commit((d) => deleteFavorite(d, f.id))
   }
 
   return (
-    <Sheet open onClose={onClose} title="Preferiti">
+    <Sheet open onClose={onClose} title={t('Preferiti')}>
       {mine.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-10 text-center text-muted">
           <MascotImg kind="zenitsu" className="h-20 w-auto" />
-          <p className="font-semibold text-ink">Nessun preferito</p>
-          <p className="max-w-xs text-sm">Apri una transazione e tocca la stella, oppure scorri una riga verso sinistra: la ritroverai qui, pronta da copiare con la data di oggi.</p>
+          <p className="font-semibold text-ink">{t('Nessun preferito')}</p>
+          <p className="max-w-xs text-sm">{t('Apri una transazione e tocca la stella, oppure scorri una riga verso sinistra: la ritroverai qui, pronta da copiare con la data di oggi.')}</p>
         </div>
       ) : (
         <ul className="-mx-2 divide-y divide-line/60">
@@ -38,20 +39,20 @@ export function FavoritesSheet({ onClose }: { onClose: () => void }) {
             const cat = f.categoryId ? cats.get(f.categoryId) : undefined
             const acc = accs.get(f.accountId)
             const hidden = acc && !visibleTo(db, acc, me?.id ?? null)
-            const title = f.title || (f.type === 'transfer' ? 'Trasferimento' : cat?.name ?? (f.type === 'income' ? 'Entrata' : 'Uscita'))
+            const title = f.title || (f.type === 'transfer' ? t('Trasferimento') : cat?.name ?? (f.type === 'income' ? t('Entrata') : t('Uscita')))
             return (
               <li key={f.id} className="flex items-center gap-1">
-                <button type="button" onClick={() => use(f)} className="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-2 py-3 text-left hover:bg-line/30 active:bg-line/50" aria-label={`Usa il preferito ${title}`}>
+                <button type="button" onClick={() => use(f)} className="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-2 py-3 text-left hover:bg-line/30 active:bg-line/50" aria-label={t('Usa il preferito {title}', { title })}>
                   {f.type === 'transfer'
                     ? <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-trf/15 text-trf"><ArrowLeftRight size={18} /></span>
                     : <CatBubble icon={cat?.icon ?? '❔'} color={cat?.color ?? '#94a3b8'} />}
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-semibold">{title}</span>
-                    <span className="block truncate text-xs text-muted">{[cat?.name, hidden ? 'Conto privato' : acc?.name, isSplit(f) ? 'Split' : ''].filter(Boolean).join(' · ')}</span>
+                    <span className="block truncate text-xs text-muted">{[cat?.name, hidden ? t('Conto privato') : acc?.name, isSplit(f) ? t('Split') : ''].filter(Boolean).join(' · ')}</span>
                   </span>
                   <span className={`shrink-0 font-bold tabular-nums ${f.type === 'income' ? 'text-inc' : f.type === 'expense' ? 'text-exp' : 'text-trf'}`}>{formatMoney(f.amount)}</span>
                 </button>
-                <button type="button" onClick={() => void remove(f)} className="rounded-full p-2 text-muted hover:bg-line/60" aria-label={`Rimuovi ${title} dai preferiti`}><Trash2 size={17} /></button>
+                <button type="button" onClick={() => void remove(f)} className="rounded-full p-2 text-muted hover:bg-line/60" aria-label={t('Rimuovi {title} dai preferiti', { title })}><Trash2 size={17} /></button>
               </li>
             )
           })}

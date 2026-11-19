@@ -4,6 +4,8 @@ import { useApp } from '../store/AppProvider'
 import { newMember, saveMember } from '../lib/mutations'
 import { nowIso } from '../lib/ids'
 import { Sheet, MemberAvatar } from './ui'
+import { t } from '../i18n'
+import { tb } from '../i18n/rich'
 
 /**
  * Collega l'account Google al membro della famiglia:
@@ -32,15 +34,15 @@ export function IdentityGuard() {
   const addNew = () => commit((d) => (d.members.some((m) => m.active && m.email?.toLowerCase() === sync.email!.toLowerCase()) ? d : saveMember(d, newMember(d, sync.name || sync.email!.split('@')[0], sync.email, true))))
 
   return (
-    <Sheet open onClose={() => undefined} title="Chi sei?">
-      <p className="mb-4 flex items-start gap-2 text-sm text-muted"><UserCheck size={18} className="mt-0.5 shrink-0 text-brand" />Hai effettuato l'accesso come <b className="text-ink">{sync.email}</b>. Scegli quale membro della famiglia sei: l'account verrà associato e vedrai i tuoi conti.</p>
+    <Sheet open onClose={() => undefined} title={t('Chi sei?')}>
+      <p className="mb-4 flex items-start gap-2 text-sm text-muted"><UserCheck size={18} className="mt-0.5 shrink-0 text-brand" />{tb('Hai effettuato l\'accesso come <b>{email}</b>. Scegli quale membro della famiglia sei: l\'account verrà associato e vedrai i tuoi conti.', { email: sync.email ?? '' })}</p>
       <div className="space-y-2">
         {unclaimed.map((m) => (
           <button key={m.id} className="flex w-full items-center gap-3 rounded-xl border border-line p-3 text-left hover:bg-line/40" onClick={() => claim(m.id)}>
-            <MemberAvatar name={m.name} color={m.color} /><span className="font-semibold">Sono {m.name}</span>
+            <MemberAvatar name={m.name} color={m.color} /><span className="font-semibold">{t('Sono {name}', { name: m.name })}</span>
           </button>
         ))}
-        <button className="btn-soft w-full" onClick={addNew}>Nessuno di questi: aggiungimi come nuovo membro</button>
+        <button className="btn-soft w-full" onClick={addNew}>{t('Nessuno di questi: aggiungimi come nuovo membro')}</button>
       </div>
     </Sheet>
   )

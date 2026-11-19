@@ -4,6 +4,7 @@ import { accountById, categoryById, involvedAccountIds, isSplit, txPayerIds, vis
 import { formatMoney, timeLabel } from '../lib/format'
 import { CatBubble } from './ui'
 import { useMemo } from 'react'
+import { t } from '../i18n'
 import { ArrowLeftRight, Copy, Pencil, Trash2 } from 'lucide-react'
 import { deleteTransaction } from '../lib/mutations'
 import { ask } from './dialogs'
@@ -15,7 +16,7 @@ export function TransactionRow({ tx }: { tx: Transaction }) {
   const { db, nameOf, openTx, me, commit } = useApp()
   const { copy } = useTxActions()
   const remove = async () => {
-    if (await ask({ title: 'Eliminare la transazione?', message: 'I saldi verranno ricalcolati.', ok: 'Elimina', danger: true })) commit((d) => deleteTransaction(d, tx.id))
+    if (await ask({ title: t('Eliminare la transazione?'), message: t('I saldi verranno ricalcolati.'), ok: t('Elimina'), danger: true })) commit((d) => deleteTransaction(d, tx.id))
   }
   const accs = useMemo(() => accountById(db), [db])
   const cats = useMemo(() => categoryById(db), [db])
@@ -26,14 +27,14 @@ export function TransactionRow({ tx }: { tx: Transaction }) {
   const extraAccounts = tx.type === 'expense' ? involvedAccountIds(tx).length - 1 : 0
   const to = tx.toAccountId ? accs.get(tx.toAccountId) : undefined
 
-  const title = tx.title || (tx.type === 'transfer' ? 'Trasferimento' : cat?.name ?? (tx.type === 'income' ? 'Entrata' : 'Uscita'))
-  const accName = (a?: typeof from) => (!a ? '?' : visibleTo(db, a, me?.id ?? null) ? a.name : 'Conto privato')
+  const title = tx.title || (tx.type === 'transfer' ? t('Trasferimento') : cat?.name ?? (tx.type === 'income' ? t('Entrata') : t('Uscita')))
+  const accName = (a?: typeof from) => (!a ? '?' : visibleTo(db, a, me?.id ?? null) ? a.name : t('Conto privato'))
   const sub = tx.type === 'transfer'
     ? `${accName(from)} → ${accName(to)}`
     : [parent ? `${parent.name} › ${cat?.name}` : cat?.name, accName(from) + (extraAccounts > 0 ? ` +${extraAccounts}` : '')].filter(Boolean).join(' · ')
   const badge = isSplit(tx)
-    ? `Split · ${tx.participants.length}${payerIds.length ? ` · ${payerIds.map(nameOf).join(' + ')}` : ''}`
-    : tx.type !== 'transfer' && tx.paidBy && !(from?.members.length === 1 && from.members[0] === tx.paidBy) ? `Pagato da ${nameOf(tx.paidBy)}` : ''
+    ? `${t('Split')} · ${tx.participants.length}${payerIds.length ? ` · ${payerIds.map(nameOf).join(' + ')}` : ''}`
+    : tx.type !== 'transfer' && tx.paidBy && !(from?.members.length === 1 && from.members[0] === tx.paidBy) ? t('Pagato da {name}', { name: nameOf(tx.paidBy) }) : ''
   const color = tx.type === 'income' ? 'text-inc' : tx.type === 'expense' ? 'text-exp' : 'text-trf'
 
   return (

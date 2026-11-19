@@ -1,3 +1,4 @@
+import { t } from '../i18n'
 /** Google Identity Services (token model). Il token vive in memoria + sessionStorage (scade dopo ~1h). */
 
 export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive'
@@ -23,7 +24,7 @@ export function loadGis(): Promise<void> {
     s.onload = () => resolve()
     s.onerror = () => {
       scriptPromise = null
-      reject(new GoogleAuthError('Impossibile caricare Google Identity Services (sei offline?).'))
+      reject(new GoogleAuthError(t('Impossibile caricare Google Identity Services (sei offline?).')))
     }
     document.head.appendChild(s)
   })
@@ -62,7 +63,7 @@ export type Prompt = '' | 'none' | 'consent' | 'select_account'
 
 /** Richiede un token. Da chiamare in risposta a un gesto dell'utente (altrimenti il popup può essere bloccato). */
 export async function requestToken(clientId: string, opts: { prompt?: Prompt; hint?: string } = {}): Promise<string> {
-  if (!clientId) throw new GoogleAuthError('Client ID Google non configurato.')
+  if (!clientId) throw new GoogleAuthError(t('Client ID Google non configurato.'))
   await loadGis()
   return new Promise<string>((resolve, reject) => {
     const client = window.google.accounts.oauth2.initTokenClient({
@@ -76,7 +77,7 @@ export async function requestToken(clientId: string, opts: { prompt?: Prompt; hi
         try { sessionStorage.setItem(SK, JSON.stringify(tok)) } catch { /* noop */ }
         resolve(tok.value)
       },
-      error_callback: (e: any) => reject(new GoogleAuthError(e?.type === 'popup_closed' ? 'Accesso annullato.' : e?.message || e?.type || 'Accesso non riuscito.')),
+      error_callback: (e: any) => reject(new GoogleAuthError(e?.type === 'popup_closed' ? t('Accesso annullato.') : e?.message || e?.type || t('Accesso non riuscito.'))),
     })
     client.requestAccessToken()
   })

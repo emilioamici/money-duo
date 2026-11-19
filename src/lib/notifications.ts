@@ -2,6 +2,7 @@ import type { Db, MemberId, Transaction } from '../types'
 import { accountById, accountMemberIds, categoryById, expenseShares, inScope, involvedAccountIds, txPayerIds, visibleTo } from './calc'
 import { formatMoney } from './format'
 import { nowIso } from './ids'
+import { t as tr } from '../i18n'
 
 export type NotifKind = 'tx' | 'account-new' | 'account-shared'
 
@@ -28,7 +29,7 @@ const GROUP_AFTER = 3 // oltre questa soglia, per tipo, si manda un riepilogo in
  */
 export function diffNotifications(prev: Db, next: Db, me: MemberId): Notif[] {
   const at = nowIso()
-  const who = (id?: string | null) => (id ? next.members.find((m) => m.id === id)?.name ?? 'Un membro' : 'Un membro')
+  const who = (id?: string | null) => (id ? next.members.find((m) => m.id === id)?.name ?? tr('Un membro') : tr('Un membro'))
   const accs = accountById(next)
   const cats = categoryById(next)
   const out: Notif[] = []
@@ -41,18 +42,18 @@ export function diffNotifications(prev: Db, next: Db, me: MemberId): Notif[] {
     const payers = txPayerIds(t)
     // se partecipo alla spesa e non l'ho pagata da solo, mi interessa la mia quota
     const myShare = t.type === 'expense' && payers.length > 0 && !(payers.length === 1 && payers[0] === me) ? expenseShares(t).find((s) => s.member === me)?.amount : undefined
-    const kind = t.type === 'expense' ? 'una spesa' : t.type === 'income' ? "un'entrata" : 'un trasferimento'
+    const kind = t.type === 'expense' ? tr('una spesa') : t.type === 'income' ? tr('un\'entrata') : tr('un trasferimento')
     const label = t.title || (t.categoryId ? cats.get(t.categoryId)?.name : '') || ''
     const accName = acc?.name ?? ''
     return {
       id: `tx:${t.id}:${t.updatedAt}`, kind: 'tx', at, read: false, txId: t.id,
-      title: myShare ? `${who(t.by)} ha aggiunto una spesa condivisa con te` : `${who(t.by)} ha aggiunto ${kind}`,
-      body: [formatMoney(t.amount), label, accName].filter(Boolean).join(' · ') + (myShare ? ` — la tua quota: ${formatMoney(myShare)}` : ''),
+      title: myShare ? tr('{who} ha aggiunto una spesa condivisa con te', { who: who(t.by) }) : tr('{who} ha aggiunto {kind}', { who: who(t.by), kind }),
+      body: [formatMoney(t.amount), label, accName].filter(Boolean).join(' · ') + (myShare ? ' — ' + tr('la tua quota: {v}', { v: formatMoney(myShare) }) : ''),
     }
   }
   if (newTx.length > GROUP_AFTER) {
     out.push({ id: `tx:group:${newTx.map((t) => t.id).sort()[0]}:${newTx.length}`, kind: 'tx', at, read: false,
-      title: `${newTx.length} nuove transazioni condivise`, body: [...new Set(newTx.map((t) => who(t.by)))].join(', ') })
+      title: tr('{n} nuove transazioni condivise', { n: newTx.length }), body: [...new Set(newTx.map((t) => who(t.by)))].join(', ') })
   } else out.push(...newTx.map(txNotif))
 
   // ----- conti
@@ -65,12 +66,12 @@ export function diffNotifications(prev: Db, next: Db, me: MemberId): Notif[] {
       const common = ids.length > 1
       const names = ids.map((id) => who(id)).join(', ')
       return isNew && common
-        ? { id: `acc:${a.id}:new`, kind: 'account-new' as const, at, read: false, accountId: a.id, title: `Nuovo conto in comune: ${a.name}`, body: `Aggiunto da ${who(a.by)} · con ${names}` }
-        : { id: `acc:${a.id}:shared:${a.updatedAt}`, kind: 'account-shared' as const, at, read: false, accountId: a.id, title: `${who(a.by)} ha condiviso con te il conto «${a.name}»`, body: common ? `Condiviso con ${names}` : 'Conto personale condiviso con te' }
+        ? { id: `acc:${a.id}:new`, kind: 'account-new' as const, at, read: false, accountId: a.id, title: tr('Nuovo conto in comune: {name}', { name: a.name }), body: tr('Aggiunto da {who} · con {names}', { who: who(a.by), names }) }
+        : { id: `acc:${a.id}:shared:${a.updatedAt}`, kind: 'account-shared' as const, at, read: false, accountId: a.id, title: tr('{who} ha condiviso con te il conto «{name}»', { who: who(a.by), name: a.name }), body: common ? tr('Condiviso con {names}', { names }) : tr('Conto personale condiviso con te') }
     })
   if (accNotifs.length > GROUP_AFTER) {
     out.push({ id: `acc:group:${accNotifs.map((n) => n.accountId).sort()[0]}:${accNotifs.length}`, kind: 'account-shared', at, read: false,
-      title: `${accNotifs.length} conti condivisi con te`, body: accNotifs.map((n) => n.title).slice(0, 3).join(' · ') })
+      title: tr('{n} conti condivisi con te', { n: accNotifs.length }), body: accNotifs.map((n) => n.title).slice(0, 3).join(' · ') })
   } else out.push(...accNotifs)
   return out
 }
