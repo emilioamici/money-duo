@@ -31,7 +31,7 @@ export function AccountForm({ account, onClose }: { account?: Account; onClose: 
     const t = nowIso()
     commit((d) => saveAccount(d, {
       id: account?.id ?? uid(), name: name.trim(), group, members: everyone ? [] : ids, initialBalance: bal, excludeFromTotal: exclude, hidden,
-      order: account?.order ?? nextOrder(d.accounts), createdAt: account?.createdAt ?? t, updatedAt: t,
+      order: account?.order ?? nextOrder(d.accounts), by: me?.id ?? null, createdAt: account?.createdAt ?? t, updatedAt: t,
     }))
     onClose()
   }

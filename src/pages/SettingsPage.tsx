@@ -1,8 +1,10 @@
 import { useRef, useState } from 'react'
 import { ChevronRight, Download, RotateCcw, ShieldCheck, Tags, Upload } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
+import { NotificationBell } from '../components/Notifications'
 import { SyncCard } from '../components/SyncCard'
 import { FamilyCard } from '../components/FamilyCard'
+import { NotificationsCard } from '../components/NotificationsCard'
 import { ask } from '../components/dialogs'
 import { CategoriesPage } from './CategoriesPage'
 import { mergeDb, parseDb, replaceData } from '../lib/merge'
@@ -46,9 +48,11 @@ export function SettingsPage({ syncRef }: { syncRef: React.RefObject<HTMLDivElem
 
   return (
     <div>
-      <div className="px-4 pb-3 pt-safe"><h1 className="pt-3 text-xl font-extrabold tracking-tight">Impostazioni</h1></div>
+      <div className="px-4 pb-3 pt-safe"><div className="flex items-center justify-between pt-3"><h1 className="text-xl font-extrabold tracking-tight">Impostazioni</h1><NotificationBell /></div></div>
       <div className="space-y-4 px-4">
         <FamilyCard />
+
+        <NotificationsCard />
 
         <div ref={syncRef}><SyncCard /></div>
 

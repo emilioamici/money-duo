@@ -13,8 +13,9 @@ React + TypeScript + Vite + Tailwind CSS. Il database è un file JSON nel **Goog
 - **Famiglia:** il capofamiglia crea il database scegliendo la **cartella di Drive** dove salvarlo, poi **invita i membri con la loro email Google** da Impostazioni → Famiglia. Nessun limite al numero di membri; i membri si possono rimuovere (l'accesso al file viene revocato e lo storico resta).
 - **Conti:** ogni conto è **personale** (un membro), **condiviso con più membri** (selezionabili) o di **tutta la famiglia**. Saldo per conto e totale liquidità (con esclusione di investimenti/fondi vincolati), **aggiungi / nascondi / mostra** senza perdere lo storico.
 - **Categorie** e sottocategorie con icona e colore, aggiungi / nascondi / mostra (cascata sui figli).
-- **Transazioni:** uscite, entrate e giroconti; chi ha pagato e **con chi dividere la spesa** (parti uguali tra i membri scelti, oppure anticipo per altri); modifica/eliminazione con ricalcolo immediato dei saldi.
+- **Transazioni:** uscite, entrate e trasferimenti; chi ha pagato e **con chi dividere la spesa** (parti uguali, **importi precisi** o **percentuali**, oppure anticipo per altri); modifica/eliminazione con ricalcolo immediato dei saldi.
 - **Dashboard:** navigazione mensile, filtri (Tutti / Condivisi / singolo membro), conto e ricerca testuale; statistiche per categoria; **saldi tra i membri** con registrazione del rimborso.
+- **Notifiche:** quando un altro membro aggiunge una transazione che ti riguarda, un conto in comune, o condivide un conto con te (vedi sotto).
 - Esporta / Importa JSON (unisci o sostituisci; i file del formato precedente vengono migrati). Interfaccia in italiano, tema chiaro/scuro automatico.
 
 > **Visibilità dei conti = filtro dell'app, non sicurezza.** Il database è un unico file condiviso con tutta la famiglia: l'app mostra a ciascuno solo i conti suoi o condivisi con lui, ma chi ha accesso al file può aprirlo da Drive e leggere tutto. Invita solo persone di cui ti fidi.
@@ -55,6 +56,20 @@ L'app si apre sulla schermata **Accedi con Google**: nessun profilo da creare n�
 
 > **Modalità Testing di Google:** finché l'app OAuth non è pubblicata, **ogni email invitata va aggiunta anche tra gli *utenti di prova*** in Google Cloud Console (*Pubblico → Utenti di prova*), altrimenti la persona riceve `access_denied`. Pubblicare l'app richiede la verifica di Google, e lo scope `drive` è "ristretto" (di norma serve una valutazione di sicurezza).
 
+## Notifiche
+Ricevi una notifica quando **un altro membro**:
+1. aggiunge una **transazione** su un conto in comune o condiviso con te, oppure una spesa **divisa con te** (con la tua quota);
+2. aggiunge un **conto in comune**;
+3. **condivide con te un conto** (nuovo, oppure un conto esistente che ora ti include).
+
+Le tue modifiche non notificano mai, e nemmeno i conti personali degli altri. La transazione divisa con te è visibile nel tuo elenco anche se è su un conto che non vedi.
+
+Come funziona, senza server: ogni dispositivo confronta i dati appena ricevuti da Drive con quelli che aveva e ne ricava le notifiche (`src/lib/notifications.ts`, funzione pura e testata). Il collegamento iniziale a un database non genera notifiche. Quelle perse con l'app chiusa compaiono alla riapertura, alla prima sincronizzazione.
+- **Nell'app:** campanella con contatore, elenco (tocco = apre la transazione o i Conti) e un avviso quando arrivano con l'app in primo piano. Sono salvate per famiglia e per membro su quel dispositivo.
+- **Del dispositivo:** si attivano in *Impostazioni → Notifiche* (Android, desktop; su iPhone serve iOS 16.4+ con l'app aggiunta alla schermata Home) e partono solo se l'app è in background.
+
+> **Limite:** il sito è statico e non ha un server, quindi non c'è un push che sveglia il telefono ad app chiusa. L'app controlla Drive ogni 2 minuti finché è aperta o in background (i browser possono rallentare o sospendere i timer) e la sessione Google dura 1 ora (vedi «Sessione Google»). Un push vero richiederebbe un piccolo backend (Web Push + notifiche di modifica di Drive).
+
 ## Schema del JSON (`schemaVersion: 2`)
 ```jsonc
 {
@@ -64,13 +79,15 @@ L'app si apre sulla schermata **Accedi con Google**: nessun profilo da creare n�
   "members": [{ "id", "name", "email": "account Google | null", "color": "#6366f1", "active": true, "joinedAt": "ISO | null", "updatedAt" }],
   "accounts": [{ "id", "name", "group": "cash|bank|card|savings|investment|other",
                  "members": ["<id membro>"] /* [] = tutta la famiglia, 1 = personale */,
-                 "initialBalance": 0, "excludeFromTotal": false, "hidden": false, "order": 0, "createdAt", "updatedAt" }],
+                 "initialBalance": 0, "excludeFromTotal": false, "hidden": false, "order": 0, "by": "<id membro>", "createdAt", "updatedAt" }],
   "categories": [{ "id", "name", "type": "expense|income", "parentId": null, "icon": "🛒", "color": "#f97316",
                    "hidden": false, "order": 0, "updatedAt" }],
   "transactions": [{ "id", "type": "expense|income|transfer", "amount": 1250, "date": "ISO",
                      "accountId", "toAccountId": null, "categoryId": null, "title": "", "note": "",
                      "paidBy": "<id membro> | null" /* null = conto condiviso */,
-                     "participants": ["<id membro>"] /* chi si divide la spesa; [] = personale */, "createdAt", "updatedAt" }],
+                     "participants": ["<id membro>"] /* chi si divide la spesa; [] = personale */,
+                     "splitMode": "equal|amount|percent", "splitValues": { "<id membro>": 5000 } /* centesimi (amount) o centesimi di punto, 5000 = 50% (percent); null se equal */,
+                     "by": "<id membro che l'ha aggiunta>", "createdAt", "updatedAt" }],
   "deleted": { "<id>": "ISO" }
 }
 ```
@@ -78,14 +95,24 @@ Gli importi sono **interi in centesimi**. `deleted` contiene le lapidi che perme
 
 Il file su Drive è marcato con la proprietà pubblica `moneyduo=db` (e nominato `moneyduo-db-<famiglia>.json`), così l'app lo ritrova anche quando è condiviso da altri.
 
+## Sessione Google
+Il token d'accesso di Google dura **1 ora** e non si può allungare: un token di rinnovo richiederebbe un server che custodisca il client secret (e, con l'app in modalità *Testing*, scadrebbe comunque dopo 7 giorni). Nella cache del dispositivo restano invece la famiglia collegata, i dati e l'email, quindi l'app si apre subito con i tuoi dati anche offline.
+
+Per ridurre l'attrito l'app **rinnova il token in silenzio**: ai tocchi dell'utente, negli ultimi 15 minuti di validità (o dopo la scadenza), chiede un nuovo token senza schermate (`prompt: 'none'`, funziona se sei ancora collegato a Google e hai già dato il consenso). Il browser può mostrare un popup che si chiude subito. Se non è possibile, compare «Riconnetti». Il token resta in `sessionStorage` (non in `localStorage`, condiviso da tutte le pagine di `<utente>.github.io`), quindi riaprendo l'app il primo tocco lo rinnova.
+
 ## Come funziona la sincronizzazione
-- Ogni modifica è salvata subito in locale e inviata a Drive dopo ~2 s; si controlla anche ogni 45 s, al ritorno in primo piano e alla riconnessione.
+- Ogni modifica è salvata subito in locale e inviata a Drive dopo ~2 s; si controlla anche ogni 2 minuti, al ritorno in primo piano e alla riconnessione.
 - Ciclo: legge la `version` del file → se è cambiata scarica e fa **merge per record** (vince l'`updatedAt` più recente; un'eliminazione più recente batte una modifica) → carica solo se ci sono differenze → memorizza la nuova `version`. Non c'è sovrascrittura cieca dell'intero file.
 - Stati visibili: *Sincronizzato, Da inviare, Sync…, Offline, Riconnetti, Errore*. Offline le modifiche restano in cache e partono al ritorno della rete.
 - **Limiti noti**: (1) il token Google dura circa 1 ora e un sito statico non può rinnovarlo in background: allo scadere compare "Riconnetti" (un tap) e nel frattempo i dati restano al sicuro in locale; (2) due scritture nello stesso istante possono teoricamente incrociarsi, ma il merge per record lo rende molto improbabile e Drive conserva la **cronologia versioni** del file per recuperare eventuali errori.
 
 ## Divisione delle spese e saldi tra i membri
-Ogni spesa ha un **pagatore** (un membro, oppure «conto condiviso») e dei **partecipanti** che se la dividono in parti uguali (il resto in centesimi è assegnato in modo deterministico). Ogni partecipante diverso dal pagatore deve la sua quota al pagatore; se il pagatore non è tra i partecipanti, ha anticipato tutto per gli altri. Le spese pagate dal «conto condiviso» o senza partecipanti non generano debiti. Un **giroconto tra due conti personali di membri diversi** conta come rimborso. Statistiche mostra i saldi netti per ogni coppia di membri, del mese e complessivi, con il pulsante «Rimborsa».
+Ogni spesa ha un **pagatore** (un membro, oppure «conto condiviso») e dei **partecipanti** che se la dividono. La divisione può essere:
+- **parti uguali** tra i membri scelti (il resto in centesimi è assegnato in modo deterministico);
+- **importi precisi**: quanto spetta a ciascuno in euro (la somma deve essere uguale all'importo della spesa);
+- **percentuali**: la quota di ciascuno in % (la somma deve fare 100%); il risultato è arrotondato al centesimo con somma sempre esatta (metodo del resto più alto).
+
+Il form mostra quanto resta da assegnare e l'anteprima di chi deve cosa. Chi lascia vuoto un valore non partecipa; se chi ha pagato non partecipa, ha anticipato tutto per gli altri. Ogni partecipante diverso dal pagatore deve la sua quota al pagatore. Le spese pagate dal «conto condiviso» o senza partecipanti non generano debiti. Un **trasferimento tra due conti personali di membri diversi** conta come rimborso. Statistiche mostra i saldi netti per ogni coppia di membri, del mese e complessivi, con il pulsante «Rimborsa».
 
 ## Struttura
 ```
@@ -93,6 +120,6 @@ src/types.ts        schema tipizzato
 src/lib/            defaults neutri, calcoli (saldi, statistiche, pareggio), merge/validazione, mutazioni pure
 src/sync/           google.ts (token GIS) · drive.ts (REST) · engine.ts (ciclo di sync)
 src/store/          stato + cache locale
-src/components/     UI riusabile, form, Gate (login + ricerca/creazione della famiglia), FamilyCard, FolderPicker
+src/components/     UI riusabile, form, Gate (login + ricerca/creazione della famiglia), FamilyCard, FolderPicker, Notifications
 src/pages/          Transazioni, Statistiche, Conti, Impostazioni, Categorie
 ```

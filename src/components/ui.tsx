@@ -3,14 +3,23 @@ import { createPortal } from 'react-dom'
 import { Check, X } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
 
+/** Finestre aperte, dalla più vecchia alla più recente: Esc chiude solo l'ultima. */
+const sheetStack: symbol[] = []
+
 export function Sheet({ open, onClose, title, children, footer }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode }) {
   useEffect(() => {
     if (!open) return
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    const id = Symbol('sheet')
+    sheetStack.push(id)
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && sheetStack[sheetStack.length - 1] === id && onClose()
     document.addEventListener('keydown', onKey)
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev }
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      sheetStack.splice(sheetStack.indexOf(id), 1)
+      document.body.style.overflow = prev
+    }
   }, [open, onClose])
   if (!open) return null
   return createPortal(

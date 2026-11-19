@@ -30,7 +30,7 @@ export const visibleTo = (db: Db, acc: Account, me: MemberId | null): boolean =>
 
 // ---------- saldi ----------
 
-/** Saldo per conto (centesimi): saldo iniziale + entrate − uscite ± giroconti. Include sempre lo storico, anche dei conti nascosti. */
+/** Saldo per conto (centesimi): saldo iniziale + entrate − uscite ± trasferimenti. Include sempre lo storico, anche dei conti nascosti. */
 export function accountBalances(db: Db): Record<string, number> {
   const bal: Record<string, number> = {}
   for (const a of db.accounts) bal[a.id] = a.initialBalance
@@ -54,7 +54,9 @@ export function totalLiquidity(db: Db, bal: Record<string, number>, include: (a:
 
 export function inScope(db: Db, accs: Map<string, Account>, tx: Transaction, scope: Scope, me: MemberId | null): boolean {
   const involved = [tx.accountId, tx.toAccountId].map((id) => (id ? accs.get(id) : undefined)).filter((a): a is Account => !!a)
-  if (!involved.some((a) => visibleTo(db, a, me))) return false
+  // visibile se vedo uno dei conti coinvolti oppure se la transazione mi riguarda (pago io o sono tra chi si divide la spesa)
+  const concerns = !!me && (tx.paidBy === me || tx.participants.includes(me))
+  if (!concerns && !involved.some((a) => visibleTo(db, a, me))) return false
   if (scope === 'all') return true
   if (scope === 'shared') return involved.some((a) => isSharedAccount(db, a))
   return involved.some((a) => accountMemberIds(db, a).includes(scope))
@@ -142,13 +144,46 @@ export function categoryBreakdown(db: Db, txs: Transaction[], type: CategoryType
 
 // ---------- divisione spese e saldi tra membri ----------
 
-/** Quota a carico di ogni partecipante (parti uguali; il resto in centesimi va ai primi, in ordine di id: deterministico). */
-export function expenseShares(tx: Transaction): Array<{ member: MemberId; amount: number }> {
-  const ids = [...new Set(tx.participants)].sort()
+/** Parti uguali tra gli id dati (il resto in centesimi va ai primi, in ordine di id: deterministico). */
+function equalShares(amount: number, members: MemberId[]): Array<{ member: MemberId; amount: number }> {
+  const ids = [...new Set(members)].sort()
   if (!ids.length) return []
-  const base = Math.floor(tx.amount / ids.length)
-  const rest = tx.amount - base * ids.length
+  const base = Math.floor(amount / ids.length)
+  const rest = amount - base * ids.length
   return ids.map((member, i) => ({ member, amount: base + (i < rest ? 1 : 0) }))
+}
+
+/** Ripartisce `total` in proporzione ai pesi interi, con il metodo del resto più alto (la somma è sempre esatta). */
+function proportionalShares(total: number, weights: Array<[MemberId, number]>): Array<{ member: MemberId; amount: number }> {
+  const sum = weights.reduce((a, [, w]) => a + w, 0)
+  const parts = weights.map(([member, w]) => ({ member, exact: (total * w) / sum }))
+  const out = parts.map((p) => ({ member: p.member, amount: Math.floor(p.exact), frac: p.exact - Math.floor(p.exact) }))
+  let left = total - out.reduce((a, p) => a + p.amount, 0)
+  for (const p of [...out].sort((a, b) => b.frac - a.frac || a.member.localeCompare(b.member))) {
+    if (left <= 0) break
+    p.amount++; left--
+  }
+  return out.map(({ member, amount }) => ({ member, amount }))
+}
+
+/**
+ * Quota a carico di ogni partecipante.
+ * - parti uguali (predefinito): tra i `participants`
+ * - 'amount': gli importi indicati in `splitValues` (devono sommare all'importo della spesa)
+ * - 'percent': le percentuali indicate (in centesimi di punto, somma 10000), arrotondate al centesimo con somma esatta
+ * Se i valori non sono coerenti si ripiega sulle parti uguali, così nessuna spesa produce debiti sbagliati.
+ */
+export function expenseShares(tx: Pick<Transaction, 'amount' | 'participants' | 'splitMode' | 'splitValues'>): Array<{ member: MemberId; amount: number }> {
+  const mode = tx.splitMode ?? 'equal'
+  const vals = tx.splitValues
+  if (mode !== 'equal' && vals) {
+    const entries = Object.entries(vals).filter(([, v]) => v > 0).sort(([a], [b]) => a.localeCompare(b))
+    const sum = entries.reduce((a, [, v]) => a + v, 0)
+    if (mode === 'amount' && sum === tx.amount) return entries.map(([member, amount]) => ({ member, amount }))
+    if (mode === 'percent' && sum === 10000) return proportionalShares(tx.amount, entries)
+    if (entries.length) return equalShares(tx.amount, entries.map(([m]) => m))
+  }
+  return equalShares(tx.amount, tx.participants)
 }
 
 export interface Debt {
@@ -161,7 +196,7 @@ export interface Debt {
  * Saldo netto tra ogni coppia di membri.
  * - spesa pagata da X e divisa tra i partecipanti: ognuno ≠ X deve la sua quota a X (X non partecipa = anticipo per gli altri)
  * - spesa senza pagatore (conto condiviso) o senza partecipanti: nessun debito
- * - giroconto tra due conti PERSONALI di membri diversi = rimborso (da X a Y riduce il debito di X verso Y)
+ * - trasferimento tra due conti PERSONALI di membri diversi = rimborso (da X a Y riduce il debito di X verso Y)
  */
 export function familyBalances(db: Db, txs: Transaction[]): Debt[] {
   const accs = accountById(db)

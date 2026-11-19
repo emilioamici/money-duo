@@ -34,7 +34,7 @@ describe('format', () => {
 })
 
 describe('saldi', () => {
-  it('calcola entrate, uscite e giroconti; esclude conti dal totale', () => {
+  it('calcola entrate, uscite e trasferimenti; esclude conti dal totale', () => {
     let db = family3()
     db = saveTransaction(db, base({ id: '1', type: 'income', amount: 5000 }))
     db = saveTransaction(db, base({ id: '2', amount: 1500 }))
@@ -106,9 +106,50 @@ describe('divisione spese e saldi tra membri', () => {
     expect(d).toHaveLength(3)
     const part = base({ type: 'transfer', amount: 400, accountId: 'acc-m3', toAccountId: 'acc-cash', categoryId: null })
     expect(familyBalances(db, [...t, part]).find((x) => x.debtor === 'm3' && x.creditor === 'm1')!.amount).toBe(200)
-    // un giroconto da un conto condiviso a più membri non è un rimborso
+    // un trasferimento da un conto condiviso a più membri non è un rimborso
     const no = base({ type: 'transfer', amount: 400, accountId: 'acc-duo', toAccountId: 'acc-cash', categoryId: null })
     expect(familyBalances(db, [no])).toEqual([])
+  })
+})
+
+describe('divisione non uguale', () => {
+  const amountTx = (over: Partial<Transaction>) => base({ amount: 10000, paidBy: 'm1', ...over })
+  it('importi precisi', () => {
+    const t = amountTx({ participants: ['m1', 'm2', 'm3'], splitMode: 'amount', splitValues: { m1: 5000, m2: 3000, m3: 2000 } })
+    expect(expenseShares(t)).toEqual([{ member: 'm1', amount: 5000 }, { member: 'm2', amount: 3000 }, { member: 'm3', amount: 2000 }])
+    expect(familyBalances(family3(), [t])).toEqual([{ debtor: 'm2', creditor: 'm1', amount: 3000 }, { debtor: 'm3', creditor: 'm1', amount: 2000 }])
+  })
+  it('percentuali: somma sempre esatta, resto al valore frazionario più alto', () => {
+    const t = amountTx({ amount: 1000, participants: ['m1', 'm2', 'm3'], splitMode: 'percent', splitValues: { m1: 3333, m2: 3333, m3: 3334 } })
+    const s = expenseShares(t)
+    expect(s.reduce((a, x) => a + x.amount, 0)).toBe(1000)
+    expect(s.find((x) => x.member === 'm3')!.amount).toBe(334)
+    const t2 = amountTx({ amount: 9999, participants: ['m1', 'm2'], splitMode: 'percent', splitValues: { m1: 7000, m2: 3000 } })
+    expect(expenseShares(t2).map((x) => x.amount)).toEqual([6999, 3000]) // 69,993 -> 69,99 ; 29,997 -> 30,00
+    expect(expenseShares(t2).reduce((a, x) => a + x.amount, 0)).toBe(9999)
+  })
+  it('chi ha valore 0 non partecipa', () => {
+    const t = amountTx({ participants: ['m1', 'm2'], splitMode: 'percent', splitValues: { m1: 10000, m2: 0 } })
+    expect(expenseShares(t)).toEqual([{ member: 'm1', amount: 10000 }])
+    expect(familyBalances(family3(), [t])).toEqual([])
+  })
+  it('valori incoerenti: si ripiega sulle parti uguali, mai debiti sballati', () => {
+    expect(expenseShares(amountTx({ participants: ['m1', 'm2'], splitMode: 'amount', splitValues: { m1: 5000, m2: 3000 } })).map((x) => x.amount)).toEqual([5000, 5000])
+    expect(expenseShares(amountTx({ participants: ['m1', 'm2'], splitMode: 'percent', splitValues: { m1: 5000, m2: 3000 } })).map((x) => x.amount)).toEqual([5000, 5000])
+  })
+  it('senza modalità (dati vecchi) = parti uguali, come prima', () => {
+    expect(expenseShares(amountTx({ participants: ['m2', 'm1'] })).map((x) => x.amount)).toEqual([5000, 5000])
+  })
+  it('anticipo per altri con importi: chi paga non partecipa', () => {
+    const t = amountTx({ participants: ['m2', 'm3'], splitMode: 'amount', splitValues: { m2: 6000, m3: 4000 } })
+    expect(familyBalances(family3(), [t])).toEqual([{ debtor: 'm2', creditor: 'm1', amount: 6000 }, { debtor: 'm3', creditor: 'm1', amount: 4000 }])
+  })
+  it('i vecchi file e le nuove transazioni mantengono la modalità dopo parse/serializzazione', () => {
+    const db = saveTransaction(family3(), amountTx({ id: 'x', participants: ['m1', 'm2'], splitMode: 'percent', splitValues: { m1: 6000, m2: 4000 } }))
+    const back = parseDb(JSON.parse(JSON.stringify(db)))
+    expect(back.transactions[0].splitMode).toBe('percent')
+    expect(back.transactions[0].splitValues).toEqual({ m1: 6000, m2: 4000 })
+    expect(parseDb(JSON.parse(JSON.stringify(createDefaultDb()))).transactions).toHaveLength(0)
   })
 })
 
