@@ -8,6 +8,7 @@ import { MonthNav } from './Nav'
 import { TxGroups } from './TxGroups'
 import { EmptyState, MembersBadge } from './ui'
 import { GROUP_LABEL } from './AccountForm'
+import { MascotPeek } from './Mascots'
 
 /** Dettaglio di un conto: saldo e movimenti del periodo scelto (mese o anno). */
 export function AccountDetail({ account, onBack, onEdit }: { account: Account; onBack: () => void; onEdit: () => void }) {
@@ -28,6 +29,7 @@ export function AccountDetail({ account, onBack, onEdit }: { account: Account; o
         <MonthNav />
       </div>
       <div className="space-y-3 px-4">
+        <MascotPeek kind="zenitsu" side="left">
         <div className="card p-4">
           <p className="text-xs font-semibold uppercase text-muted">Saldo · {GROUP_LABEL[account.group]}</p>
           <p className={`text-3xl font-extrabold tabular-nums ${balance < 0 ? 'text-exp' : ''}`}>{formatMoney(balance)}</p>
@@ -37,6 +39,7 @@ export function AccountDetail({ account, onBack, onEdit }: { account: Account; o
             {account.hidden && <span>nascosto</span>}
           </div>
         </div>
+        </MascotPeek>
         <div className="card grid grid-cols-3 divide-x divide-line/70 py-3 text-center">
           <div><p className="text-[11px] font-semibold uppercase text-muted">Entrate</p><p className="font-bold text-inc tabular-nums">{formatMoney(sum.income)}</p></div>
           <div><p className="text-[11px] font-semibold uppercase text-muted">Uscite</p><p className="font-bold text-exp tabular-nums">{formatMoney(sum.expense)}</p></div>

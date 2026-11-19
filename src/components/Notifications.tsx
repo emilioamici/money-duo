@@ -1,3 +1,4 @@
+import { MascotImg } from './Mascots'
 import { Bell, Receipt, Wallet, X } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
 import { Sheet } from './ui'
@@ -45,7 +46,7 @@ export function NotificationCenter({ onOpenAccounts }: { onOpenAccounts: () => v
       ) : undefined}>
       {notifications.length === 0 ? (
         <div className="py-10 text-center text-sm text-muted">
-          <Bell className="mx-auto mb-3 text-brand" />
+          <MascotImg kind="mochi" className="mx-auto mb-3 h-20 w-auto" />
           <p className="font-semibold text-ink">Nessuna notifica</p>
           <p className="mx-auto mt-1 max-w-xs">Ti avviso quando un altro membro aggiunge una transazione che ti riguarda o un conto in comune, o condivide un conto con te.</p>
         </div>

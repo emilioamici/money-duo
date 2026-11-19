@@ -6,6 +6,7 @@ import { formatMoney } from '../lib/format'
 import { MonthNav, ScopeChips, SyncChip } from '../components/Nav'
 import { TxGroups } from '../components/TxGroups'
 import { FilterSheet } from '../components/FilterSheet'
+import { MascotPeek } from '../components/Mascots'
 import { EmptyState } from '../components/ui'
 import { NotificationBell } from '../components/Notifications'
 
@@ -38,11 +39,13 @@ export function HomePage({ onOpenSync }: { onOpenSync: () => void }) {
       </div>
 
       <div className="space-y-3 px-4">
-        <div className="card grid grid-cols-3 divide-x divide-line/70 py-3 text-center">
-          <div><p className="text-[11px] font-semibold uppercase text-muted">Entrate</p><p className="font-bold text-inc tabular-nums">{formatMoney(sum.income)}</p></div>
-          <div><p className="text-[11px] font-semibold uppercase text-muted">Uscite</p><p className="font-bold text-exp tabular-nums">{formatMoney(sum.expense)}</p></div>
-          <div><p className="text-[11px] font-semibold uppercase text-muted">Bilancio</p><p className={`font-bold tabular-nums ${sum.balance < 0 ? 'text-exp' : ''}`}>{formatMoney(sum.balance)}</p></div>
-        </div>
+        <MascotPeek kind="mochi">
+          <div className="card grid grid-cols-3 divide-x divide-line/70 py-3 text-center">
+            <div><p className="text-[11px] font-semibold uppercase text-muted">Entrate</p><p className="font-bold text-inc tabular-nums">{formatMoney(sum.income)}</p></div>
+            <div><p className="text-[11px] font-semibold uppercase text-muted">Uscite</p><p className="font-bold text-exp tabular-nums">{formatMoney(sum.expense)}</p></div>
+            <div><p className="text-[11px] font-semibold uppercase text-muted">Bilancio</p><p className={`font-bold tabular-nums ${sum.balance < 0 ? 'text-exp' : ''}`}>{formatMoney(sum.balance)}</p></div>
+          </div>
+        </MascotPeek>
 
         {nFilters > 0 && (
           <div className="flex items-center justify-between rounded-xl bg-brand/10 px-3 py-2 text-sm">
