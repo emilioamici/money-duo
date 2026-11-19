@@ -45,7 +45,9 @@ function Shell() {
       <main className="min-w-0 flex-1 pb-36 md:pb-10">
         {sync.status === 'auth' && (
           <button onClick={() => void engine.signIn().catch(() => undefined)} className="mx-4 mt-3 w-[calc(100%-2rem)] rounded-xl bg-exp/10 p-3 text-left text-sm font-medium text-exp pt-safe">
-            Sessione Google scaduta: tocca per riconnetterti. Le modifiche restano salvate in locale e verranno inviate dopo.
+            {sync.reconciled
+              ? 'Sessione Google scaduta: tocca per riconnetterti. Le modifiche restano salvate in locale e verranno inviate dopo.'
+              : 'Sessione Google scaduta, e i dati di questo dispositivo vanno ricaricati da Drive: tocca per riconnetterti.'}
           </button>
         )}
         {tab === 'home' && <HomePage onOpenSync={goSync} />}

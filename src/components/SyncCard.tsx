@@ -14,7 +14,7 @@ const msg = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
 /** Stato della sincronizzazione e gestione dell'account (il collegamento al database avviene dalla schermata di accesso). */
 export function SyncCard() {
-  const { sync } = useApp()
+  const { sync, cacheOk } = useApp()
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
 
@@ -33,6 +33,7 @@ export function SyncCard() {
         </div>
       </div>
       {sync.email && <p className="mb-3 flex items-center gap-2 text-sm text-muted"><UserRound size={15} />{sync.email}</p>}
+      {!cacheOk && <p className="mb-3 rounded-xl bg-amber-500/15 p-3 text-sm text-amber-700 dark:text-amber-300">Non riesco a salvare una copia dei dati su questo dispositivo (spazio del browser esaurito o archiviazione bloccata). L'app funziona, ma a ogni apertura deve riscaricare tutto da Drive e serve la connessione.</p>}
       {(sync.error || err) && <p className="mb-3 rounded-xl bg-exp/10 p-3 text-sm text-exp">{err || sync.error}</p>}
       {!sync.signedIn ? (
         <button className="btn-primary w-full" disabled={busy} onClick={() => run(() => engine.signIn())}>Riconnetti Google Drive</button>

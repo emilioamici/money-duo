@@ -103,6 +103,9 @@ Il token d'accesso di Google dura **1 ora** e non si può allungare: un token di
 
 Per ridurre l'attrito l'app **rinnova il token in silenzio**: ai tocchi dell'utente, negli ultimi 15 minuti di validità (o dopo la scadenza), chiede un nuovo token senza schermate (`prompt: 'none'`, funziona se sei ancora collegato a Google e hai già dato il consenso). Il browser può mostrare un popup che si chiude subito. Se non è possibile, compare «Riconnetti». Il token resta in `sessionStorage` (non in `localStorage`, condiviso da tutte le pagine di `<utente>.github.io`), quindi riaprendo l'app il primo tocco lo rinnova.
 
+## Copia locale e sicurezza dei dati
+La copia locale dei dati sta in **IndexedDB** (non in `localStorage`, che ha un limite di circa 5 MB e su iPhone si riempiva) e ricorda a quale **versione del file su Drive** corrisponde. Regola di sicurezza: **se la copia manca o non corrisponde all'ultima versione di Drive, l'app rilegge Drive prima di inviare qualsiasi cosa** (con la copia persa adotta Drive così com'è; con una copia datata unisce). Una copia vuota non può quindi sovrascrivere il file. Se il browser non riesce a salvare la copia, Impostazioni → Sincronizzazione lo segnala. Drive conserva comunque le versioni precedenti del file (*Gestisci versioni*).
+
 ## Come funziona la sincronizzazione
 - Ogni modifica è salvata subito in locale e inviata a Drive dopo ~2 s; si controlla anche ogni 2 minuti, al ritorno in primo piano e alla riconnessione.
 - Ciclo: legge la `version` del file → se è cambiata scarica e fa **merge per record** (vince l'`updatedAt` più recente; un'eliminazione più recente batte una modifica) → carica solo se ci sono differenze → memorizza la nuova `version`. Non c'è sovrascrittura cieca dell'intero file.

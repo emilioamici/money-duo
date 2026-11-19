@@ -12,7 +12,7 @@ import { Sheet, MemberAvatar } from './ui'
  */
 export function IdentityGuard() {
   const { db, commit, me, sync } = useApp()
-  const ready = sync.status === 'synced' && !!sync.email
+  const ready = sync.status === 'synced' && !!sync.email && sync.reconciled
   const unclaimed = db.members.filter((m) => m.active && !m.email)
 
   useEffect(() => {
