@@ -34,7 +34,7 @@ export function FamilyCard() {
 
   const invite = () => guard(async () => {
     const mail = email.trim()
-    if (db.members.some((m) => m.active && m.email?.toLowerCase() === mail.toLowerCase())) throw new Error('Questa persona è già nella famiglia.')
+    if (db.members.some((m) => m.active && m.email?.toLowerCase() === mail.toLowerCase())) throw new Error('Questa persona è già nella famiglia. Se non ha ancora accesso al database, usa «Reinvia invito» accanto al suo nome.')
     await engine.invite(mail, db.family.name)
     const existing = db.members.find((m) => !m.active && m.email?.toLowerCase() === mail.toLowerCase())
     const claimed = target !== 'new' ? db.members.find((m) => m.id === target && m.active && !m.email) : undefined
@@ -42,6 +42,12 @@ export function FamilyCard() {
     commit((d) => saveMember(d, claimed ? { ...claimed, email: mail } : existing ? { ...existing, active: true } : newMember(d, name.trim() || mail.split('@')[0], mail)))
     setInfo(`Invito inviato a ${mail}. Deve accedere all'app con quell'account Google.`)
     setEmail(''); setName(''); setTarget('new')
+  })
+
+  /** Per chi ha l'email ma non è mai entrato (es. membri importati): concede (di nuovo) l'accesso al file su Drive. */
+  const resend = (mail: string) => guard(async () => {
+    await engine.invite(mail, db.family.name)
+    setInfo(`Invito inviato a ${mail}. Deve accedere all'app con quell'account Google.`)
   })
 
   const remove = async (id: string) => {
@@ -83,6 +89,9 @@ export function FamilyCard() {
                   {!m.joinedAt && m.email && <span className="rounded-full bg-amber-500/15 px-1.5 text-amber-600">Invitato</span>}
                 </p>
               </div>
+              {canManage && !isOwner && m.id !== me?.id && m.email && !m.joinedAt && (
+                <button className="btn-soft !px-2.5 !py-1 !text-xs" disabled={busy} onClick={() => void resend(m.email!)}>Reinvia invito</button>
+              )}
               {canManage && !isOwner && m.id !== me?.id && (
                 <button className="rounded-full p-2 text-muted hover:bg-exp/10 hover:text-exp" aria-label={`Rimuovi ${m.name}`} disabled={busy} onClick={() => void remove(m.id)}><UserMinus size={18} /></button>
               )}
