@@ -64,6 +64,12 @@ describe('notifiche: transazioni', () => {
     expect(inScope(next, accountById(next), next.transactions[0], 'all', 'm2')).toBe(true)
     expect(inScope(next, accountById(next), next.transactions[0], 'all', 'm1')).toBe(true)
   })
+  it('con una divisione non uguale la quota indicata è quella precisa', () => {
+    const prev = base()
+    const next = saveTransaction(prev, tx({ accountId: 'a-m3', by: 'm3', paidBy: 'm3', amount: 10000, participants: ['m2', 'm3'], splitMode: 'percent', splitValues: { m2: 2500, m3: 7500 } }))
+    const n = diffNotifications(prev, next, 'm2')
+    expect(n[0].body).toContain('la tua quota: 25,00')
+  })
   it('una transazione già presente non notifica di nuovo; modificarla non è "aggiungere"', async () => {
     const prev = saveTransaction(base(), tx({ id: 'x', accountId: 'a-all', by: 'm1' }))
     await sleep()

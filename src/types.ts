@@ -6,6 +6,7 @@ export type MemberId = string
 export type TxType = 'expense' | 'income' | 'transfer'
 export type AccountGroup = 'cash' | 'bank' | 'card' | 'savings' | 'investment' | 'other'
 export type CategoryType = 'expense' | 'income'
+export type SplitMode = 'equal' | 'amount' | 'percent'
 
 export interface Family {
   name: string
@@ -64,15 +65,22 @@ export interface Transaction {
   /** ISO 8601 (UTC) */
   date: string
   accountId: string
-  /** solo per i giroconti */
+  /** solo per i trasferimenti */
   toAccountId: string | null
   categoryId: string | null
   title: string
   note: string
   /** chi ha pagato/incassato; null = conto condiviso (nessun debito tra membri) */
   paidBy: MemberId | null
-  /** membri che si dividono la spesa in parti uguali; [] = spesa personale */
+  /** membri che si dividono la spesa; [] = spesa personale */
   participants: MemberId[]
+  /** come si divide: parti uguali (predefinito), importi precisi o percentuali */
+  splitMode?: SplitMode
+  /**
+   * valori inseriti per membro: importo in centesimi (mode 'amount') oppure percentuale in centesimi di punto,
+   * 3333 = 33,33% (mode 'percent'). Assente con le parti uguali.
+   */
+  splitValues?: Record<MemberId, number> | null
   /** membro che ha aggiunto / modificato per ultimo la transazione (serve alle notifiche) */
   by?: MemberId | null
   createdAt: string

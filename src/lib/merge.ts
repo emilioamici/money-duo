@@ -79,6 +79,12 @@ export function replaceData(current: Db, incoming: Db): Db {
 
 const str = (v: unknown, d = ''): string => (typeof v === 'string' ? v : d)
 const num = (v: unknown, d = 0): number => (typeof v === 'number' && Number.isFinite(v) ? v : d)
+const numMap = (v: unknown): Record<string, number> | null => {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null
+  const out: Record<string, number> = {}
+  for (const [k, n] of Object.entries(v as Record<string, unknown>)) if (typeof n === 'number' && Number.isFinite(n)) out[k] = Math.round(n)
+  return Object.keys(out).length ? out : null
+}
 const bool = (v: unknown): boolean => v === true
 const strArr = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [])
 const pick = <T extends string>(v: unknown, allowed: readonly T[], d: T): T => (allowed.includes(v as T) ? (v as T) : d)
@@ -172,6 +178,8 @@ export function parseDb(input: unknown): Db {
     note: str(x.note),
     paidBy: typeof x.paidBy === 'string' ? x.paidBy : null,
     participants: strArr(x.participants),
+    splitMode: pick(x.splitMode, ['equal', 'amount', 'percent'] as const, 'equal'),
+    splitValues: numMap(x.splitValues),
     by: typeof x.by === 'string' ? x.by : null,
     createdAt: str(x.createdAt, EPOCH),
     updatedAt: str(x.updatedAt, EPOCH),

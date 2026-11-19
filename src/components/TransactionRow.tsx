@@ -15,7 +15,7 @@ export function TransactionRow({ tx }: { tx: Transaction }) {
   const from = accs.get(tx.accountId)
   const to = tx.toAccountId ? accs.get(tx.toAccountId) : undefined
 
-  const title = tx.title || (tx.type === 'transfer' ? 'Giroconto' : cat?.name ?? (tx.type === 'income' ? 'Entrata' : 'Uscita'))
+  const title = tx.title || (tx.type === 'transfer' ? 'Trasferimento' : cat?.name ?? (tx.type === 'income' ? 'Entrata' : 'Uscita'))
   const accName = (a?: typeof from) => (!a ? '?' : visibleTo(db, a, me?.id ?? null) ? a.name : 'Conto privato')
   const sub = tx.type === 'transfer'
     ? `${accName(from)} → ${accName(to)}`

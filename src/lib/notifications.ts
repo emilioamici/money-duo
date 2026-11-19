@@ -39,7 +39,7 @@ export function diffNotifications(prev: Db, next: Db, me: MemberId): Notif[] {
   const txNotif = (t: Transaction): Notif => {
     const acc = accs.get(t.accountId)
     const myShare = t.type === 'expense' && t.paidBy && t.paidBy !== me ? expenseShares(t).find((s) => s.member === me)?.amount : undefined
-    const kind = t.type === 'expense' ? 'una spesa' : t.type === 'income' ? "un'entrata" : 'un giroconto'
+    const kind = t.type === 'expense' ? 'una spesa' : t.type === 'income' ? "un'entrata" : 'un trasferimento'
     const label = t.title || (t.categoryId ? cats.get(t.categoryId)?.name : '') || ''
     const accName = acc && visibleTo(next, acc, me) ? acc.name : ''
     return {

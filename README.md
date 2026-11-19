@@ -13,7 +13,7 @@ React + TypeScript + Vite + Tailwind CSS. Il database è un file JSON nel **Goog
 - **Famiglia:** il capofamiglia crea il database scegliendo la **cartella di Drive** dove salvarlo, poi **invita i membri con la loro email Google** da Impostazioni → Famiglia. Nessun limite al numero di membri; i membri si possono rimuovere (l'accesso al file viene revocato e lo storico resta).
 - **Conti:** ogni conto è **personale** (un membro), **condiviso con più membri** (selezionabili) o di **tutta la famiglia**. Saldo per conto e totale liquidità (con esclusione di investimenti/fondi vincolati), **aggiungi / nascondi / mostra** senza perdere lo storico.
 - **Categorie** e sottocategorie con icona e colore, aggiungi / nascondi / mostra (cascata sui figli).
-- **Transazioni:** uscite, entrate e giroconti; chi ha pagato e **con chi dividere la spesa** (parti uguali tra i membri scelti, oppure anticipo per altri); modifica/eliminazione con ricalcolo immediato dei saldi.
+- **Transazioni:** uscite, entrate e trasferimenti; chi ha pagato e **con chi dividere la spesa** (parti uguali, **importi precisi** o **percentuali**, oppure anticipo per altri); modifica/eliminazione con ricalcolo immediato dei saldi.
 - **Dashboard:** navigazione mensile, filtri (Tutti / Condivisi / singolo membro), conto e ricerca testuale; statistiche per categoria; **saldi tra i membri** con registrazione del rimborso.
 - **Notifiche:** quando un altro membro aggiunge una transazione che ti riguarda, un conto in comune, o condivide un conto con te (vedi sotto).
 - Esporta / Importa JSON (unisci o sostituisci; i file del formato precedente vengono migrati). Interfaccia in italiano, tema chiaro/scuro automatico.
@@ -86,6 +86,7 @@ Come funziona, senza server: ogni dispositivo confronta i dati appena ricevuti d
                      "accountId", "toAccountId": null, "categoryId": null, "title": "", "note": "",
                      "paidBy": "<id membro> | null" /* null = conto condiviso */,
                      "participants": ["<id membro>"] /* chi si divide la spesa; [] = personale */,
+                     "splitMode": "equal|amount|percent", "splitValues": { "<id membro>": 5000 } /* centesimi (amount) o centesimi di punto, 5000 = 50% (percent); null se equal */,
                      "by": "<id membro che l'ha aggiunta>", "createdAt", "updatedAt" }],
   "deleted": { "<id>": "ISO" }
 }
@@ -106,7 +107,12 @@ Per ridurre l'attrito l'app **rinnova il token in silenzio**: ai tocchi dell'ute
 - **Limiti noti**: (1) il token Google dura circa 1 ora e un sito statico non può rinnovarlo in background: allo scadere compare "Riconnetti" (un tap) e nel frattempo i dati restano al sicuro in locale; (2) due scritture nello stesso istante possono teoricamente incrociarsi, ma il merge per record lo rende molto improbabile e Drive conserva la **cronologia versioni** del file per recuperare eventuali errori.
 
 ## Divisione delle spese e saldi tra i membri
-Ogni spesa ha un **pagatore** (un membro, oppure «conto condiviso») e dei **partecipanti** che se la dividono in parti uguali (il resto in centesimi è assegnato in modo deterministico). Ogni partecipante diverso dal pagatore deve la sua quota al pagatore; se il pagatore non è tra i partecipanti, ha anticipato tutto per gli altri. Le spese pagate dal «conto condiviso» o senza partecipanti non generano debiti. Un **giroconto tra due conti personali di membri diversi** conta come rimborso. Statistiche mostra i saldi netti per ogni coppia di membri, del mese e complessivi, con il pulsante «Rimborsa».
+Ogni spesa ha un **pagatore** (un membro, oppure «conto condiviso») e dei **partecipanti** che se la dividono. La divisione può essere:
+- **parti uguali** tra i membri scelti (il resto in centesimi è assegnato in modo deterministico);
+- **importi precisi**: quanto spetta a ciascuno in euro (la somma deve essere uguale all'importo della spesa);
+- **percentuali**: la quota di ciascuno in % (la somma deve fare 100%); il risultato è arrotondato al centesimo con somma sempre esatta (metodo del resto più alto).
+
+Il form mostra quanto resta da assegnare e l'anteprima di chi deve cosa. Chi lascia vuoto un valore non partecipa; se chi ha pagato non partecipa, ha anticipato tutto per gli altri. Ogni partecipante diverso dal pagatore deve la sua quota al pagatore. Le spese pagate dal «conto condiviso» o senza partecipanti non generano debiti. Un **trasferimento tra due conti personali di membri diversi** conta come rimborso. Statistiche mostra i saldi netti per ogni coppia di membri, del mese e complessivi, con il pulsante «Rimborsa».
 
 ## Struttura
 ```
