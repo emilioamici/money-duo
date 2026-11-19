@@ -15,7 +15,7 @@ export const PALETTE = [
   '#0ea5e9', '#6366f1', '#8b5cf6', '#ec4899', '#64748b', '#78716c',
 ]
 
-export const MEMBER_COLORS = ['#6366f1', '#ec4899', '#10b981', '#f59e0b', '#0ea5e9', '#ef4444', '#8b5cf6', '#14b8a6']
+export const MEMBER_COLORS = ['#3f9c86', '#e08a7b', '#d9a441', '#6aa4c9', '#9b86c9', '#c56f8e', '#7fae6a', '#b89b86']
 
 export const ICONS = [
   '🍽️', '🛒', '🍕', '☕', '🏠', '💡', '🔧', '🚗', '⛽', '🚌', '✈️', '🎉',

@@ -1,9 +1,9 @@
 // Service worker minimale: guscio dell'app disponibile offline.
 // Le chiamate cross-origin (Google Drive / Identity) non vengono MAI intercettate né messe in cache.
-const CACHE = 'moneyduo-shell-v3'
+const CACHE = 'moneyduo-shell-v4'
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', './manifest.webmanifest', './icon.svg'])))
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', './manifest.webmanifest', './icon-192.png'])))
   self.skipWaiting()
 })
 
