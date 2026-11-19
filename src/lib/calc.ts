@@ -298,6 +298,22 @@ export function familyBalances(db: Db, txs: Transaction[]): Debt[] {
   return out.sort((a, b) => b.amount - a.amount)
 }
 
+export type DebtTone = 'credit' | 'debit' | 'neutral'
+
+/** Colore di un saldo per chi lo guarda: verde se gli devono dei soldi, rosso se li deve lui, neutro se non lo riguarda. */
+export const debtTone = (d: Debt, me: MemberId | null | undefined): DebtTone => (me && d.creditor === me ? 'credit' : me && d.debtor === me ? 'debit' : 'neutral')
+
+/**
+ * Il saldo da mettere in evidenza: il più grande tra quelli che riguardano chi guarda (se ce ne sono), altrimenti il più grande in assoluto.
+ * `debts` è già ordinato dal più grande. Nessun saldo = tutto in ordine (null).
+ */
+export function headlineDebt(debts: Debt[], me: MemberId | null | undefined): { debt: Debt; tone: DebtTone } | null {
+  if (!debts.length) return null
+  const mine = me ? debts.find((d) => d.debtor === me || d.creditor === me) : undefined
+  const debt = mine ?? debts[0]
+  return { debt, tone: debtTone(debt, me) }
+}
+
 // ---------- tag
 
 /** Normalizza un tag: niente "#" iniziale, spazi compattati, massimo 30 caratteri. */

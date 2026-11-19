@@ -6,9 +6,9 @@ const load = (): Record<string, boolean> => { try { return JSON.parse(localStora
 
 /**
  * Scheda a scomparsa con un riepilogo sempre visibile (`headline`): da chiusa mostra solo quello,
- * aperta mostra anche il dettaglio. Lo stato aperto/chiuso si ricorda su questo dispositivo.
+ * aperta mostra anche il dettaglio. `quick` è un'azione rapida sempre visibile sotto il riepilogo. Lo stato aperto/chiuso si ricorda su questo dispositivo.
  */
-export function Panel({ id, label, icon, headline, sub, children }: { id: string; label: string; icon: ReactNode; headline: ReactNode; sub?: ReactNode; children: ReactNode }) {
+export function Panel({ id, label, icon, headline, sub, quick, children }: { id: string; label: string; icon: ReactNode; headline: ReactNode; sub?: ReactNode; quick?: ReactNode; children: ReactNode }) {
   const [open, setOpen] = useState(() => !!load()[id])
   const flip = () => setOpen((o) => {
     const n = !o
@@ -26,6 +26,7 @@ export function Panel({ id, label, icon, headline, sub, children }: { id: string
         </span>
         <ChevronDown size={20} className={`shrink-0 text-muted transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
+      {quick && <div className="px-4 pb-4">{quick}</div>}
       {open && <div className="border-t border-line/60 p-4">{children}</div>}
     </section>
   )
