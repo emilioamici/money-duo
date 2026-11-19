@@ -74,6 +74,8 @@ Come funziona, senza server: ogni dispositivo confronta i dati appena ricevuti d
 ## Server delle notifiche push (facoltativo)
 Per ricevere le notifiche **anche con l'app chiusa** serve un piccolo server, gratuito su **Cloudflare Workers** (codice in `worker/`, guida passo-passo in [`worker/README.md`](worker/README.md)). È il Web Push standard, cifrato fino al dispositivo; il server conosce solo gli iscritti e **non ha accesso a Drive**: a ogni richiesta verifica il token Google di chi scrive e che abbia accesso al database della famiglia. Quando fai una modifica, la tua app comunica al server chi avvisare, con le stesse regole delle notifiche nell'app. Si attiva per dispositivo in *Impostazioni → Notifiche*. Lo stesso Worker può anche rendere persistente l'accesso Google (vedi «Sessione Google»). Senza server l'app funziona come prima.
 
+La notifica push parte **dopo che i dati sono arrivati su Drive** (anche per le spese fatte offline): finché non c'è rete restano in coda sul dispositivo, e vengono scartate se la spesa viene eliminata prima dell'invio.
+
 ## Schema del JSON (`schemaVersion: 2`)
 ```jsonc
 {

@@ -57,6 +57,8 @@ export interface SyncHost {
   /** applica una trasformazione al DB; `dirty` = va poi sincronizzato */
   /** `source: 'remote'` = dati arrivati da un altro dispositivo/membro (da cui si ricavano le notifiche) */
   applyDb: (fn: (prev: Db) => Db, dirty: boolean, source?: 'remote') => void
+  /** dopo un ciclo riuscito senza modifiche in attesa: i dati locali sono su Drive (serve a inviare le notifiche push in coda) */
+  afterSync?: () => void
 }
 
 const EMPTY: Persisted = { fileId: null, fileName: null, email: null, name: null, ownerEmail: null, canShare: false, remoteVersion: null, lastSyncAt: null, dirty: false }
@@ -406,6 +408,7 @@ export class SyncEngine {
       this.persist()
       this.set(this.p.dirty ? 'pending' : 'synced')
       if (this.p.dirty) this.debounce = setTimeout(() => void this.syncNow(), 1000)
+      else this.host.afterSync?.()
     } catch (e) {
       this.handleError(e)
     } finally {
