@@ -5,7 +5,8 @@ import { createDefaultDb } from '../lib/defaults'
 import { nowIso } from '../lib/ids'
 import { diffNotifications, mergeNotifications, type Notif } from '../lib/notifications'
 import { engine, type SyncState } from '../sync/engine'
-import { pushConfigured, refreshPush, sendPush } from '../sync/push'
+import { PushHttpError, pushConfigured, refreshPush, sendPush } from '../sync/push'
+import { enqueue, flushQueue, type QueuedPush, type SendResult } from '../sync/pushQueue'
 import { cacheState, getCacheHealth, getLoadedCache, subscribeCacheHealth, writeCache } from './cache'
 
 const PREFS_KEY = 'moneyduo:prefs'
@@ -70,20 +71,41 @@ interface AppCtx {
 const NOTIF_PREFIX = 'moneyduo:notifs:'
 
 /**
- * Dopo una modifica fatta qui, avvisa il server push di chi deve ricevere una notifica: per ogni altro membro con email
- * si usano le stesse regole delle notifiche nell'app. Le modifiche "di massa" (import, ripristini) non notificano.
+ * Dopo una modifica fatta qui, mette in coda le notifiche push per gli altri membri (stesse regole delle notifiche nell'app).
+ * Partono dopo l'invio dei dati a Drive (vedi flushPush), anche se la modifica è stata fatta offline.
+ * Le modifiche "di massa" (import, ripristini) non notificano.
  */
-function notifyPeers(prev: Db, next: Db, me: Member | null): void {
+function queuePeers(prev: Db, next: Db, me: Member | null): void {
   if (!pushConfigured() || !me?.email) return
   const fileId = engine.getSnapshot().fileId
-  const token = engine.currentToken()
-  if (!fileId || !token) return
+  if (!fileId) return
   if (next.transactions.length - prev.transactions.length > 3 || next.accounts.length - prev.accounts.length > 3) return
+  const items: QueuedPush[] = []
   for (const m of next.members) {
     if (!m.active || !m.email || m.id === me.id || m.email.toLowerCase() === me.email.toLowerCase()) continue
-    const first = diffNotifications(prev, next, m.id)[0]
-    if (first) void sendPush(fileId, token, { recipients: [m.email], title: first.title, body: first.body, tag: first.id }).catch(() => undefined)
+    for (const d of diffNotifications(prev, next, m.id).slice(0, 1)) {
+      items.push({ key: `${d.id}|${m.email.toLowerCase()}`, fileId, email: m.email, title: d.title, body: d.body, tag: d.id, at: Date.now(), txId: d.txId, accountId: d.accountId })
+    }
   }
+  enqueue(items)
+}
+
+/** Invia le notifiche in coda (i dati sono già su Drive). Errori di rete o del server: si tiene e si riprova al prossimo ciclo. */
+async function flushPush(getDb: () => Db): Promise<void> {
+  const snap = engine.getSnapshot()
+  const token = engine.currentToken()
+  if (!pushConfigured() || !snap.fileId || !token) return
+  const db = getDb()
+  await flushQueue({
+    fileId: snap.fileId,
+    // se la spesa o il conto è stato eliminato prima dell'invio, la notifica non ha più senso
+    exists: (q) => (q.txId ? db.transactions.some((t) => t.id === q.txId) : q.accountId ? db.accounts.some((a) => a.id === q.accountId) : true),
+    send: async (q): Promise<SendResult> => {
+      try { await sendPush(snap.fileId!, token, { recipients: [q.email], title: q.title, body: q.body, tag: q.tag }); return 'ok' } catch (e) {
+        return e instanceof PushHttpError && [400, 403, 404, 413].includes(e.status) ? 'drop' : 'retry'
+      }
+    },
+  })
 }
 
 function loadNotifs(key: string): Notif[] {
@@ -127,7 +149,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     dbRef.current = next
     listeners.current.forEach((l) => l())
     writeCache(next, engine.getSnapshot().remoteVersion)
-    if (dirty) { engine.markDirty(); notifyPeers(prev, next, meRef.current) }
+    if (dirty) { engine.markDirty(); queuePeers(prev, next, meRef.current) }
     if (source === 'remote') onRemote.current(prev, next) // dati arrivati da altri: possibili notifiche
   }, [])
 
@@ -135,7 +157,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const attached = useRef(false)
   if (!attached.current) {
     attached.current = true
-    engine.attach({ getDb: () => dbRef.current, applyDb: apply })
+    engine.attach({ getDb: () => dbRef.current, applyDb: apply, afterSync: () => void flushPush(() => dbRef.current) })
   }
 
   const commit = useCallback((fn: (d: Db) => Db) => apply((prev) => { const n = fn(prev); return n === prev ? prev : { ...n, meta: { ...n.meta, updatedAt: nowIso() } } }, true), [apply])

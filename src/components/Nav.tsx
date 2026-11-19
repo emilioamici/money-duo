@@ -33,7 +33,7 @@ export function SyncChip({ onClick }: { onClick: () => void }) {
     synced: { icon: <Cloud size={16} />, cls: 'text-inc', label: 'Sincronizzato' },
     syncing: { icon: <Loader2 size={16} className="animate-spin" />, cls: 'text-brand', label: 'Sync…' },
     pending: { icon: <Cloud size={16} />, cls: 'text-brand', label: 'Da inviare' },
-    offline: { icon: <CloudOff size={16} />, cls: 'text-muted', label: 'Offline' },
+    offline: { icon: <CloudOff size={16} />, cls: sync.dirty ? 'text-brand' : 'text-muted', label: sync.dirty ? 'Offline · da inviare' : 'Offline' },
     auth: { icon: <CloudAlert size={16} />, cls: 'text-exp', label: 'Riconnetti' },
     error: { icon: <CloudAlert size={16} />, cls: 'text-exp', label: 'Errore' },
     off: { icon: null, cls: '', label: '' },

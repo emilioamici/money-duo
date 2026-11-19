@@ -35,10 +35,15 @@ const keyBytes = (b64u: string): Uint8Array => {
   return Uint8Array.from(atob(s), (c) => c.charCodeAt(0))
 }
 
+/** Errore restituito dal server delle notifiche (con il codice HTTP, per capire se ritentare). */
+export class PushHttpError extends Error {
+  constructor(public status: number, message: string) { super(message) }
+}
+
 async function post(path: string, token: string, body: unknown): Promise<unknown> {
   const r = await fetch(pushUrl() + path, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   const j = (await r.json().catch(() => ({}))) as { error?: string }
-  if (!r.ok) throw new Error(j.error || `Server notifiche: errore ${r.status}`)
+  if (!r.ok) throw new PushHttpError(r.status, j.error || `Server notifiche: errore ${r.status}`)
   return j
 }
 

@@ -9,7 +9,6 @@ import { HomePage } from './pages/HomePage'
 import { StatsPage } from './pages/StatsPage'
 import { AccountsPage } from './pages/AccountsPage'
 import { SettingsPage } from './pages/SettingsPage'
-import { engine } from './sync/engine'
 import { Gate } from './components/Gate'
 import { IdentityGuard } from './components/IdentityGuard'
 import { NotificationCenter, NotificationToast } from './components/Notifications'
@@ -23,7 +22,7 @@ const TABS: Array<{ id: Tab; label: string; icon: typeof Plus }> = [
 ]
 
 function Shell() {
-  const { txForm, openTx, openSplit, closeTx, sync } = useApp()
+  const { txForm, openTx, openSplit, closeTx } = useApp()
   const [fabOpen, setFabOpen] = useState(false)
   const [tab, setTab] = useState<Tab>('home')
   const syncRef = useRef<HTMLDivElement>(null)
@@ -43,13 +42,6 @@ function Shell() {
       </aside>
 
       <main className="min-w-0 flex-1 pb-36 md:pb-10">
-        {sync.status === 'auth' && (
-          <button onClick={() => void engine.signIn().catch(() => undefined)} className="mx-4 mt-3 w-[calc(100%-2rem)] rounded-xl bg-exp/10 p-3 text-left text-sm font-medium text-exp pt-safe">
-            {sync.reconciled
-              ? 'Sessione Google scaduta: tocca per riconnetterti. Le modifiche restano salvate in locale e verranno inviate dopo.'
-              : 'Sessione Google scaduta, e i dati di questo dispositivo vanno ricaricati da Drive: tocca per riconnetterti.'}
-          </button>
-        )}
         {tab === 'home' && <HomePage onOpenSync={goSync} />}
         {tab === 'stats' && <StatsPage />}
         {tab === 'accounts' && <AccountsPage />}
@@ -93,7 +85,17 @@ function Shell() {
 /** Senza un database collegato si passa dal login Google; con il database collegato l'app funziona anche offline. */
 function Root() {
   const { sync } = useApp()
-  return <>{sync.fileId ? <Shell /> : <Gate />}<DialogHost /></>
+  if (!sync.fileId) return <><Gate /><DialogHost /></>
+  // sessione scaduta (e online): la schermata di accesso copre tutto e i dati non si vedono. L'app resta montata sotto, inerte,
+  // così quello che stavi scrivendo non si perde e dopo l'accesso si riprende da dove si era.
+  const locked = sync.status === 'auth'
+  return (
+    <>
+      <div aria-hidden={locked || undefined} {...(locked ? { inert: '' } : {})} data-locked={locked || undefined}><Shell /></div>
+      {locked && <div className="fixed inset-0 z-[100] overflow-y-auto bg-bg" data-testid="login-overlay"><Gate reconnect /></div>}
+      <DialogHost />
+    </>
+  )
 }
 
 export default function App() {

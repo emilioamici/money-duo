@@ -116,7 +116,8 @@ Non serve altro (l'app usa lo stesso indirizzo del server delle notifiche). Sull
 - **Un dispositivo non riceve più nulla:** riattiva l'interruttore (il server elimina le iscrizioni non più valide).
 
 ## Limiti
-- La notifica parte solo per le modifiche **fatte dall'app** (non per quelle fatte a mano sul file in Drive), e chi le fa deve avere la sessione Google valida in quel momento.
+- La notifica parte solo per le modifiche **fatte dall'app** (non per quelle fatte a mano sul file in Drive).
+- **La notifica parte quando i dati arrivano su Drive**, non quando premi «Salva»: così chi la riceve trova subito la spesa. Se sei offline, le notifiche restano in coda sul dispositivo (fino a 24 ore, max 100) e partono dopo l'invio dei dati; se il server push non risponde si riprova al ciclo successivo. Se nel frattempo elimini la spesa, la notifica viene scartata. In quel momento serve una sessione Google valida.
 - Un'importazione di massa (più di 3 transazioni o conti insieme) non invia notifiche, per evitare tempeste di messaggi.
 - Se l'app è in primo piano, il push non mostra nulla: sincronizza subito e compare la campanella.
 
