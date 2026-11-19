@@ -14,6 +14,15 @@ export const pushUrl = (): string => strip(read(URL_KEY) || (import.meta.env.VIT
 export const vapidPublicKey = (): string => read(VAPID_KEY) || (import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined) || ''
 export const pushConfigured = (): boolean => !!pushUrl() && !!vapidPublicKey()
 
+/** Controlla il formato dei due valori di configurazione; ritorna un messaggio in italiano, oppure null se vanno bene. */
+export function configError(url: string = pushUrl(), key: string = vapidPublicKey()): string | null {
+  if (url && !/^https:\/\/[^\s/]+$/.test(url)) return `L'indirizzo del server non è valido ("${url}"): deve essere del tipo https://nome.workers.dev, senza percorso e senza spazi.`
+  if (key && !/^B[\w-]{86}$/.test(key)) return `La chiave pubblica VAPID non è valida (${key.length} caratteri, inizia con "${key[0]}"): deve iniziare con B ed essere lunga 87 caratteri. Hai incollato la chiave privata, o con "VAPID_PUBLIC_KEY=" davanti?`
+  return null
+}
+
+const describe = (e: unknown): string => (e instanceof Error ? (e.name && e.name !== 'Error' ? `${e.name}: ${e.message}` : e.message) : String(e))
+
 export function savePushConfig(url: string, vapid: string): void {
   try { localStorage.setItem(URL_KEY, strip(url)); localStorage.setItem(VAPID_KEY, vapid.trim()) } catch { /* noop */ }
 }
@@ -48,12 +57,24 @@ export async function currentSubscription(): Promise<PushSubscription | null> {
 /** Chiede il permesso (da chiamare in risposta a un tocco), iscrive il dispositivo e lo registra sul server. */
 export async function enablePush(fileId: string, token: string): Promise<void> {
   if (!pushConfigured()) throw new Error('Server delle notifiche non configurato.')
-  if (!pushSupported()) throw new Error('Questo browser non supporta le notifiche push. Su iPhone servono iOS 16.4+ e l\'app aggiunta alla schermata Home.')
+  const bad = configError()
+  if (bad) throw new Error(bad)
+  if (!pushSupported()) throw new Error('Questo browser non supporta le notifiche push. Su iPhone servono iOS 16.4+ e l\'app aggiunta alla schermata Home (non da una scheda di Safari).')
   const perm = Notification.permission === 'default' ? await Notification.requestPermission() : Notification.permission
   if (perm !== 'granted') throw new Error('Permesso negato: abilitalo dalle impostazioni del browser o del telefono per questo sito.')
-  const reg = await registration()
-  const sub = (await reg.pushManager.getSubscription()) ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(vapidPublicKey()) as BufferSource }))
-  await post('/subscribe', token, { fileId, subscription: sub.toJSON() })
+  // ogni passaggio ha il suo messaggio, così si capisce dove si ferma
+  let reg: ServiceWorkerRegistration
+  try { reg = await registration() } catch (e) { throw new Error(`Passaggio 1 di 3, service worker non disponibile: ${describe(e)}`) }
+  let sub: PushSubscription
+  try {
+    sub = (await reg.pushManager.getSubscription()) ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(vapidPublicKey()) as BufferSource }))
+  } catch (e) {
+    throw new Error(`Passaggio 2 di 3, il browser non riesce a iscriversi al servizio push (${describe(e)}). Controlla la chiave pubblica VAPID e, su iPhone, che l'app sia aperta dall'icona sulla Home con iOS 16.4 o successivo.`)
+  }
+  try { await post('/subscribe', token, { fileId, subscription: sub.toJSON() }) } catch (e) {
+    if (e instanceof TypeError) throw new Error(`Passaggio 3 di 3, non riesco a contattare il server ${pushUrl()} (${describe(e)}). Controlla l'indirizzo e la connessione.`)
+    throw e
+  }
 }
 
 /** Rinnova la registrazione sul server (si fa a ogni apertura: tiene viva la sottoscrizione). */

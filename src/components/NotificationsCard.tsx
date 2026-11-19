@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { BellRing } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
 import { engine } from '../sync/engine'
-import { disablePush, enablePush, pushConfigured, pushSupported, savePushConfig, pushUrl, vapidPublicKey, sendPush } from '../sync/push'
+import { configError, disablePush, enablePush, pushConfigured, pushSupported, savePushConfig, pushUrl, vapidPublicKey, sendPush } from '../sync/push'
 import { Toggle } from './ui'
 
 /** Impostazioni delle notifiche di sistema di questo dispositivo (le notifiche nell'app sono sempre attive). */
@@ -76,6 +76,13 @@ export function NotificationsCard() {
         {!pushConfigured() ? (
           <div className="space-y-2 text-xs text-muted">
             <p>Serve il piccolo server di notifiche (guida in <b>worker/README.md</b>). Quando è pronto, inserisci qui i due valori.</p>
+            <input className="input" placeholder="Indirizzo del server (https://….workers.dev)" defaultValue={pushUrl()} onBlur={(e) => { savePushConfig(e.target.value, vapidPublicKey()); bump((n) => n + 1) }} />
+            <input className="input" placeholder="Chiave pubblica VAPID" defaultValue={vapidPublicKey()} onBlur={(e) => { savePushConfig(pushUrl(), e.target.value); bump((n) => n + 1) }} />
+            {configError() && <p className="text-exp">{configError()}</p>}
+          </div>
+        ) : configError() ? (
+          <div className="space-y-2 text-xs">
+            <p className="text-exp">{configError()}</p>
             <input className="input" placeholder="Indirizzo del server (https://….workers.dev)" defaultValue={pushUrl()} onBlur={(e) => { savePushConfig(e.target.value, vapidPublicKey()); bump((n) => n + 1) }} />
             <input className="input" placeholder="Chiave pubblica VAPID" defaultValue={vapidPublicKey()} onBlur={(e) => { savePushConfig(pushUrl(), e.target.value); bump((n) => n + 1) }} />
           </div>
