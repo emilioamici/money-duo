@@ -31,15 +31,19 @@ export function TransactionForm({ state, onClose }: { state: TxFormState; onClos
   const [type, setType] = useState<TxType>(seed.type ?? 'expense')
   const [amount, setAmount] = useState(seed.amount ? centsToInput(seed.amount) : '')
   const [date, setDate] = useState(toLocalInput(seed.date ?? nowIso()))
-  const [accountId, setAccountId] = useState(seed.accountId ?? defaultAcc)
-  const [toAccountId, setToAccountId] = useState(seed.toAccountId ?? accounts.find((a) => a.id !== (seed.accountId ?? defaultAcc))?.id ?? '')
+  // per una copia o un preferito il conto salvato può non essere più selezionabile (nascosto, non visibile): si usa quello predefinito
+  const usable = (id: string | null | undefined) => (id && (tx || accounts.some((a) => a.id === id)) ? id : undefined)
+  const startAcc = usable(seed.accountId) ?? defaultAcc
+  const [accountId, setAccountId] = useState(startAcc)
+  const [toAccountId, setToAccountId] = useState(usable(seed.toAccountId) && usable(seed.toAccountId) !== startAcc ? usable(seed.toAccountId)! : accounts.find((a) => a.id !== startAcc)?.id ?? '')
   const [categoryId, setCategoryId] = useState<string | null>(seed.categoryId ?? null)
   const [title, setTitle] = useState(seed.title ?? '')
   const [note, setNote] = useState(seed.note ?? '')
   const [tags, setTags] = useState<string[]>(seed.tags ?? [])
   // chi ha pagato non si sceglie qui: segue il conto (personale = il suo proprietario); si conserva se la transazione ne aveva uno
-  const [paidBy, setPaidBy] = useState<string | null>(seed.paidBy !== undefined ? seed.paidBy : payerFor(seed.accountId ?? defaultAcc))
-  const [paidTouched] = useState(seed.paidBy !== undefined)
+  const keepPayer = seed.paidBy !== undefined && (!!tx || usable(seed.accountId) === seed.accountId)
+  const [paidBy, setPaidBy] = useState<string | null>(keepPayer ? seed.paidBy! : payerFor(startAcc))
+  const [paidTouched] = useState(keepPayer)
   const [error, setError] = useState('')
 
   const cents = parseAmount(amount)

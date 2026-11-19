@@ -42,9 +42,14 @@ export function SplitForm({ state, onClose }: { state: TxFormState; onClose: () 
   const [note, setNote] = useState(seed.note ?? '')
   const [tags, setTags] = useState<string[]>(seed.tags ?? [])
   const [rows, setRows] = useState<PayerRow[]>(() => {
-    if (tx) {
+    // modifica, copia o preferito: i pagamenti si portano dietro; un conto che non si può più scegliere (nascosto, non mio) cede il posto al primo disponibile
+    const src = tx ?? (seed.accountId || seed.payments?.length ? ({ ...seed, amount: seed.amount ?? 0 } as Transaction) : null)
+    if (src) {
       const fallback = me?.id ?? members[0]?.id ?? ''
-      return txPayments(tx).map((p) => ({ key: newKey(), member: p.member ?? fallback, accountId: p.accountId, amount: centsToInput(p.amount) }))
+      return txPayments(src).map((p) => {
+        const member = p.member ?? fallback
+        return { key: newKey(), member, accountId: tx || accounts.some((a) => a.id === p.accountId) ? p.accountId : firstAccount(member), amount: centsToInput(p.amount) }
+      })
     }
     const first = me?.id ?? members[0]?.id ?? ''
     return [{ key: newKey(), member: first, accountId: firstAccount(first), amount: '' }]
