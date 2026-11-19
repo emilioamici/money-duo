@@ -90,13 +90,16 @@ La notifica push parte **dopo che i dati sono arrivati su Drive** (anche per le 
 - **Conti:** toccando un conto si apre il suo dettaglio (saldo e movimenti del mese o dell'anno scelto). Scorrendo un conto verso sinistra compaiono *Modifica*, *Escludi dal totale* (o *Includi*) e *Nascondi* (o *Mostra*).
 - **Impostazioni** a schede che si aprono e si chiudono: Famiglia, Sincronizzazione e account, Notifiche, Backup e dati; *Categorie* resta una schermata a parte. Da chiuse mostrano un riepilogo; lo stato aperto/chiuso si ricorda su ogni dispositivo.
 
+**Rimborsi con PayPal.** Ogni membro può indicare il proprio nome **PayPal.Me** (Impostazioni → Famiglia → «Il tuo PayPal»; basta anche incollare il link `paypal.me/…`). Nelle Statistiche, accanto a «Rimborsa», un debito verso chi ha collegato PayPal mostra il pulsante **PayPal**: apre `paypal.me/<nome>/<importo>EUR` con l'importo già impostato e, nell'app, il rimborso già compilato da salvare. Il nome PayPal.Me è visibile a tutta la famiglia (vive nel file su Drive, campo `paypal` del membro).
+Limite: PayPal.Me non permette di preselezionare «Per amici e familiari» da link; quel passaggio si sceglie in PayPal al momento del pagamento (con un conto personale la scelta è proposta da PayPal).
+
 ## Schema del JSON (`schemaVersion: 2`)
 ```jsonc
 {
   "schemaVersion": 2,
   "meta": { "dbId": "uuid", "createdAt": "ISO", "updatedAt": "ISO", "updatedBy": "email", "revision": 0 },
   "family": { "name": "Famiglia", "updatedAt": "ISO" },
-  "members": [{ "id", "name", "email": "account Google | null", "color": "#6366f1", "active": true, "joinedAt": "ISO | null", "updatedAt" }],
+  "members": [{ "id", "name", "email": "account Google | null", "color": "#6366f1", "active": true, "joinedAt": "ISO | null", "paypal": "nome PayPal.Me | null", "updatedAt" }],
   "accounts": [{ "id", "name", "group": "cash|bank|card|savings|investment|other",
                  "members": ["<id membro>"] /* [] = tutta la famiglia, 1 = personale */,
                  "initialBalance": 0, "excludeFromTotal": false, "hidden": false, "order": 0, "by": "<id membro>", "createdAt", "updatedAt" }],

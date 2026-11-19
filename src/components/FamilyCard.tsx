@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Crown, FolderOpen, Mail, UserMinus } from 'lucide-react'
+import { Crown, FolderOpen, Mail, UserMinus, Wallet } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
 import { engine } from '../sync/engine'
 import { deactivateMember, newMember, saveFamilyName, saveMember } from '../lib/mutations'
 import { Field, MemberAvatar } from './ui'
 import { ask } from './dialogs'
 import { FolderPicker } from './FolderPicker'
+import { parsePaypalHandle } from '../lib/paypal'
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e))
 const validEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim())
@@ -86,6 +87,7 @@ export function FamilyCard() {
                   {isOwner && <span className="flex items-center gap-0.5 font-semibold text-amber-600"><Crown size={12} />Capofamiglia</span>}
                   {m.id === me?.id && <span className="font-semibold text-brand">Tu</span>}
                   {!m.joinedAt && m.email && <span className="rounded-full bg-amber-500/15 px-1.5 text-amber-600">Invitato</span>}
+                  {m.paypal && <span className="font-semibold text-trf">PayPal ✓</span>}
                 </p>
               </div>
               {canManage && !isOwner && m.id !== me?.id && m.email && !m.joinedAt && (
@@ -98,6 +100,8 @@ export function FamilyCard() {
           )
         })}
       </ul>
+
+      {me && <PaypalField key={me.id + (me.paypal ?? '')} handle={me.paypal ?? ''} onSave={(h) => commit((d) => saveMember(d, { ...me, paypal: h }))} />}
 
       {canManage ? (
         <div className="space-y-2 rounded-2xl bg-bg p-3">
@@ -131,6 +135,27 @@ export function FamilyCard() {
         <FolderPicker title="Sposta il database in…" onClose={() => setPicking(false)}
           onPick={(f) => { setPicking(false); void guard(async () => { await engine.moveTo(f.id); setFolder(f.name); setInfo(`Database spostato in «${f.name}».`) }) }} />
       )}
+    </div>
+  )
+}
+
+/** Il PayPal.Me di chi usa l'app: serve agli altri membri per rimborsarti con l'importo già impostato. */
+function PaypalField({ handle, onSave }: { handle: string; onSave: (h: string | null) => void }) {
+  const [text, setText] = useState(handle)
+  const [err, setErr] = useState('')
+  const save = () => {
+    const r = parsePaypalHandle(text)
+    if ('error' in r) return setErr(r.error)
+    setErr(''); setText(r.handle ?? '')
+    if (r.handle !== (handle || null)) onSave(r.handle)
+  }
+  return (
+    <div className="mb-4 rounded-2xl bg-bg p-3">
+      <p className="mb-1 flex items-center gap-2 text-sm font-semibold"><Wallet size={16} className="text-trf" />Il tuo PayPal</p>
+      <input className="input" aria-label="Nome PayPal.Me" placeholder="Il tuo nome PayPal.Me (es. mario.rossi)" value={text} autoCapitalize="none" autoCorrect="off"
+        onChange={(e) => { setText(e.target.value); setErr('') }} onBlur={save} onKeyDown={(e) => { if (e.key === 'Enter') save() }} />
+      {err && <p className="mt-1 text-xs text-exp">{err}</p>}
+      <p className="mt-1 text-xs text-muted">È il nome dopo paypal.me/ nel tuo link (lo crei dall'app PayPal → «Il mio link PayPal.Me»). Gli altri membri lo useranno per rimborsarti: sarà visibile a tutta la famiglia.</p>
     </div>
   )
 }
