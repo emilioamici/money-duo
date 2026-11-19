@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ChevronDown, CircleCheck, Handshake } from 'lucide-react'
+import { ChevronDown, CircleCheck, Handshake, Wallet } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
 import { NotificationBell } from '../components/Notifications'
 import { categoryBreakdown, debtTone, headlineDebt, familyBalances, filterTransactions, periodRange, sortedAccounts, summarize, type Debt } from '../lib/calc'
@@ -70,6 +70,9 @@ export function StatsPage() {
             headline={head
               ? <span className={TONE[head.tone]} data-tone={head.tone}><b>{nameOf(head.debt.debtor)}</b> deve a <b>{nameOf(head.debt.creditor)}</b> · {formatMoney(head.debt.amount)}</span>
               : <span className="inline-flex items-center gap-1.5 text-ink" data-tone="ok"><CircleCheck size={20} aria-hidden />Tutti i saldi tra i membri sono in ordine</span>}
+            quick={head && head.tone === 'debit' && payTo(head.debt.creditor)
+              ? <button className="btn-soft w-full" onClick={() => payPaypal(head.debt)} aria-label={`Paga ${nameOf(head.debt.creditor)} con PayPal`}><Wallet size={18} />Paga {nameOf(head.debt.creditor)} con PayPal · {formatMoney(head.debt.amount)}</button>
+              : undefined}
             sub={totalDebts.length > 1 ? <span className="text-muted">+ {totalDebts.length - 1} {totalDebts.length === 2 ? 'altro saldo' : 'altri saldi'}</span> : undefined}>
             <p className="mb-1 text-[11px] font-semibold uppercase text-muted">{view.period === 'year' ? 'Quest\'anno' : 'Questo mese'}</p>
             <DebtList list={monthDebts} />
