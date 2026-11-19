@@ -57,6 +57,14 @@ export interface Category {
   updatedAt: string
 }
 
+/** Un pagamento di una spesa: chi ha pagato, da quale conto e quanto. */
+export interface Payment {
+  member: MemberId | null
+  accountId: string
+  /** centesimi */
+  amount: number
+}
+
 export interface Transaction {
   id: string
   type: TxType
@@ -81,6 +89,14 @@ export interface Transaction {
    * 3333 = 33,33% (mode 'percent'). Assente con le parti uguali.
    */
   splitValues?: Record<MemberId, number> | null
+  /**
+   * Spesa pagata da più persone, ciascuna dal proprio conto. Assente (o null) = un solo pagamento:
+   * `accountId` + `paidBy` + `amount`. Con più pagamenti `amount` è il totale, `accountId` il primo conto
+   * e `paidBy` null; la somma dei pagamenti è uguale all'importo.
+   */
+  payments?: Payment[] | null
+  /** etichette libere (es. "vacanza", "lidl") */
+  tags?: string[]
   /** membro che ha aggiunto / modificato per ultimo la transazione (serve alle notifiche) */
   by?: MemberId | null
   createdAt: string

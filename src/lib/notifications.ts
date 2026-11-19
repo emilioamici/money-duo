@@ -1,5 +1,5 @@
 import type { Db, MemberId, Transaction } from '../types'
-import { accountById, accountMemberIds, categoryById, expenseShares, inScope, visibleTo } from './calc'
+import { accountById, accountMemberIds, categoryById, expenseShares, inScope, involvedAccountIds, txPayerIds, visibleTo } from './calc'
 import { formatMoney } from './format'
 import { nowIso } from './ids'
 
@@ -37,11 +37,13 @@ export function diffNotifications(prev: Db, next: Db, me: MemberId): Notif[] {
   const prevTx = new Set(prev.transactions.map((t) => t.id))
   const newTx = next.transactions.filter((t) => !prevTx.has(t.id) && t.by !== me && inScope(next, accs, t, 'all', me))
   const txNotif = (t: Transaction): Notif => {
-    const acc = accs.get(t.accountId)
-    const myShare = t.type === 'expense' && t.paidBy && t.paidBy !== me ? expenseShares(t).find((s) => s.member === me)?.amount : undefined
+    const acc = involvedAccountIds(t).map((id) => accs.get(id)).find((a) => a && visibleTo(next, a, me))
+    const payers = txPayerIds(t)
+    // se partecipo alla spesa e non l'ho pagata da solo, mi interessa la mia quota
+    const myShare = t.type === 'expense' && payers.length > 0 && !(payers.length === 1 && payers[0] === me) ? expenseShares(t).find((s) => s.member === me)?.amount : undefined
     const kind = t.type === 'expense' ? 'una spesa' : t.type === 'income' ? "un'entrata" : 'un trasferimento'
     const label = t.title || (t.categoryId ? cats.get(t.categoryId)?.name : '') || ''
-    const accName = acc && visibleTo(next, acc, me) ? acc.name : ''
+    const accName = acc?.name ?? ''
     return {
       id: `tx:${t.id}:${t.updatedAt}`, kind: 'tx', at, read: false, txId: t.id,
       title: myShare ? `${who(t.by)} ha aggiunto una spesa condivisa con te` : `${who(t.by)} ha aggiunto ${kind}`,

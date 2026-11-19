@@ -32,6 +32,8 @@ export interface View {
 export interface TxFormState {
   tx?: Transaction
   initial?: Partial<Transaction>
+  /** quale form aprire per una nuova voce (modificando si sceglie in base alla transazione) */
+  kind?: 'normal' | 'split'
 }
 
 interface Prefs { lastAccountId: string; /** notifiche di sistema attive su questo dispositivo */ systemNotif: boolean }
@@ -47,6 +49,7 @@ interface AppCtx {
   setView: (patch: Partial<View>) => void
   txForm: TxFormState | null
   openTx: (s?: TxFormState) => void
+  openSplit: (s?: TxFormState) => void
   closeTx: () => void
   prefs: Prefs
   setPrefs: (p: Partial<Prefs>) => void
@@ -126,6 +129,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const [txForm, setTxForm] = useState<TxFormState | null>(null)
   const openTx = useCallback((s: TxFormState = {}) => setTxForm(s), [])
+  const openSplit = useCallback((s: TxFormState = {}) => setTxForm({ ...s, kind: 'split' }), [])
   const closeTx = useCallback(() => setTxForm(null), [])
 
   const [prefs, setPrefsState] = useState<Prefs>(() => {
@@ -179,8 +183,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const unread = useMemo(() => notifications.filter((n) => !n.read).length, [notifications])
 
   const value = useMemo<AppCtx>(
-    () => ({ db, commit, resetLocal, sync, view, setView, txForm, openTx, closeTx, prefs, setPrefs, me, members, nameOf, notifications, unread, markRead, markAllRead, clearNotifications, toast, dismissToast, centerOpen, setCenterOpen }),
-    [db, commit, resetLocal, sync, view, setView, txForm, openTx, closeTx, prefs, setPrefs, me, members, nameOf, notifications, unread, markRead, markAllRead, clearNotifications, toast, dismissToast, centerOpen],
+    () => ({ db, commit, resetLocal, sync, view, setView, txForm, openTx, openSplit, closeTx, prefs, setPrefs, me, members, nameOf, notifications, unread, markRead, markAllRead, clearNotifications, toast, dismissToast, centerOpen, setCenterOpen }),
+    [db, commit, resetLocal, sync, view, setView, txForm, openTx, openSplit, closeTx, prefs, setPrefs, me, members, nameOf, notifications, unread, markRead, markAllRead, clearNotifications, toast, dismissToast, centerOpen],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

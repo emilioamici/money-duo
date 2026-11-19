@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { ListChecks, PieChart, Plus, Settings, Wallet } from 'lucide-react'
+import { ListChecks, PieChart, Plus, Receipt, Settings, Users, Wallet, X } from 'lucide-react'
 import { AppProvider, useApp } from './store/AppProvider'
 import { DialogHost } from './components/dialogs'
 import { TransactionForm } from './components/TransactionForm'
+import { SplitForm } from './components/SplitForm'
+import { isSplit } from './lib/calc'
 import { HomePage } from './pages/HomePage'
 import { StatsPage } from './pages/StatsPage'
 import { AccountsPage } from './pages/AccountsPage'
@@ -21,7 +23,8 @@ const TABS: Array<{ id: Tab; label: string; icon: typeof Plus }> = [
 ]
 
 function Shell() {
-  const { txForm, openTx, closeTx, sync } = useApp()
+  const { txForm, openTx, openSplit, closeTx, sync } = useApp()
+  const [fabOpen, setFabOpen] = useState(false)
   const [tab, setTab] = useState<Tab>('home')
   const syncRef = useRef<HTMLDivElement>(null)
   const goSync = () => { setTab('settings'); setTimeout(() => syncRef.current?.scrollIntoView({ behavior: 'smooth' }), 80) }
@@ -36,6 +39,7 @@ function Shell() {
           <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold ${tab === t.id ? 'bg-brand/10 text-brand' : 'text-muted hover:bg-line/50'}`}><t.icon size={20} />{t.label}</button>
         ))}
         <button className="btn-primary mt-4" onClick={() => openTx()}><Plus size={18} />Nuova transazione</button>
+        <button className="btn-soft" onClick={() => openSplit()}><Users size={18} />Nuovo split</button>
       </aside>
 
       <main className="min-w-0 flex-1 pb-36 md:pb-10">
@@ -50,10 +54,23 @@ function Shell() {
         {tab === 'settings' && <SettingsPage syncRef={syncRef} />}
       </main>
 
-      <button onClick={() => openTx()} aria-label="Aggiungi transazione"
-        className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-onbrand shadow-lg shadow-brand/30 transition active:scale-95 md:hidden">
-        <Plus size={28} />
-      </button>
+      {fabOpen && <div className="fixed inset-0 z-30 animate-fade bg-black/40 md:hidden" onClick={() => setFabOpen(false)} />}
+      <div className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-4 z-40 flex flex-col items-end gap-3 md:hidden">
+        {fabOpen && (
+          <>
+            <button onClick={() => { setFabOpen(false); openSplit() }} className="flex animate-sheet items-center gap-2 rounded-full bg-surface py-3 pl-4 pr-5 text-sm font-semibold shadow-lg">
+              <Users size={18} className="text-brand" />Nuovo split
+            </button>
+            <button onClick={() => { setFabOpen(false); openTx() }} className="flex animate-sheet items-center gap-2 rounded-full bg-surface py-3 pl-4 pr-5 text-sm font-semibold shadow-lg">
+              <Receipt size={18} className="text-brand" />Nuova transazione
+            </button>
+          </>
+        )}
+        <button onClick={() => setFabOpen((o) => !o)} aria-label={fabOpen ? 'Chiudi' : 'Aggiungi'} aria-expanded={fabOpen}
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-brand text-onbrand shadow-lg shadow-brand/30 transition active:scale-95">
+          {fabOpen ? <X size={26} /> : <Plus size={28} />}
+        </button>
+      </div>
 
       <nav className="pb-safe fixed inset-x-0 bottom-0 z-20 grid grid-cols-4 border-t border-line/70 bg-surface/95 backdrop-blur md:hidden">
         {TABS.map((t) => (
@@ -64,7 +81,9 @@ function Shell() {
       <IdentityGuard />
       <NotificationCenter onOpenAccounts={() => setTab('accounts')} />
       <NotificationToast />
-      {txForm && <TransactionForm key={txForm.tx?.id ?? 'new'} state={txForm} onClose={closeTx} />}
+      {txForm && (txForm.kind === 'split' || (txForm.tx && isSplit(txForm.tx))
+        ? <SplitForm key={txForm.tx?.id ?? 'new-split'} state={txForm} onClose={closeTx} />
+        : <TransactionForm key={txForm.tx?.id ?? 'new'} state={txForm} onClose={closeTx} />)}
     </div>
   )
 }

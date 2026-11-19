@@ -5,6 +5,7 @@ import { NotificationBell } from '../components/Notifications'
 import { categoryBreakdown, familyBalances, filterTransactions, monthRange, sortedAccounts, summarize, type Debt } from '../lib/calc'
 import { formatMoney } from '../lib/format'
 import { MonthNav, ScopeChips } from '../components/Nav'
+import { LiquidityChart } from '../components/LiquidityChart'
 import { Donut } from '../components/Donut'
 import { CatBubble, Segmented } from '../components/ui'
 import type { CategoryType } from '../types'
@@ -46,8 +47,11 @@ export function StatsPage() {
 
   return (
     <div>
-      <div className="sticky top-0 z-10 space-y-3 bg-bg/90 px-4 pb-3 pt-safe backdrop-blur">
+      <div className="space-y-3 px-4 pt-safe">
         <div className="flex items-center justify-between pt-3"><h1 className="text-xl font-extrabold tracking-tight">Statistiche</h1><NotificationBell /></div>
+        <LiquidityChart />
+      </div>
+      <div className="sticky top-0 z-10 mt-3 space-y-3 bg-bg/90 px-4 pb-3 pt-2 backdrop-blur">
         <MonthNav />
         <ScopeChips />
       </div>
