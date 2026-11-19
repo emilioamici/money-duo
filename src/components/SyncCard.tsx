@@ -5,6 +5,7 @@ import { engine } from '../sync/engine'
 import { parseFileId, type DriveFile } from '../sync/drive'
 import { dateTimeLabel } from '../lib/format'
 import { ask } from './dialogs'
+import { linkDatabase } from './linkFlow'
 
 export const STATUS_LABEL: Record<string, string> = {
   off: 'Non collegato', auth: 'Riconnessione necessaria', pending: 'Da sincronizzare', syncing: 'Sincronizzazione…',
@@ -28,20 +29,7 @@ export function SyncCard() {
   }
 
   const connectFile = (id: string) => run(async () => {
-    const { file, remote } = await engine.inspect(id)
-    const hasLocal = db.transactions.length > 0
-    let mode: 'merge' | 'replace' = 'replace'
-    if (hasLocal) {
-      const r = await ask({
-        title: `Collegare «${file.name}»`,
-        message: `Su questo dispositivo ci sono ${db.transactions.length} transazioni locali. Vuoi unirle ai dati del file Drive o usare solo il file Drive (i dati locali verranno scartati)?`,
-        ok: 'Unisci ai dati del file', alt: 'Usa solo il file Drive',
-      })
-      if (!r) return
-      mode = r === 'ok' ? 'merge' : 'replace'
-    }
-    await engine.link(file, remote, mode)
-    setFiles(null); setLink('')
+    if (await linkDatabase(db, id)) { setFiles(null); setLink('') }
   })
 
   const refresh = () => run(async () => setFiles(await engine.listCandidates()))

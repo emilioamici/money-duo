@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createDefaultDb } from './defaults'
+import { createDefaultDb, isPristine } from './defaults'
 import { accountBalances, coupleBalance, totalLiquidity, categoryBreakdown } from './calc'
 import { mergeDb, parseDb, replaceData, sameData } from './merge'
 import { deleteCategory, deleteTransaction, saveAccount, saveProfiles, saveTransaction, setCategoryHidden } from './mutations'
@@ -77,6 +77,16 @@ describe('categorie', () => {
     expect(r[0].total).toBe(500)
     expect(r[0].children).toHaveLength(2)
     expect(r[1].name).toBe('Senza categoria')
+  })
+})
+
+describe('isPristine', () => {
+  it('vero solo per i dati di esempio mai toccati', () => {
+    const db = createDefaultDb()
+    expect(isPristine(db)).toBe(true)
+    expect(isPristine(saveTransaction(db, base({ id: 'x' })))).toBe(false)
+    expect(isPristine(saveAccount(db, { ...db.accounts[0], name: 'Altro' }))).toBe(false)
+    expect(isPristine(saveProfiles(db, { a: 'X', b: 'Y', shared: 'Z' }))).toBe(false)
   })
 })
 

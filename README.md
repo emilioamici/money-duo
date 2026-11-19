@@ -45,9 +45,12 @@ Scope richiesto: `https://www.googleapis.com/auth/drive`. Serve per vedere e col
 > `localStorage` è condiviso da tutte le pagine della stessa origine `<utente>.github.io`. Se pubblichi altri siti sullo stesso account, valuta un dominio dedicato.
 
 ## Uso in coppia
-1. **Persona 1**: Impostazioni → Google Drive → *Accedi con Google* → *Crea nuovo database su Drive* (`moneyduo-shared-db.json`) → inserisci l'email dell'altra persona e premi condividi (permesso *modifica*).
-2. **Persona 2**: apre l'app, *Accedi con Google* col proprio account → *Collega file esistente* (compare tra i file condivisi, oppure incolla link/ID). Se ha già dati locali sceglie se **unirli** o usare solo il file.
-3. Da qui le modifiche si sincronizzano da sole.
+L'app si apre sulla schermata **Accedi con Google**: non ci sono profili da creare né file da collegare a mano.
+1. **Prima persona**: accede col proprio account. Non trovando nessun database, l'app mostra «Crea nuovo database» (crea `moneyduo-shared-db.json` su Drive). Poi, da *Impostazioni → Google Drive*, condivide il file con l'email dell'altra persona (permesso *modifica*).
+2. **Seconda persona**: accede col proprio account. L'app cerca da sola il file condiviso e si collega: non resta che aspettare un attimo. Se il file non è ancora stato condiviso, la schermata mostra l'email con cui ha fatto l'accesso, da usare per la condivisione, e un pulsante «Cerca di nuovo».
+3. Su un nuovo dispositivo o browser basta rifare l'accesso: il database viene ritrovato in automatico. Se ci sono più file con lo stesso nome compare una scelta; se sul dispositivo ci sono dati propri non ancora nel file si sceglie se unirli o usare solo il file.
+
+> Crea un database nuovo **solo una volta**: due file separati non si vedrebbero tra loro.
 
 ## Schema del JSON (`schemaVersion: 1`)
 ```jsonc
@@ -82,6 +85,6 @@ src/types.ts        schema tipizzato
 src/lib/            defaults neutri, calcoli (saldi, statistiche, pareggio), merge/validazione, mutazioni pure
 src/sync/           google.ts (token GIS) · drive.ts (REST) · engine.ts (ciclo di sync)
 src/store/          stato + cache locale
-src/components/     UI riusabile e form
+src/components/     UI riusabile, form, Gate (login + ricerca automatica del database)
 src/pages/          Transazioni, Statistiche, Conti, Impostazioni, Categorie
 ```

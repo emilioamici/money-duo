@@ -3,7 +3,7 @@ import { SCHEMA_VERSION } from '../types'
 import { nowIso, uid } from './ids'
 
 /** I dati di esempio non sono "modifiche dell'utente": con timestamp epoch perdono sempre contro qualsiasi modifica reale nei merge. */
-const SEED_TIME = '1970-01-01T00:00:00.000Z'
+export const SEED_TIME = '1970-01-01T00:00:00.000Z'
 
 /**
  * Struttura di avvio NEUTRA: nessun dato personale.
@@ -76,4 +76,14 @@ export function createDefaultDb(): Db {
     transactions: [],
     deleted: {},
   }
+}
+
+/** Dati ancora quelli di esempio, mai modificati dall'utente (nessuna transazione, nessuna modifica). */
+export function isPristine(db: Db): boolean {
+  return (
+    db.transactions.length === 0 &&
+    Object.keys(db.deleted).length === 0 &&
+    db.profiles.updatedAt === SEED_TIME &&
+    [...db.accounts, ...db.categories].every((x) => x.updatedAt === SEED_TIME)
+  )
 }
