@@ -29,6 +29,9 @@ jobs:
         env:
           # Variabile (non segreto) da definire in Settings > Secrets and variables > Actions > Variables
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+          # Facoltative: server delle notifiche push (worker/README.md). Valori pubblici, non segreti.
+          VITE_PUSH_URL: ${{ vars.VITE_PUSH_URL }}
+          VITE_VAPID_PUBLIC_KEY: ${{ vars.VITE_VAPID_PUBLIC_KEY }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

@@ -5,7 +5,8 @@ import { nowIso } from '../lib/ids'
 import type { CacheState } from '../store/cache'
 import * as drive from './drive'
 import { DriveError } from './drive'
-import { GoogleAuthError, cachedToken, clearToken, requestToken, revokeToken, tokenRemainingMs, type Prompt } from './google'
+import { GoogleAuthError, cachedToken, clearToken, requestToken, revokeToken, setToken, tokenRemainingMs, type Prompt } from './google'
+import { SessionExpired, brokerAvailable, hasSession, logoutBroker, refreshAccessToken, startBrokerLogin } from './auth'
 
 /**
  * Motore di sincronizzazione con un file JSON su Google Drive.
@@ -17,6 +18,8 @@ export const SYNC_EVERY_MS = 120_000
 /** il token Google dura 1 ora: si prova a rinnovarlo (in silenzio) negli ultimi 15 minuti o dopo la scadenza */
 const RENEW_WINDOW_MS = 15 * 60_000
 const RENEW_RETRY_MS = 10 * 60_000
+/** con l'accesso persistente il token si rinnova quando mancano meno di 10 minuti */
+const SILENT_RENEW_MS = 10 * 60_000
 
 const KEY = 'moneyduo:sync'
 const CLIENT_KEY = 'moneyduo:clientId'
@@ -45,6 +48,8 @@ export interface SyncState extends Persisted {
   signedIn: boolean
   /** i dati locali sono stati allineati a Drive in questa sessione (false = la copia locale non è affidabile: niente invii) */
   reconciled: boolean
+  /** accesso persistente attivo: il token Google si rinnova da solo, senza popup */
+  persistent: boolean
 }
 
 export interface SyncHost {
@@ -104,7 +109,7 @@ export class SyncEngine {
   getSnapshot = (): SyncState => this.snapshot
 
   private rebuild(): void {
-    this.snapshot = { ...this.p, status: this.status, error: this.error, clientId: this.clientId, signedIn: !!cachedToken(), reconciled: this.reconciled }
+    this.snapshot = { ...this.p, status: this.status, error: this.error, clientId: this.clientId, signedIn: !!cachedToken(), reconciled: this.reconciled, persistent: hasSession() }
     this.listeners.forEach((l) => l())
   }
   private persist(): void {
@@ -125,6 +130,9 @@ export class SyncEngine {
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') void this.syncNow() })
     // anche con l'app in background (i browser rallentano i timer): serve a ricevere le notifiche
     setInterval(() => void this.syncNow(), SYNC_EVERY_MS)
+    // accesso persistente: il token si rinnova da solo, anche in background e senza tocchi
+    setInterval(() => { if (tokenRemainingMs() < SILENT_RENEW_MS) void this.brokerRenew() }, 60_000)
+    void this.brokerRenew().then(() => this.syncNow())
     // il rinnovo silenzioso del token va chiesto durante un gesto dell'utente, altrimenti il browser blocca il popup
     document.addEventListener('pointerdown', () => void this.renewIfNeeded(), { capture: true, passive: true })
     void this.syncNow()
@@ -152,6 +160,35 @@ export class SyncEngine {
     this.rebuild()
   }
 
+  private brokerBusy: Promise<boolean> | null = null
+  /**
+   * Rinnova il token Google tramite la sessione persistente (nessun popup). Ritorna true se ora c'è un token valido.
+   * Se la sessione non vale più la cancella: tornerà l'avviso «Riconnetti».
+   */
+  brokerRenew(): Promise<boolean> {
+    if (!hasSession()) return Promise.resolve(!!cachedToken())
+    this.brokerBusy ??= (async () => {
+      try {
+        const r = await refreshAccessToken()
+        if (!r) return !!cachedToken()
+        setToken(r.token, r.expiresIn)
+        if (r.email && r.email !== this.p.email) { this.p.email = r.email; this.persist() }
+        if (this.status === 'auth') this.set(this.p.dirty ? 'pending' : 'synced')
+        else this.rebuild()
+        return true
+      } catch (e) {
+        if (e instanceof SessionExpired) this.rebuild()
+        return !!cachedToken() // rete assente o server non raggiungibile: si riprova al prossimo giro
+      } finally { this.brokerBusy = null }
+    })()
+    return this.brokerBusy
+  }
+
+  /** Token Google valido adesso, oppure null: non apre mai popup. */
+  currentToken(): string | null {
+    return cachedToken()
+  }
+
   /** Va chiamato dopo ogni modifica locale. */
   markDirty(): void {
     if (!this.p.fileId) return
@@ -165,6 +202,8 @@ export class SyncEngine {
 
   // ----- azioni utente -----
   async signIn(opts: { selectAccount?: boolean } = {}): Promise<void> {
+    // con il server di accesso configurato si passa da lì (accesso persistente): la pagina va su Google e torna qui
+    if (await brokerAvailable()) { startBrokerLogin(opts.selectAccount ? null : this.p.email); return }
     const prompt: Prompt = opts.selectAccount ? 'select_account' : ''
     const token = await requestToken(this.clientId, { prompt, hint: opts.selectAccount ? undefined : this.p.email ?? undefined })
     const me = await drive.about(token)
@@ -182,6 +221,7 @@ export class SyncEngine {
    * (sessione Google chiusa, consenso da rifare, popup bloccato) non succede nulla e resta il pulsante «Riconnetti».
    */
   async renewIfNeeded(): Promise<void> {
+    if (hasSession()) return // ci pensa il rinnovo con la sessione persistente
     if (!this.p.fileId || !this.p.email || this.renewing || !this.clientId) return
     if (tokenRemainingMs() > RENEW_WINDOW_MS) return
     if (Date.now() - this.lastRenewTry < RENEW_RETRY_MS) return
@@ -199,6 +239,7 @@ export class SyncEngine {
   }
 
   async signOut(): Promise<void> {
+    void logoutBroker()
     revokeToken()
     this.p = { ...EMPTY }
     this.persist()
@@ -291,7 +332,7 @@ export class SyncEngine {
 
   // ----- core -----
   private async token(): Promise<string> {
-    const t = cachedToken()
+    const t = cachedToken() ?? ((await this.brokerRenew()) ? cachedToken() : null)
     if (t) return t
     // gesto utente in corso (azioni dalla UI): richiede un nuovo token senza dialoghi se già autorizzato
     const fresh = await requestToken(this.clientId, { prompt: '', hint: this.p.email ?? undefined })
@@ -307,7 +348,8 @@ export class SyncEngine {
     if (!this.p.fileId || !this.host) return
     if (this.running) { this.rerun = true; return }
     if (!navigator.onLine) return this.set('offline')
-    const token = cachedToken()
+    let token = cachedToken()
+    if (!token && hasSession()) { await this.brokerRenew(); token = cachedToken() }
     if (!token) return this.set('auth')
 
     this.running = true

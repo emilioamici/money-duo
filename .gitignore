@@ -22,3 +22,8 @@ Thumbs.db
 !.vscode/extensions.json
 *.log
 .claude/settings.local.json
+
+# server di notifiche: configurazione locale (contiene l'ID del tuo spazio KV)
+worker/wrangler.toml
+worker/.dev.vars
+worker/.wrangler/

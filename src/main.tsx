@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client'
 import App from './App'
 import './index.css'
 import { initCache } from './store/cache'
+import { consumeSessionFromUrl } from './sync/auth'
+
+consumeSessionFromUrl() // ritorno dal login con il server: salva la sessione e ripulisce l'indirizzo
 
 // la copia locale (IndexedDB) si legge prima di mostrare l'app, così parte subito con i dati
 void initCache().finally(() => createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>))

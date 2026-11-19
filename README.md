@@ -69,7 +69,10 @@ Come funziona, senza server: ogni dispositivo confronta i dati appena ricevuti d
 - **Nell'app:** campanella con contatore, elenco (tocco = apre la transazione o i Conti) e un avviso quando arrivano con l'app in primo piano. Sono salvate per famiglia e per membro su quel dispositivo.
 - **Del dispositivo:** si attivano in *Impostazioni → Notifiche* (Android, desktop; su iPhone serve iOS 16.4+ con l'app aggiunta alla schermata Home) e partono solo se l'app è in background.
 
-> **Limite:** il sito è statico e non ha un server, quindi non c'è un push che sveglia il telefono ad app chiusa. L'app controlla Drive ogni 2 minuti finché è aperta o in background (i browser possono rallentare o sospendere i timer) e la sessione Google dura 1 ora (vedi «Sessione Google»). Un push vero richiederebbe un piccolo backend (Web Push + notifiche di modifica di Drive).
+> **Limite (senza server push):** il sito è statico e non ha un server, quindi non c'è un push che sveglia il telefono ad app chiusa. Per averlo, vedi «Server delle notifiche push» qui sotto. L'app controlla Drive ogni 2 minuti finché è aperta o in background (i browser possono rallentare o sospendere i timer) e la sessione Google dura 1 ora (vedi «Sessione Google»). Un push vero richiederebbe un piccolo backend (Web Push + notifiche di modifica di Drive).
+
+## Server delle notifiche push (facoltativo)
+Per ricevere le notifiche **anche con l'app chiusa** serve un piccolo server, gratuito su **Cloudflare Workers** (codice in `worker/`, guida passo-passo in [`worker/README.md`](worker/README.md)). È il Web Push standard, cifrato fino al dispositivo; il server conosce solo gli iscritti e **non ha accesso a Drive**: a ogni richiesta verifica il token Google di chi scrive e che abbia accesso al database della famiglia. Quando fai una modifica, la tua app comunica al server chi avvisare, con le stesse regole delle notifiche nell'app. Si attiva per dispositivo in *Impostazioni → Notifiche*. Lo stesso Worker può anche rendere persistente l'accesso Google (vedi «Sessione Google»). Senza server l'app funziona come prima.
 
 ## Schema del JSON (`schemaVersion: 2`)
 ```jsonc
@@ -99,9 +102,11 @@ Gli importi sono **interi in centesimi**. `deleted` contiene le lapidi che perme
 Il file su Drive è marcato con la proprietà pubblica `moneyduo=db` (e nominato `moneyduo-db-<famiglia>.json`), così l'app lo ritrova anche quando è condiviso da altri.
 
 ## Sessione Google
-Il token d'accesso di Google dura **1 ora** e non si può allungare: un token di rinnovo richiederebbe un server che custodisca il client secret (e, con l'app in modalità *Testing*, scadrebbe comunque dopo 7 giorni). Nella cache del dispositivo restano invece la famiglia collegata, i dati e l'email, quindi l'app si apre subito con i tuoi dati anche offline.
+Il token d'accesso di Google dura **1 ora** e non si può allungare dal solo sito statico. Nella cache del dispositivo restano la famiglia collegata, i dati e l'email, quindi l'app si apre subito con i tuoi dati anche offline.
 
-Per ridurre l'attrito l'app **rinnova il token in silenzio**: ai tocchi dell'utente, negli ultimi 15 minuti di validità (o dopo la scadenza), chiede un nuovo token senza schermate (`prompt: 'none'`, funziona se sei ancora collegato a Google e hai già dato il consenso). Il browser può mostrare un popup che si chiude subito. Se non è possibile, compare «Riconnetti». Il token resta in `sessionStorage` (non in `localStorage`, condiviso da tutte le pagine di `<utente>.github.io`), quindi riaprendo l'app il primo tocco lo rinnova.
+**Senza server:** l'app **rinnova il token in silenzio** ai tocchi dell'utente, negli ultimi 15 minuti di validità (o dopo la scadenza), con `prompt: 'none'` (funziona se sei ancora collegato a Google e hai già dato il consenso; il browser può mostrare un popup che si chiude subito). Se non è possibile compare «Riconnetti». Il token resta in `sessionStorage`.
+
+**Con il server (facoltativo): accesso persistente.** Il Worker Cloudflare conserva, cifrato, un token di rinnovo e l'app ottiene token freschi da sola, **senza popup e anche in background**. Richiede il client secret nel Worker e di pubblicare l'app OAuth in produzione (in *Testing* i token di rinnovo scadono dopo 7 giorni): la guida con i compromessi di sicurezza è in [`worker/README.md`](worker/README.md#accesso-persistente-facoltativo).
 
 ## Copia locale e sicurezza dei dati
 La copia locale dei dati sta in **IndexedDB** (non in `localStorage`, che ha un limite di circa 5 MB e su iPhone si riempiva) e ricorda a quale **versione del file su Drive** corrisponde. Regola di sicurezza: **se la copia manca o non corrisponde all'ultima versione di Drive, l'app rilegge Drive prima di inviare qualsiasi cosa** (con la copia persa adotta Drive così com'è; con una copia datata unisce). Una copia vuota non può quindi sovrascrivere il file. Se il browser non riesce a salvare la copia, Impostazioni → Sincronizzazione lo segnala. Drive conserva comunque le versioni precedenti del file (*Gestisci versioni*).
@@ -130,4 +135,5 @@ src/sync/           google.ts (token GIS) · drive.ts (REST) · engine.ts (ciclo
 src/store/          stato + cache locale
 src/components/     UI riusabile, form, Gate (login + ricerca/creazione della famiglia), FamilyCard, FolderPicker, Notifications
 src/pages/          Transazioni, Statistiche, Conti, Impostazioni, Categorie
+worker/             server delle notifiche push (Cloudflare Worker) con guida e test
 ```
