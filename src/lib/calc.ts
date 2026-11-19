@@ -1,4 +1,4 @@
-import type { Account, Category, CategoryType, Db, Member, MemberId, Transaction } from '../types'
+import type { Account, Category, CategoryType, Db, Member, MemberId, Payment, Transaction } from '../types'
 
 /** all = tutti i conti che vedo · shared = conti con più membri · altrimenti id di un membro */
 export type Scope = 'all' | 'shared' | MemberId
@@ -7,6 +7,20 @@ export const accountById = (db: Db): Map<string, Account> => new Map(db.accounts
 export const categoryById = (db: Db): Map<string, Category> => new Map(db.categories.map((c) => [c.id, c]))
 export const memberById = (db: Db): Map<string, Member> => new Map(db.members.map((m) => [m.id, m]))
 export const activeMembers = (db: Db): Member[] => db.members.filter((m) => m.active)
+
+// ---------- pagamenti di una spesa
+
+/** I pagamenti di una transazione: quelli espliciti (spesa pagata da più persone) oppure l'unico implicito (conto + pagatore). */
+export function txPayments(tx: Transaction): Payment[] {
+  return tx.payments && tx.payments.length ? tx.payments : [{ member: tx.paidBy, accountId: tx.accountId, amount: tx.amount }]
+}
+/** Chi ha pagato (membri). */
+export const txPayerIds = (tx: Transaction): MemberId[] => [...new Set(txPayments(tx).map((p) => p.member).filter((m): m is MemberId => !!m))]
+/** Tutti i conti toccati dalla transazione. */
+export const involvedAccountIds = (tx: Transaction): string[] =>
+  [...new Set([...(tx.type === 'expense' ? txPayments(tx).map((p) => p.accountId) : [tx.accountId]), tx.toAccountId].filter((x): x is string => !!x))]
+/** Una spesa condivisa ("split"): ha dei partecipanti o più pagamenti. */
+export const isSplit = (tx: Transaction): boolean => tx.type === 'expense' && (tx.participants.length > 0 || (tx.payments?.length ?? 0) > 1)
 
 export const sortedAccounts = (db: Db): Account[] => [...db.accounts].sort((a, b) => a.order - b.order)
 
@@ -35,7 +49,7 @@ export function accountBalances(db: Db): Record<string, number> {
   const bal: Record<string, number> = {}
   for (const a of db.accounts) bal[a.id] = a.initialBalance
   for (const t of db.transactions) {
-    if (t.type === 'expense') bal[t.accountId] = (bal[t.accountId] ?? 0) - t.amount
+    if (t.type === 'expense') for (const p of txPayments(t)) bal[p.accountId] = (bal[p.accountId] ?? 0) - p.amount
     else if (t.type === 'income') bal[t.accountId] = (bal[t.accountId] ?? 0) + t.amount
     else {
       bal[t.accountId] = (bal[t.accountId] ?? 0) - t.amount
@@ -53,9 +67,9 @@ export function totalLiquidity(db: Db, bal: Record<string, number>, include: (a:
 // ---------- filtri ----------
 
 export function inScope(db: Db, accs: Map<string, Account>, tx: Transaction, scope: Scope, me: MemberId | null): boolean {
-  const involved = [tx.accountId, tx.toAccountId].map((id) => (id ? accs.get(id) : undefined)).filter((a): a is Account => !!a)
+  const involved = involvedAccountIds(tx).map((id) => accs.get(id)).filter((a): a is Account => !!a)
   // visibile se vedo uno dei conti coinvolti oppure se la transazione mi riguarda (pago io o sono tra chi si divide la spesa)
-  const concerns = !!me && (tx.paidBy === me || tx.participants.includes(me))
+  const concerns = !!me && (txPayerIds(tx).includes(me) || tx.participants.includes(me))
   if (!concerns && !involved.some((a) => visibleTo(db, a, me))) return false
   if (scope === 'all') return true
   if (scope === 'shared') return involved.some((a) => isSharedAccount(db, a))
@@ -86,9 +100,9 @@ export function filterTransactions(db: Db, f: Filters): Transaction[] {
       const ts = new Date(t.date).getTime()
       if (ts < from || ts >= to) return false
       if (!inScope(db, accs, t, f.scope, f.me)) return false
-      if (f.accountId !== 'all' && t.accountId !== f.accountId && t.toAccountId !== f.accountId) return false
+      if (f.accountId !== 'all' && !involvedAccountIds(t).includes(f.accountId)) return false
       if (q) {
-        const hay = [t.title, t.note, cats.get(t.categoryId ?? '')?.name, accs.get(t.accountId)?.name, accs.get(t.toAccountId ?? '')?.name, (t.amount / 100).toFixed(2).replace('.', ',')]
+        const hay = [t.title, t.note, cats.get(t.categoryId ?? '')?.name, ...involvedAccountIds(t).map((id) => accs.get(id)?.name), ...(t.tags ?? []).map((g) => '#' + g), (t.amount / 100).toFixed(2).replace('.', ',')]
           .filter(Boolean).join(' ').toLowerCase()
         if (!hay.includes(q)) return false
       }
@@ -194,7 +208,8 @@ export interface Debt {
 
 /**
  * Saldo netto tra ogni coppia di membri.
- * - spesa pagata da X e divisa tra i partecipanti: ognuno ≠ X deve la sua quota a X (X non partecipa = anticipo per gli altri)
+ * - spesa condivisa: per ogni membro, netto = quanto ha pagato − la sua quota. Chi ha netto negativo deve la differenza a chi ha
+ *   netto positivo (assegnazione deterministica dal più grande); con un solo pagatore è semplicemente "ognuno deve la sua quota a chi ha pagato"
  * - spesa senza pagatore (conto condiviso) o senza partecipanti: nessun debito
  * - trasferimento tra due conti PERSONALI di membri diversi = rimborso (da X a Y riduce il debito di X verso Y)
  */
@@ -203,8 +218,21 @@ export function familyBalances(db: Db, txs: Transaction[]): Debt[] {
   const owe = new Map<string, number>() // "debitore>creditore" -> importo
   const add = (d: MemberId, c: MemberId, v: number) => owe.set(`${d}>${c}`, (owe.get(`${d}>${c}`) ?? 0) + v)
   for (const t of txs) {
-    if (t.type === 'expense' && t.paidBy) {
-      for (const s of expenseShares(t)) if (s.member !== t.paidBy) add(s.member, t.paidBy, s.amount)
+    if (t.type === 'expense' && t.participants.length > 0) {
+      const net = new Map<MemberId, number>()
+      let paidByMembers = 0
+      for (const p of txPayments(t)) if (p.member) { net.set(p.member, (net.get(p.member) ?? 0) + p.amount); paidByMembers += p.amount }
+      if (!paidByMembers) continue
+      for (const s of expenseShares(t)) net.set(s.member, (net.get(s.member) ?? 0) - s.amount)
+      const creditors = [...net].filter(([, v]) => v > 0).sort(([a, x], [b, y]) => y - x || a.localeCompare(b)).map(([id, v]) => ({ id, left: v }))
+      const debtors = [...net].filter(([, v]) => v < 0).sort(([a, x], [b, y]) => x - y || a.localeCompare(b)).map(([id, v]) => ({ id, need: -v }))
+      for (const d of debtors) {
+        for (const c of creditors) {
+          if (d.need === 0) break
+          const take = Math.min(d.need, c.left)
+          if (take > 0) { add(d.id, c.id, take); d.need -= take; c.left -= take }
+        }
+      }
     } else if (t.type === 'transfer' && t.toAccountId) {
       const from = accs.get(t.accountId)
       const to = accs.get(t.toAccountId)
@@ -220,4 +248,55 @@ export function familyBalances(db: Db, txs: Transaction[]): Debt[] {
       else if (net < 0) out.push({ debtor: ids[j], creditor: ids[i], amount: -net })
     }
   return out.sort((a, b) => b.amount - a.amount)
+}
+
+// ---------- tag
+
+/** Normalizza un tag: niente "#" iniziale, spazi compattati, massimo 30 caratteri. */
+export const normalizeTag = (s: string): string => s.trim().replace(/^#+/, '').replace(/\s+/g, ' ').slice(0, 30).trim()
+
+/** Tag già usati, dal più frequente. */
+export function allTags(db: Db): string[] {
+  const n = new Map<string, number>()
+  for (const t of db.transactions) for (const g of t.tags ?? []) n.set(g, (n.get(g) ?? 0) + 1)
+  return [...n].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([g]) => g)
+}
+
+// ---------- andamento della liquidità
+
+export interface LiquidityPoint {
+  /** 0-11 */
+  month: number
+  /** liquidità a fine mese (per il mese in corso: oggi); null per i mesi futuri */
+  value: number | null
+}
+
+/**
+ * Liquidità a fine di ogni mese dell'anno, sui conti che contano nel totale (visibili a `me`, non nascosti, non esclusi).
+ * `start` è la liquidità a inizio anno.
+ */
+export function liquiditySeries(db: Db, year: number, me: MemberId | null, now: Date = new Date()): { start: number; points: LiquidityPoint[] } {
+  const counted = new Map(db.accounts.filter((a) => !a.hidden && !a.excludeFromTotal && visibleTo(db, a, me)).map((a) => [a.id, a]))
+  const flows: Array<{ t: number; delta: number }> = []
+  for (const t of db.transactions) {
+    const ts = new Date(t.date).getTime()
+    const push = (accountId: string | null | undefined, delta: number) => { if (accountId && counted.has(accountId)) flows.push({ t: ts, delta }) }
+    if (t.type === 'expense') for (const p of txPayments(t)) push(p.accountId, -p.amount)
+    else if (t.type === 'income') push(t.accountId, t.amount)
+    else { push(t.accountId, -t.amount); push(t.toAccountId, t.amount) }
+  }
+  flows.sort((a, b) => a.t - b.t)
+  let running = [...counted.values()].reduce((s, a) => s + a.initialBalance, 0)
+  let i = 0
+  const upTo = (limit: number) => { while (i < flows.length && flows[i].t < limit) running += flows[i++].delta }
+  upTo(new Date(year, 0, 1).getTime())
+  const start = running
+  const points: LiquidityPoint[] = []
+  for (let m = 0; m < 12; m++) {
+    const monthStart = new Date(year, m, 1).getTime()
+    if (monthStart > now.getTime()) { points.push({ month: m, value: null }); continue }
+    upTo(Math.min(new Date(year, m + 1, 1).getTime(), now.getTime() + 1))
+    points.push({ month: m, value: running })
+  }
+  return { start, points }
 }

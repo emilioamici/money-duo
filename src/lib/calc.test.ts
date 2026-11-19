@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createDefaultDb, createFamilyDb, isPristine } from './defaults'
-import { accountBalances, categoryBreakdown, expenseShares, familyBalances, isSharedAccount, totalLiquidity, visibleTo } from './calc'
+import { accountBalances, allTags, categoryBreakdown, expenseShares, familyBalances, filterTransactions, involvedAccountIds, isSharedAccount, isSplit, liquiditySeries, normalizeTag, totalLiquidity, txPayerIds, visibleTo } from './calc'
 import { mergeDb, parseDb, replaceData, sameData } from './merge'
 import { deactivateMember, deleteCategory, deleteTransaction, newMember, saveAccount, saveFamilyName, saveMember, saveTransaction, setCategoryHidden } from './mutations'
 import { parseAmount } from './format'
@@ -109,6 +109,104 @@ describe('divisione spese e saldi tra membri', () => {
     // un trasferimento da un conto condiviso a più membri non è un rimborso
     const no = base({ type: 'transfer', amount: 400, accountId: 'acc-duo', toAccountId: 'acc-cash', categoryId: null })
     expect(familyBalances(db, [no])).toEqual([])
+  })
+})
+
+describe('spese pagate da più persone', () => {
+  // 100 € pagati: Marco 60 dal suo conto, Anna 40 dal suo; divisi in parti uguali tra i tre
+  const multi = () => base({ amount: 10000, accountId: 'acc-cash', paidBy: null, participants: ['m1', 'm2', 'm3'],
+    payments: [{ member: 'm1', accountId: 'acc-cash', amount: 6000 }, { member: 'm2', accountId: 'acc-m2', amount: 4000 }] })
+  it('ogni conto viene addebitato del proprio pagamento', () => {
+    const db = saveTransaction(family3(), multi())
+    const bal = accountBalances(db)
+    expect(bal['acc-cash']).toBe(-6000)
+    expect(bal['acc-m2']).toBe(-4000)
+    expect(bal['acc-m3']).toBe(0)
+  })
+  it('è una spesa condivisa e coinvolge tutti i conti dei pagamenti', () => {
+    const t = multi()
+    expect(isSplit(t)).toBe(true)
+    expect(involvedAccountIds(t).sort()).toEqual(['acc-cash', 'acc-m2'])
+    expect(txPayerIds(t).sort()).toEqual(['m1', 'm2'])
+    expect(isSplit(base({ participants: [] }))).toBe(false)
+  })
+  it('debiti: ognuno paga la sua quota, chi ha pagato di più è creditore', () => {
+    // quote 33,34 / 33,33 / 33,33 ; netti: m1 +26,66 ; m2 +6,67 ; m3 −33,33
+    const d = familyBalances(family3(), [multi()])
+    expect(d).toContainEqual({ debtor: 'm3', creditor: 'm1', amount: 2666 })
+    expect(d).toContainEqual({ debtor: 'm3', creditor: 'm2', amount: 667 })
+    expect(d).toHaveLength(2)
+    expect(d.reduce((a, x) => a + x.amount, 0)).toBe(3333) // la quota di m3, esatta
+  })
+  it('con un solo pagatore il risultato è identico al modello precedente', () => {
+    const single = base({ amount: 3000, paidBy: 'm1', participants: ['m1', 'm2', 'm3'] })
+    const asPayments = { ...single, paidBy: null, payments: [{ member: 'm1', accountId: 'acc-cash', amount: 3000 }] }
+    expect(familyBalances(family3(), [asPayments])).toEqual(familyBalances(family3(), [single]))
+  })
+  it('chi ha pagato ma non partecipa ha anticipato per gli altri', () => {
+    const t = base({ amount: 9000, paidBy: null, participants: ['m2', 'm3'],
+      payments: [{ member: 'm1', accountId: 'acc-cash', amount: 5000 }, { member: 'm2', accountId: 'acc-m2', amount: 4000 }] })
+    // quote 45/45 ; netti: m1 +50 ; m2 −5 ; m3 −45
+    const d = familyBalances(family3(), [t])
+    expect(d).toContainEqual({ debtor: 'm3', creditor: 'm1', amount: 4500 })
+    expect(d).toContainEqual({ debtor: 'm2', creditor: 'm1', amount: 500 })
+  })
+  it('un pagamento dal conto condiviso (senza membro) non crea debiti', () => {
+    const t = base({ amount: 5000, paidBy: null, participants: ['m1', 'm2'], payments: [{ member: null, accountId: 'acc-shared', amount: 5000 }] })
+    expect(familyBalances(family3(), [t])).toEqual([])
+  })
+  it('chi ha pagato vede la spesa anche se il conto è di un altro; una spesa vecchia senza pagamenti funziona come prima', () => {
+    const db = saveTransaction(family3(), multi())
+    const found = filterTransactions(db, { from: new Date('2026-11-01'), to: new Date('2026-12-01'), scope: 'all', accountId: 'acc-m2', q: '', me: 'm1' })
+    expect(found).toHaveLength(1) // m1 non vede acc-m2 ma ha pagato
+    expect(involvedAccountIds(base({ accountId: 'acc-cash' }))).toEqual(['acc-cash'])
+  })
+  it('parse: i pagamenti sopravvivono al salvataggio', () => {
+    const back = parseDb(JSON.parse(JSON.stringify(saveTransaction(family3(), multi()))))
+    expect(back.transactions[0].payments).toEqual(multi().payments)
+  })
+})
+
+describe('tag', () => {
+  it('normalizzazione, elenco per frequenza, ricerca', () => {
+    expect(normalizeTag('  #Vacanza  Estate ')).toBe('Vacanza Estate')
+    expect(normalizeTag('#'.repeat(3) + 'x'.repeat(50)).length).toBe(30)
+    let db = family3()
+    db = saveTransaction(db, base({ id: 'a', tags: ['lidl', 'spesa'] }))
+    db = saveTransaction(db, base({ id: 'b', tags: ['lidl'] }))
+    db = saveTransaction(db, base({ id: 'c', tags: ['viaggio'] }))
+    expect(allTags(db)).toEqual(['lidl', 'spesa', 'viaggio'])
+    const f = (q: string) => filterTransactions(db, { from: new Date('2026-11-01'), to: new Date('2026-12-01'), scope: 'all', accountId: 'all', q, me: null }).length
+    expect(f('lidl')).toBe(2)
+    expect(f('#viaggio')).toBe(1)
+    expect(f('inesistente')).toBe(0)
+    expect(parseDb(JSON.parse(JSON.stringify(db))).transactions.find((t) => t.id === 'a')!.tags).toEqual(['lidl', 'spesa'])
+  })
+})
+
+describe('andamento della liquidità', () => {
+  it('liquidità a fine mese, trasferimenti compresi, mesi futuri vuoti', () => {
+    let db = family3()
+    db = { ...db, accounts: db.accounts.map((a) => (a.id === 'acc-cash' ? { ...a, initialBalance: 10000 } : a)) }
+    const at = (iso: string, over: Partial<Transaction>) => base({ date: iso, ...over })
+    db = saveTransaction(db, at('2025-12-20T10:00:00.000Z', { id: 'prev', type: 'income', amount: 5000 }))      // prima dell'anno: finisce nel saldo iniziale
+    db = saveTransaction(db, at('2026-01-15T10:00:00.000Z', { id: 'j', type: 'expense', amount: 2000 }))        // gennaio -20
+    db = saveTransaction(db, at('2026-03-05T10:00:00.000Z', { id: 'm', type: 'income', amount: 7000 }))         // marzo +70
+    db = saveTransaction(db, at('2026-03-20T10:00:00.000Z', { id: 't1', type: 'transfer', amount: 1000, toAccountId: 'acc-shared', categoryId: null })) // tra conti contati: netto 0
+    db = { ...db, accounts: db.accounts.map((a) => (a.id === 'acc-shared' ? { ...a, excludeFromTotal: true } : a)) }                                // ...ma se è escluso, esce dalla liquidità
+    const s = liquiditySeries(db, 2026, null, new Date('2026-05-10T12:00:00.000Z'))
+    expect(s.start).toBe(15000)
+    // 15.000 a inizio anno; gen −20 → 13.000; mar +70 e −10 verso il conto escluso → 19.000; aprile e maggio invariati; poi mesi futuri
+    expect(s.points.map((p) => p.value)).toEqual([13000, 13000, 19000, 19000, 19000, null, null, null, null, null, null, null])
+    expect(s.points[11].value).toBeNull()
+  })
+  it('un anno passato ha tutti i dodici mesi; non conta ciò che non vedo', () => {
+    let db = family3()
+    db = saveTransaction(db, base({ id: 'x', accountId: 'acc-m3', type: 'income', amount: 9000, date: '2024-06-10T10:00:00.000Z' }))
+    const all = liquiditySeries(db, 2024, null, new Date('2026-05-10'))
+    expect(all.points.every((p) => p.value !== null)).toBe(true)
+    expect(all.points[11].value).toBe(9000)
+    expect(liquiditySeries(db, 2024, 'm2', new Date('2026-05-10')).points[11].value).toBe(0) // il conto di m3 non è di m2
   })
 })
 

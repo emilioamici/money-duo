@@ -70,6 +70,17 @@ describe('notifiche: transazioni', () => {
     const n = diffNotifications(prev, next, 'm2')
     expect(n[0].body).toContain('la tua quota: 25,00')
   })
+  it('spesa pagata da più persone: notifica a chi partecipa, con la sua quota', () => {
+    const prev = base()
+    const next = saveTransaction(prev, tx({ accountId: 'a-m3', by: 'm3', paidBy: null, amount: 9000, participants: ['m1', 'm2', 'm3'],
+      payments: [{ member: 'm3', accountId: 'a-m3', amount: 5000 }, { member: 'm1', accountId: 'a-duo', amount: 4000 }] }))
+    const n = diffNotifications(prev, next, 'm2')
+    expect(n).toHaveLength(1)
+    expect(n[0].title).toBe('Luca ha aggiunto una spesa condivisa con te')
+    expect(n[0].body).toContain('la tua quota: 30,00')
+    expect(n[0].body).toContain('Conto Marco+Anna') // il primo conto che vedo tra quelli dei pagamenti
+    expect(diffNotifications(prev, next, 'm1')).toHaveLength(1)
+  })
   it('una transazione già presente non notifica di nuovo; modificarla non è "aggiungere"', async () => {
     const prev = saveTransaction(base(), tx({ id: 'x', accountId: 'a-all', by: 'm1' }))
     await sleep()

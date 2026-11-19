@@ -1,4 +1,4 @@
-import type { Account, Category, Db, Member, Transaction } from '../types'
+import type { Account, Category, Db, Member, Payment, Transaction } from '../types'
 import { SCHEMA_VERSION } from '../types'
 import { nowIso, uid } from './ids'
 import { MEMBER_COLORS } from './defaults'
@@ -84,6 +84,13 @@ const numMap = (v: unknown): Record<string, number> | null => {
   const out: Record<string, number> = {}
   for (const [k, n] of Object.entries(v as Record<string, unknown>)) if (typeof n === 'number' && Number.isFinite(n)) out[k] = Math.round(n)
   return Object.keys(out).length ? out : null
+}
+const parsePayments = (v: unknown): Payment[] | null => {
+  if (!Array.isArray(v)) return null
+  const out = v
+    .filter((p): p is Record<string, unknown> => !!p && typeof p === 'object' && typeof (p as Record<string, unknown>).accountId === 'string')
+    .map((p) => ({ member: typeof p.member === 'string' ? p.member : null, accountId: p.accountId as string, amount: Math.abs(Math.round(num(p.amount))) }))
+  return out.length ? out : null
 }
 const bool = (v: unknown): boolean => v === true
 const strArr = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [])
@@ -180,6 +187,8 @@ export function parseDb(input: unknown): Db {
     participants: strArr(x.participants),
     splitMode: pick(x.splitMode, ['equal', 'amount', 'percent'] as const, 'equal'),
     splitValues: numMap(x.splitValues),
+    payments: parsePayments(x.payments),
+    tags: strArr(x.tags),
     by: typeof x.by === 'string' ? x.by : null,
     createdAt: str(x.createdAt, EPOCH),
     updatedAt: str(x.updatedAt, EPOCH),

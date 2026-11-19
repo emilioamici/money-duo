@@ -13,6 +13,8 @@
   --inc: 5 150 105;
   --exp: 225 29 72;
   --trf: 2 132 199;
+  /* serie del grafico: validati con lo script dataviz (banda di luminosità, contrasto) su sfondo chiaro e scuro */
+  --chart-line: 79 70 229;
   color-scheme: light dark;
 }
 @media (prefers-color-scheme: dark) {
@@ -27,6 +29,7 @@
     --inc: 52 211 153;
     --exp: 251 113 133;
     --trf: 56 189 248;
+    --chart-line: 112 118 240;
   }
 }
 
