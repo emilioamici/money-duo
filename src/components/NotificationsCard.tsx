@@ -94,6 +94,16 @@ export function NotificationsCard() {
             {prefs.pushEnabled && <button className="btn-soft w-full" disabled={pushBusy} onClick={() => void testPush()}>Invia una notifica push di prova</button>}
           </>
         )}
+        {pushConfigured() && (
+          <details className="mt-3 text-xs">
+            <summary className="cursor-pointer text-muted">Impostazioni del server (modifica o rimuovi)</summary>
+            <div className="mt-2 space-y-2">
+              <input className="input" aria-label="Indirizzo del server" placeholder="Indirizzo del server (https://….workers.dev)" defaultValue={pushUrl()} onBlur={(e) => { savePushConfig(e.target.value, vapidPublicKey()); setPushMsg('Salvato. Se avevi già attivato le notifiche, disattiva e riattiva l\'interruttore per iscrivere di nuovo il dispositivo.'); bump((n) => n + 1) }} />
+              <input className="input" aria-label="Chiave pubblica VAPID" placeholder="Chiave pubblica VAPID" defaultValue={vapidPublicKey()} onBlur={(e) => { savePushConfig(pushUrl(), e.target.value); setPushMsg('Salvato. Se avevi già attivato le notifiche, disattiva e riattiva l\'interruttore per iscrivere di nuovo il dispositivo.'); bump((n) => n + 1) }} />
+              <button className="btn-danger w-full" onClick={() => { if (sync.fileId && prefs.pushEnabled) void disablePush(sync.fileId, engine.currentToken()); setPrefs({ pushEnabled: false }); savePushConfig('', ''); setPushMsg('Configurazione rimossa.'); bump((n) => n + 1) }}>Rimuovi la configurazione del server</button>
+            </div>
+          </details>
+        )}
         {pushMsg && <p className="mt-2 text-sm text-muted">{pushMsg}</p>}
       </div>
       <p className="mt-3 text-xs text-muted">
