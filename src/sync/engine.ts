@@ -150,7 +150,8 @@ export class SyncEngine {
     const token = await this.token()
     const db = this.stamp(this.host!.getDb(), 1)
     const f = await drive.createFile(token, JSON.stringify(db))
-    this.host!.applyDb(() => db, false)
+    // si riapplicano solo i metadati: eventuali modifiche fatte durante l'upload non vanno perse
+    this.host!.applyDb((prev) => ({ ...prev, meta: db.meta }), false)
     this.p = { ...this.p, fileId: f.id, fileName: f.name, remoteVersion: f.version, lastSyncAt: nowIso(), dirty: false }
     this.persist()
     this.set('synced')
@@ -226,7 +227,7 @@ export class SyncEngine {
         const seq = this.dirtySeq
         const out = this.stamp(this.host.getDb(), 1)
         const f = await drive.updateFile(token, id, JSON.stringify(out))
-        this.host.applyDb(() => out, false)
+        this.host.applyDb((prev) => ({ ...prev, meta: out.meta }), false)
         version = f.version
         // se nel frattempo ci sono state altre modifiche locali, restano "dirty" per il ciclo successivo
         this.p.dirty = this.dirtySeq !== seq

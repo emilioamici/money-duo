@@ -2,6 +2,9 @@ import type { Account, Category, Db } from '../types'
 import { SCHEMA_VERSION } from '../types'
 import { nowIso, uid } from './ids'
 
+/** I dati di esempio non sono "modifiche dell'utente": con timestamp epoch perdono sempre contro qualsiasi modifica reale nei merge. */
+const SEED_TIME = '1970-01-01T00:00:00.000Z'
+
 /**
  * Struttura di avvio NEUTRA: nessun dato personale.
  * I conti reali, i saldi e le transazioni vengono creati nell'app e salvati su Google Drive.
@@ -37,7 +40,7 @@ const INCOME: Seed[] = [
 ]
 
 export function defaultCategories(): Category[] {
-  const t = nowIso()
+  const t = SEED_TIME
   const out: Category[] = []
   let order = 0
   const push = (type: Category['type'], seeds: Seed[]) => {
@@ -55,7 +58,7 @@ export function defaultCategories(): Category[] {
 }
 
 export function defaultAccounts(): Account[] {
-  const t = nowIso()
+  const t = SEED_TIME
   return [
     { id: 'acc-cash', name: 'Contanti', group: 'cash', owner: 'a', initialBalance: 0, excludeFromTotal: false, hidden: false, order: 0, createdAt: t, updatedAt: t },
     { id: 'acc-shared', name: 'Conto Comune', group: 'bank', owner: 'shared', initialBalance: 0, excludeFromTotal: false, hidden: false, order: 1, createdAt: t, updatedAt: t },
@@ -67,7 +70,7 @@ export function createDefaultDb(): Db {
   return {
     schemaVersion: SCHEMA_VERSION,
     meta: { dbId: uid(), createdAt: t, updatedAt: t, updatedBy: '', revision: 0 },
-    profiles: { a: 'Emilio', b: 'Sara', shared: 'In Comune', updatedAt: t },
+    profiles: { a: 'Emilio', b: 'Sara', shared: 'In Comune', updatedAt: SEED_TIME },
     accounts: defaultAccounts(),
     categories: defaultCategories(),
     transactions: [],

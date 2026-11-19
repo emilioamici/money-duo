@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createDefaultDb } from './defaults'
 import { accountBalances, coupleBalance, totalLiquidity, categoryBreakdown } from './calc'
 import { mergeDb, parseDb, replaceData, sameData } from './merge'
-import { deleteTransaction, saveTransaction, setCategoryHidden } from './mutations'
+import { deleteCategory, deleteTransaction, saveAccount, saveProfiles, saveTransaction, setCategoryHidden } from './mutations'
 import { parseAmount } from './format'
 import type { Transaction } from '../types'
 
@@ -103,6 +103,22 @@ describe('merge', () => {
     const out = replaceData(cur, incoming)
     expect(out.transactions).toHaveLength(0)
     expect(mergeDb(out, cur).transactions).toHaveLength(0)
+  })
+  it('i dati di esempio di un\'installazione nuova non battono le modifiche reali', async () => {
+    const remote0 = createDefaultDb()
+    await new Promise((r) => setTimeout(r, 5))
+    let remote = saveAccount(remote0, { ...remote0.accounts[0], name: 'Portafoglio', initialBalance: 5000 })
+    remote = deleteCategory(remote, 'cat-health')
+    remote = saveProfiles(remote, { a: 'Luca', b: 'Anna', shared: 'Casa' })
+    await new Promise((r) => setTimeout(r, 5))
+    const local = createDefaultDb() // nuova installazione, creata DOPO
+    for (const m of [mergeDb(local, remote), mergeDb(remote, local)]) {
+      const acc = m.accounts.find((a) => a.id === 'acc-cash')!
+      expect(acc.name).toBe('Portafoglio')
+      expect(acc.initialBalance).toBe(5000)
+      expect(m.categories.some((c) => c.id === 'cat-health')).toBe(false)
+      expect(m.profiles.a).toBe('Luca')
+    }
   })
   it('parseDb valida', () => {
     expect(() => parseDb({})).toThrow()
