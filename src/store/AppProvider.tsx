@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import type { Db, Member, Transaction } from '../types'
-import type { Scope } from '../lib/calc'
+import { emptyFilters, type Scope, type TxFilters } from '../lib/calc'
 import { createDefaultDb } from '../lib/defaults'
 import { nowIso } from '../lib/ids'
 import { diffNotifications, mergeNotifications, type Notif } from '../lib/notifications'
@@ -18,6 +18,8 @@ export interface View {
   scope: Scope
   accountId: string
   q: string
+  /** filtri avanzati della schermata Transazioni */
+  filters: TxFilters
 }
 
 export interface TxFormState {
@@ -175,7 +177,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (sync.remoteVersion !== lastVersion.current) { lastVersion.current = sync.remoteVersion; writeCache(dbRef.current, sync.remoteVersion) }
   }, [sync.remoteVersion])
 
-  const [view, setViewState] = useState<View>({ month: new Date(), period: 'month', scope: 'all', accountId: 'all', q: '' })
+  const [view, setViewState] = useState<View>({ month: new Date(), period: 'month', scope: 'all', accountId: 'all', q: '', filters: emptyFilters() })
   const setView = useCallback((p: Partial<View>) => setViewState((v) => ({ ...v, ...p })), [])
 
   const [txForm, setTxForm] = useState<TxFormState | null>(null)

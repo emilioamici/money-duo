@@ -27,7 +27,7 @@ export function SyncCard() {
   }
 
   return (
-    <div className="card p-4">
+    <div>
       <div className="mb-3 flex items-center gap-3">
         <span className={`rounded-full p-2.5 ${sync.status === 'synced' ? 'bg-inc/15 text-inc' : 'bg-line text-muted'}`}>{sync.status === 'offline' ? <CloudOff size={20} /> : <Cloud size={20} />}</span>
         <div className="min-w-0 flex-1">

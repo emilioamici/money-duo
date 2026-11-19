@@ -85,6 +85,11 @@ La notifica push parte **dopo che i dati sono arrivati su Drive** (anche per le 
 - **Titoli già usati:** mentre scrivi il titolo compaiono le proposte (prima quelli che iniziano con il testo, poi quelli che lo contengono).
 - **Comportamento da app su mobile:** la pagina non scorre né rimbalza in orizzontale.
 
+**Filtri, dettaglio conto e impostazioni.**
+- **Filtri** (Transazioni, icona accanto alla campanella): tipo (uscite, entrate, trasferimenti), conti, importo minimo e massimo, categorie (una categoria principale include le sue sottocategorie), tag e «solo spese condivise». I criteri si combinano; l'anteprima nel pulsante mostra quanti risultati ci sono. Il badge sull'icona e la riga «N filtri attivi» ricordano che la lista è filtrata; i filtri restano finché non li azzeri.
+- **Conti:** toccando un conto si apre il suo dettaglio (saldo e movimenti del mese o dell'anno scelto). Scorrendo un conto verso sinistra compaiono *Modifica*, *Escludi dal totale* (o *Includi*) e *Nascondi* (o *Mostra*).
+- **Impostazioni** a schede che si aprono e si chiudono: Famiglia, Sincronizzazione e account, Notifiche, Backup e dati; *Categorie* resta una schermata a parte. Da chiuse mostrano un riepilogo; lo stato aperto/chiuso si ricorda su ogni dispositivo.
+
 ## Schema del JSON (`schemaVersion: 2`)
 ```jsonc
 {

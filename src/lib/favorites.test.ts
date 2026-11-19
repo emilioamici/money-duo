@@ -88,3 +88,34 @@ describe('proposte di titoli', () => {
     expect(titleSuggestions(db, 'a', 2)).toHaveLength(2)
   })
 })
+
+import { countFilters, emptyFilters, filterTransactions } from './calc'
+describe('filtri avanzati', () => {
+  const db0 = createFamilyDb('Rossi', { name: 'Marco', email: 'marco@example.com' })
+  const me = db0.members[0].id
+  const cat = db0.categories.find((c) => !c.parentId && c.type === 'expense')!
+  const kid = { ...cat, id: 'kid', parentId: cat.id, name: 'Figlia' }
+  const other = db0.categories.find((c) => !c.parentId && c.type === 'expense' && c.id !== cat.id)!
+  const db = [
+    tx({ id: 'a', amount: 500, categoryId: cat.id, tags: ['casa'], title: 'a' }),
+    tx({ id: 'b', amount: 2000, categoryId: 'kid', tags: ['Vacanza'], title: 'b' }),
+    tx({ id: 'c', amount: 8000, categoryId: other.id, tags: [], title: 'c', type: 'income' }),
+    tx({ id: 'd', amount: 3000, categoryId: null, type: 'transfer', accountId: 'acc-cash', toAccountId: 'acc-shared', tags: [], title: 'd' }),
+    tx({ id: 'e', amount: 4000, categoryId: other.id, participants: [me, 'm2'], paidBy: me, tags: [], title: 'e' }),
+  ].reduce((d, t) => saveTransaction(d, t), { ...db0, categories: [...db0.categories, kid] })
+  const base = { from: new Date('2025-01-01'), to: new Date('2027-01-01'), scope: 'all' as const, accountId: 'all', q: '', me }
+  const ids = (adv: Partial<ReturnType<typeof emptyFilters>>) => filterTransactions(db, { ...base, adv: { ...emptyFilters(), ...adv } }).map((t) => t.id).sort().join('')
+
+  it('senza criteri non filtra nulla e non conta nulla', () => { expect(ids({})).toBe('abcde'); expect(countFilters(emptyFilters())).toBe(0) })
+  it('per tipo', () => { expect(ids({ types: ['income'] })).toBe('c'); expect(ids({ types: ['income', 'transfer'] })).toBe('cd') })
+  it('per importo: minimo e massimo inclusi', () => { expect(ids({ min: 2000, max: 4000 })).toBe('bde'); expect(ids({ min: 5000 })).toBe('c'); expect(ids({ max: 500 })).toBe('a') })
+  it('per categoria: la principale include le sottocategorie; i trasferimenti non hanno categoria', () => {
+    expect(ids({ categoryIds: [cat.id] })).toBe('ab')
+    expect(ids({ categoryIds: ['kid'] })).toBe('b')
+    expect(ids({ categoryIds: [other.id] })).toBe('ce')
+  })
+  it('per tag, senza badare alle maiuscole', () => { expect(ids({ tags: ['vacanza'] })).toBe('b'); expect(ids({ tags: ['casa', 'vacanza'] })).toBe('ab') })
+  it('per conto: anche il conto di destinazione di un trasferimento', () => { expect(ids({ accountIds: ['acc-shared'] })).toBe('d') })
+  it('solo spese condivise', () => { expect(ids({ splitOnly: true })).toBe('e') })
+  it('i criteri si combinano', () => { expect(ids({ types: ['expense'], min: 3000 })).toBe('e'); expect(countFilters({ ...emptyFilters(), types: ['expense'], min: 1, splitOnly: true })).toBe(3) })
+})

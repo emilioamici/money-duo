@@ -1,26 +1,22 @@
 import { useMemo, useState } from 'react'
-import { Receipt, Search, X } from 'lucide-react'
+import { Receipt, Search, SlidersHorizontal, X } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
-import { filterTransactions, periodRange, sortedAccounts, summarize, visibleTo } from '../lib/calc'
-import { dayKey, dayLabel, formatMoney } from '../lib/format'
+import { countFilters, emptyFilters, filterTransactions, periodRange, summarize } from '../lib/calc'
+import { formatMoney } from '../lib/format'
 import { MonthNav, ScopeChips, SyncChip } from '../components/Nav'
-import { TransactionRow } from '../components/TransactionRow'
+import { TxGroups } from '../components/TxGroups'
+import { FilterSheet } from '../components/FilterSheet'
 import { EmptyState } from '../components/ui'
 import { NotificationBell } from '../components/Notifications'
-import type { Transaction } from '../types'
 
 export function HomePage({ onOpenSync }: { onOpenSync: () => void }) {
   const { db, view, setView, openTx, me } = useApp()
   const [search, setSearch] = useState(!!view.q)
+  const [filtering, setFiltering] = useState(false)
+  const nFilters = countFilters(view.filters)
   const { from, to } = periodRange(view.month, view.period)
-  const txs = useMemo(() => filterTransactions(db, { from, to, scope: view.scope, accountId: view.accountId, q: view.q, me: me?.id ?? null }), [db, view, me, from.getTime()]) // eslint-disable-line react-hooks/exhaustive-deps
+  const txs = useMemo(() => filterTransactions(db, { from, to, scope: view.scope, accountId: view.accountId, q: view.q, me: me?.id ?? null, adv: view.filters }), [db, view, me, from.getTime()]) // eslint-disable-line react-hooks/exhaustive-deps
   const sum = summarize(txs)
-  const groups = useMemo(() => {
-    const m = new Map<string, Transaction[]>()
-    for (const t of txs) { const k = dayKey(t.date); m.set(k, [...(m.get(k) ?? []), t]) }
-    return [...m.entries()]
-  }, [txs])
-
   return (
     <div>
       <div className="sticky top-0 z-10 space-y-3 bg-bg/90 px-4 pb-3 pt-safe backdrop-blur">
@@ -29,6 +25,10 @@ export function HomePage({ onOpenSync }: { onOpenSync: () => void }) {
           <div className="flex items-center gap-2">
             <SyncChip onClick={onOpenSync} />
             <NotificationBell />
+            <button className="relative rounded-full p-2 hover:bg-line/60" aria-label="Filtri" onClick={() => setFiltering(true)}>
+              <SlidersHorizontal size={20} />
+              {nFilters > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[10px] font-bold text-onbrand">{nFilters}</span>}
+            </button>
             <button className="rounded-full p-2 hover:bg-line/60" aria-label="Cerca" onClick={() => { setSearch((s) => !s); if (search) setView({ q: '' }) }}>{search ? <X size={20} /> : <Search size={20} />}</button>
           </div>
         </div>
@@ -44,27 +44,19 @@ export function HomePage({ onOpenSync }: { onOpenSync: () => void }) {
           <div><p className="text-[11px] font-semibold uppercase text-muted">Bilancio</p><p className={`font-bold tabular-nums ${sum.balance < 0 ? 'text-exp' : ''}`}>{formatMoney(sum.balance)}</p></div>
         </div>
 
-        <select className="input !py-2 text-sm" value={view.accountId} onChange={(e) => setView({ accountId: e.target.value })} aria-label="Filtra per conto">
-          <option value="all">Tutti i conti</option>
-          {sortedAccounts(db).filter((a) => visibleTo(db, a, me?.id ?? null) && (!a.hidden || a.id === view.accountId)).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-        </select>
+        {nFilters > 0 && (
+          <div className="flex items-center justify-between rounded-xl bg-brand/10 px-3 py-2 text-sm">
+            <button className="font-semibold text-brand" onClick={() => setFiltering(true)}>{nFilters} {nFilters === 1 ? 'filtro attivo' : 'filtri attivi'}</button>
+            <button className="font-semibold text-muted" onClick={() => setView({ filters: emptyFilters() })}>Azzera</button>
+          </div>
+        )}
 
-        {groups.length === 0 ? (
-          <div className="card"><EmptyState icon={<Receipt size={28} />} title="Nessuna transazione" text={view.q ? 'Nessun risultato per questa ricerca.' : 'Non ci sono movimenti in questo periodo.'}
+        {txs.length === 0 ? (
+          <div className="card"><EmptyState icon={<Receipt size={28} />} title="Nessuna transazione" text={view.q || nFilters ? 'Nessun risultato per questa ricerca o questi filtri.' : 'Non ci sono movimenti in questo periodo.'}
             action={<button className="btn-primary" onClick={() => openTx()}>Aggiungi transazione</button>} /></div>
-        ) : groups.map(([k, list]) => {
-          const day = summarize(list)
-          return (
-            <section key={k} className="card overflow-hidden">
-              <header className="flex justify-between border-b border-line/60 bg-line/20 px-4 py-2 text-xs font-semibold text-muted">
-                <span>{dayLabel(k)}</span>
-                <span className="tabular-nums">{day.income > 0 && <span className="text-inc">+{formatMoney(day.income)} </span>}{day.expense > 0 && <span className="text-exp">−{formatMoney(day.expense)}</span>}</span>
-              </header>
-              <div className="divide-y divide-line/50">{list.map((t) => <TransactionRow key={t.id} tx={t} />)}</div>
-            </section>
-          )
-        })}
+        ) : <TxGroups txs={txs} />}
       </div>
+      {filtering && <FilterSheet onClose={() => setFiltering(false)} />}
     </div>
   )
 }

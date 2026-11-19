@@ -66,8 +66,7 @@ export function FamilyCard() {
   }
 
   return (
-    <section className="card p-4">
-      <h2 className="mb-3 font-bold">Famiglia</h2>
+    <div>
       <Field label="Nome della famiglia">
         <input className="input" value={db.family.name} readOnly={!canManage} onChange={(e) => commit((d) => saveFamilyName(d, e.target.value))} />
       </Field>
@@ -132,6 +131,6 @@ export function FamilyCard() {
         <FolderPicker title="Sposta il database in…" onClose={() => setPicking(false)}
           onPick={(f) => { setPicking(false); void guard(async () => { await engine.moveTo(f.id); setFolder(f.name); setInfo(`Database spostato in «${f.name}».`) }) }} />
       )}
-    </section>
+    </div>
   )
 }

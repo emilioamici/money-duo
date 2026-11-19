@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { BellRing } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
 import { engine } from '../sync/engine'
 import { configError, disablePush, enablePush, pushConfigured, pushSupported, savePushConfig, pushUrl, vapidPublicKey, sendPush } from '../sync/push'
@@ -56,8 +55,7 @@ export function NotificationsCard() {
   }
 
   return (
-    <section className="card p-4">
-      <h2 className="mb-1 flex items-center gap-2 font-bold"><BellRing size={18} className="text-brand" />Notifiche</h2>
+    <div>
       <p className="mb-3 text-xs text-muted">
         Nell'app trovi sempre la campanella: ti avviso quando un altro membro aggiunge una transazione che ti riguarda o un conto in comune, o condivide un conto con te.
         Puoi ricevere anche una notifica del dispositivo.
@@ -110,6 +108,6 @@ export function NotificationsCard() {
         Senza il server push, il sito non può svegliare il telefono: le notifiche arrivano mentre l'app è aperta o in background (si controlla ogni 2 minuti),
         e quelle perse mentre era chiusa le trovi alla riapertura. {sync.persistent ? "L'accesso persistente tiene attiva la sessione Google anche in background." : "La sessione Google dura 1 ora: finché usi l'app si rinnova da sola; se resta in background senza essere toccata, dopo un'ora le notifiche si fermano finché non la riapri."}
       </p>
-    </section>
+    </div>
   )
 }
