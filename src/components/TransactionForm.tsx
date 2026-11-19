@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import { Trash2, Users } from 'lucide-react'
 import type { Transaction, TxType } from '../types'
 import { useApp, type TxFormState } from '../store/AppProvider'
 import { accountById, sortedAccounts, visibleTo } from '../lib/calc'
@@ -13,7 +13,7 @@ import { CategoryRow, Row, SelectField, TagsRow, TitleRow, accountLabel, plain }
 
 /** Nuova transazione "normale": uscita, entrata o trasferimento. Le spese condivise hanno un form dedicato (Nuovo split). */
 export function TransactionForm({ state, onClose }: { state: TxFormState; onClose: () => void }) {
-  const { db, commit, prefs, setPrefs, me, nameOf } = useApp()
+  const { db, commit, prefs, setPrefs, me, nameOf, openSplit } = useApp()
   const { tx, initial } = state
   const accs = useMemo(() => accountById(db), [db])
   const accounts = useMemo(
@@ -82,6 +82,15 @@ export function TransactionForm({ state, onClose }: { state: TxFormState; onClos
     }
   }
 
+  /** Trasforma la spesa in uno split portando con sé quello che hai già modificato (senza salvare nulla). */
+  const toSplit = () => {
+    if (!tx) return
+    openSplit({ tx: {
+      ...tx, amount: cents && cents > 0 ? cents : tx.amount, date: fromLocalInput(date || toLocalInput(tx.date)), accountId, categoryId,
+      title: title.trim(), note: note.trim(), tags, paidBy,
+    } })
+  }
+
   const options = (skip?: string) => accounts.filter((a) => a.id !== skip).map((a) => ({ value: a.id, label: accountLabel(a, nameOf) }))
 
   return (
@@ -120,6 +129,10 @@ export function TransactionForm({ state, onClose }: { state: TxFormState; onClos
         <Row label="Note"><textarea className={`${plain} resize-none`} rows={1} value={note} onChange={(e) => setNote(e.target.value)} /></Row>
         <TagsRow value={tags} onChange={setTags} />
       </div>
+
+      {tx && type === 'expense' && (
+        <button type="button" className="btn-soft mt-4 w-full" onClick={toSplit}><Users size={18} />Dividi questa spesa</button>
+      )}
 
       {error && <p className="mt-3 text-sm font-medium text-exp">{error}</p>}
     </Sheet>
