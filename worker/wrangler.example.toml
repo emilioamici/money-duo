@@ -9,6 +9,10 @@ ALLOWED_ORIGINS = "https://<utente>.github.io,http://localhost:5173"
 # Contatto inviato ai servizi di push: l'indirizzo del sito va benissimo
 VAPID_SUBJECT = "https://<utente>.github.io/money-duo/"
 
+# Solo per l'accesso persistente (facoltativo): ID del client OAuth di Google Cloud (è un identificativo pubblico).
+# Il client secret e SESSION_KEY NON vanno qui: si impostano con `npx wrangler secret put` (vedi README).
+# GOOGLE_CLIENT_ID = "xxxx.apps.googleusercontent.com"
+
 [[kv_namespaces]]
 binding = "SUBS"
 id = "INSERISCI_QUI_L_ID_DEL_KV"

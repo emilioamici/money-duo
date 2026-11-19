@@ -1,3 +1,4 @@
+import { authCallback, authConfigured, authLogout, authRefresh, authStart } from './auth'
 import { sendWebPush, type PushSubscriptionData, type VapidKeys } from './webpush'
 
 /** Minimo indispensabile dell'archivio KV di Cloudflare (così il codice si prova anche in Node). */
@@ -19,6 +20,14 @@ export interface Env {
   ALLOW_ANY_PUSH_HOST?: string
   /** solo per i test in locale: indirizzo delle API Google (predefinito: https://www.googleapis.com) */
   GOOGLE_API?: string
+  // ----- accesso persistente (facoltativo): client OAuth di Google Cloud e chiave per cifrare i token di rinnovo
+  GOOGLE_CLIENT_ID?: string
+  GOOGLE_CLIENT_SECRET?: string
+  /** 32 byte casuali in base64url (node worker/scripts/generate-session-key.mjs) */
+  SESSION_KEY?: string
+  /** solo test: indirizzi di Google per OAuth */
+  GOOGLE_AUTH_URL?: string
+  GOOGLE_OAUTH_API?: string
 }
 
 /** Servizi di push dei browser: gli unici indirizzi a cui il server accetta di inviare. */
@@ -153,7 +162,10 @@ export default {
     const json = (status: number, data: unknown) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json', ...headers } })
     const { pathname } = new URL(req.url)
     if (req.method === 'OPTIONS') return new Response(null, { status: headers['Access-Control-Allow-Origin'] ? 204 : 403, headers })
-    if (pathname === '/health') return json(200, { ok: true })
+    if (pathname === '/health') return json(200, { ok: true, auth: authConfigured(env) })
+    // l'accesso persistente passa da due pagine aperte nel browser (GET): Google rimanda qui dopo il consenso
+    if (req.method === 'GET' && pathname === '/auth/start') return authStart(env, req)
+    if (req.method === 'GET' && pathname === '/auth/callback') return authCallback(env, req)
     if (req.method !== 'POST') return json(404, { error: 'Non trovato' })
     // le chiamate dal browser devono arrivare da un'origine autorizzata
     if (!headers['Access-Control-Allow-Origin']) return json(403, { error: 'Origine non autorizzata' })
@@ -161,6 +173,8 @@ export default {
       if (pathname === '/subscribe') return json(200, await subscribe(env, req))
       if (pathname === '/unsubscribe') return json(200, await unsubscribe(env, req))
       if (pathname === '/notify') return json(200, await notify(env, req))
+      if (pathname === '/auth/refresh') { const r = await authRefresh(env, req); return json(r.status, r.body) }
+      if (pathname === '/auth/logout') { const r = await authLogout(env, req); return json(r.status, r.body) }
       return json(404, { error: 'Non trovato' })
     } catch (e) {
       if (e instanceof HttpError) return json(e.status, { error: e.message })

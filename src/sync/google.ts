@@ -47,6 +47,12 @@ export function tokenRemainingMs(): number {
   return tok ? Math.max(0, tok.exp - Date.now()) : 0
 }
 
+/** Imposta un token ottenuto dal server di accesso (stessa cache del token ottenuto con il popup di Google). */
+export function setToken(value: string, expiresInSec: number): void {
+  tok = { value, exp: Date.now() + expiresInSec * 1000 }
+  try { sessionStorage.setItem(SK, JSON.stringify(tok)) } catch { /* noop */ }
+}
+
 export function clearToken(): void {
   tok = null
   try { sessionStorage.removeItem(SK) } catch { /* noop */ }

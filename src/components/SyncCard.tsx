@@ -1,7 +1,8 @@
-import { useState } from 'react'
-import { Cloud, CloudOff, LogOut, RefreshCw, Unplug, UserRound } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Cloud, CloudOff, LogOut, RefreshCw, ShieldCheck, Unplug, UserRound } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
 import { engine } from '../sync/engine'
+import { brokerAvailable } from '../sync/auth'
 import { dateTimeLabel } from '../lib/format'
 import { ask } from './dialogs'
 
@@ -17,6 +18,8 @@ export function SyncCard() {
   const { sync, cacheOk } = useApp()
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const [broker, setBroker] = useState(false)
+  useEffect(() => { void brokerAvailable().then(setBroker) }, [])
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true); setErr('')
@@ -33,6 +36,11 @@ export function SyncCard() {
         </div>
       </div>
       {sync.email && <p className="mb-3 flex items-center gap-2 text-sm text-muted"><UserRound size={15} />{sync.email}</p>}
+      {sync.persistent ? (
+        <p className="mb-3 flex items-start gap-2 rounded-xl bg-inc/10 p-3 text-sm text-inc"><ShieldCheck size={16} className="mt-0.5 shrink-0" />Accesso persistente attivo: la sessione Google si rinnova da sola, anche in background.</p>
+      ) : broker && sync.fileId ? (
+        <button className="btn-soft mb-3 w-full" disabled={busy} onClick={() => run(() => engine.signIn())}><ShieldCheck size={18} />Attiva l'accesso persistente</button>
+      ) : null}
       {!cacheOk && <p className="mb-3 rounded-xl bg-amber-500/15 p-3 text-sm text-amber-700 dark:text-amber-300">Non riesco a salvare una copia dei dati su questo dispositivo (spazio del browser esaurito o archiviazione bloccata). L'app funziona, ma a ogni apertura deve riscaricare tutto da Drive e serve la connessione.</p>}
       {(sync.error || err) && <p className="mb-3 rounded-xl bg-exp/10 p-3 text-sm text-exp">{err || sync.error}</p>}
       {!sync.signedIn ? (

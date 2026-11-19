@@ -5,7 +5,7 @@ Piccolo server che permette di ricevere le notifiche **anche con l'app chiusa**.
 ## Come funziona
 - Ogni dispositivo che attiva le notifiche si **iscrive** al server (indirizzo del servizio di push del browser + chiavi di cifratura).
 - Quando qualcuno aggiunge una transazione o un conto, **la sua app dice al server a chi inviare la notifica** (le regole sono quelle delle notifiche nell'app). Il server cifra il messaggio e lo spedisce al servizio di push di Google/Apple/Mozilla, che lo consegna al telefono.
-- Il server **non ha mai accesso a Drive** e non conserva token Google. A ogni richiesta controlla il token Google di chi scrive: deve essere valido e avere accesso al file del database della famiglia. Salva solo gli iscritti, sotto chiave `id del database + email`.
+- Il server **non ha mai accesso a Drive** e, per le sole notifiche, non conserva token Google (con l'accesso persistente facoltativo conserva invece un token di rinnovo cifrato: vedi sotto). A ogni richiesta controlla il token Google di chi scrive: deve essere valido e avere accesso al file del database della famiglia. Salva solo gli iscritti, sotto chiave `id del database + email`.
 - Il messaggio è cifrato fino al dispositivo (RFC 8291). Il testo però passa dal server: nella notifica ci sono nome, importo e titolo.
 
 ## Cosa serve
@@ -65,6 +65,48 @@ Su ogni telefono o computer: *Impostazioni → Notifiche → Ricevi le notifiche
 
 - **iPhone:** serve iOS 16.4 o successivo e l'app **aggiunta alla schermata Home** (Safari → Condividi → Aggiungi a Home). Dalle semplici pagine di Safari il push non funziona.
 - **Android e computer:** funziona anche da browser.
+
+## Accesso persistente (facoltativo)
+Il token di accesso di Google dura 1 ora, e un sito statico non può rinnovarlo da solo: dopo un'ora, o a ogni riapertura, serve un tocco su «Riconnetti». Con questo server l'accesso diventa **persistente**: il Worker conserva il token di rinnovo e l'app ottiene token freschi da sola, senza popup e **anche in background**, quindi le notifiche non si fermano.
+
+**Prima di attivarlo, due cose da sapere**
+- Il Worker custodirà un token di rinnovo con **accesso completo a Google Drive** per ogni persona che lo attiva, oltre al **client secret** dell'app. È cifrato (AES-GCM, chiave `SESSION_KEY` nei segreti di Cloudflare) e non esce mai dal Worker, ma chi controllasse il tuo account Cloudflare potrebbe usarlo. Usa un account Cloudflare protetto da verifica in due passaggi.
+- Sul dispositivo resta un identificativo di sessione casuale (in `localStorage`): chi lo ottenesse potrebbe farsi dare token d'accesso dal Worker. Se sul tuo `<utente>.github.io` pubblichi anche altri siti, valuta un dominio dedicato.
+
+**1. Google Cloud Console**
+1. **Pubblica l'app.** Vai su *Google Auth Platform → Pubblico* (o *Schermata consenso OAuth*) e premi **Pubblica app** (stato *In produzione*). Se resta in *Testing*, Google fa scadere i token di rinnovo dopo **7 giorni**. In produzione senza verifica, Google mostra «app non verificata» al primo accesso: *Avanzate → Vai a MoneyDuo*. Per uso personale va bene (limite di 100 utenti).
+2. **Aggiungi l'URI di reindirizzamento.** In *Client → il tuo ID client OAuth → URI di reindirizzamento autorizzati* aggiungi l'indirizzo del Worker seguito da `/auth/callback`, per esempio `https://moneyduo-push.tuo-nome.workers.dev/auth/callback`.
+3. **Copia il client secret** dalla stessa pagina del client. Non incollarlo in chat né nel repository: lo inserirai tra poco nel terminale.
+
+**2. Worker**
+```bash
+node worker/scripts/generate-session-key.mjs        # stampa SESSION_KEY: copiala
+cd worker
+```
+Poi:
+- in `wrangler.toml` togli il `#` davanti a `GOOGLE_CLIENT_ID` e inserisci l'ID del client (è pubblico);
+- imposta i due segreti (ti viene chiesto di incollare il valore):
+  ```bash
+  npx wrangler secret put GOOGLE_CLIENT_SECRET
+  npx wrangler secret put SESSION_KEY
+  npx wrangler deploy
+  ```
+- apri `…/health` nel browser: deve comparire `{"ok":true,"auth":true}`.
+
+**3. App**
+Non serve altro (l'app usa lo stesso indirizzo del server delle notifiche). Sulle nuove installazioni «Accedi con Google» passa dal Worker. Dove sei già dentro: *Impostazioni → Sincronizzazione → Attiva l'accesso persistente*. Dopo il consenso su Google l'app ricompare con «Accesso persistente attivo».
+
+**Come si gestisce**
+- *Esci* elimina la sessione **di quel dispositivo**. Il token di rinnovo non viene revocato su Google, perché scollegherebbe anche gli altri dispositivi.
+- Per revocare tutto: <https://myaccount.google.com/permissions> → MoneyDuo → Rimuovi accesso. Al rinnovo successivo il Worker se ne accorge, cancella la sessione e l'app chiede un nuovo accesso.
+- Se cambi o perdi `SESSION_KEY`, le sessioni esistenti non sono più leggibili: basta rifare l'accesso.
+- Le sessioni scadono dopo 180 giorni di inattività.
+
+**Se qualcosa non va**
+- **«Google non ha rilasciato il token di rinnovo»:** l'app era già autorizzata. Rimuovi l'accesso su myaccount.google.com/permissions e riprova.
+- **Errore `redirect_uri_mismatch` su Google:** l'URI nel punto 1.2 non coincide con l'indirizzo del Worker (compreso `https://` e `/auth/callback`).
+- **Dopo 7 giorni chiede di nuovo l'accesso:** l'app è ancora in *Testing*; vedi il punto 1.1.
+- **«Origine non autorizzata»:** `ALLOWED_ORIGINS` deve contenere l'origine dell'app (per esempio `https://emilioamici.github.io`, senza percorso).
 
 ## Se qualcosa non va
 - **«Origine non autorizzata» (403):** `ALLOWED_ORIGINS` non coincide con l'indirizzo del sito. Correggi `wrangler.toml` e rifai `npx wrangler deploy`.

@@ -91,7 +91,7 @@ export function NotificationsCard() {
       </div>
       <p className="mt-3 text-xs text-muted">
         Senza il server push, il sito non può svegliare il telefono: le notifiche arrivano mentre l'app è aperta o in background (si controlla ogni 2 minuti),
-        e quelle perse mentre era chiusa le trovi alla riapertura. La sessione Google dura 1 ora: finché usi l'app si rinnova da sola; se resta in background senza essere toccata, dopo un'ora le notifiche si fermano finché non la riapri.
+        e quelle perse mentre era chiusa le trovi alla riapertura. {sync.persistent ? "L'accesso persistente tiene attiva la sessione Google anche in background." : "La sessione Google dura 1 ora: finché usi l'app si rinnova da sola; se resta in background senza essere toccata, dopo un'ora le notifiche si fermano finché non la riapri."}
       </p>
     </section>
   )
