@@ -5,6 +5,7 @@ import { createDefaultDb } from '../lib/defaults'
 import { nowIso } from '../lib/ids'
 import { diffNotifications, mergeNotifications, type Notif } from '../lib/notifications'
 import { engine, type SyncState } from '../sync/engine'
+import { pushConfigured, refreshPush, sendPush } from '../sync/push'
 import { cacheState, getCacheHealth, getLoadedCache, subscribeCacheHealth, writeCache } from './cache'
 
 const PREFS_KEY = 'moneyduo:prefs'
@@ -23,7 +24,13 @@ export interface TxFormState {
   kind?: 'normal' | 'split'
 }
 
-interface Prefs { lastAccountId: string; /** notifiche di sistema attive su questo dispositivo */ systemNotif: boolean }
+interface Prefs {
+  lastAccountId: string
+  /** notifiche di sistema attive su questo dispositivo */
+  systemNotif: boolean
+  /** notifiche push dal server attive su questo dispositivo */
+  pushEnabled: boolean
+}
 
 interface AppCtx {
   db: Db
@@ -62,6 +69,23 @@ interface AppCtx {
 
 const NOTIF_PREFIX = 'moneyduo:notifs:'
 
+/**
+ * Dopo una modifica fatta qui, avvisa il server push di chi deve ricevere una notifica: per ogni altro membro con email
+ * si usano le stesse regole delle notifiche nell'app. Le modifiche "di massa" (import, ripristini) non notificano.
+ */
+function notifyPeers(prev: Db, next: Db, me: Member | null): void {
+  if (!pushConfigured() || !me?.email) return
+  const fileId = engine.getSnapshot().fileId
+  const token = engine.currentToken()
+  if (!fileId || !token) return
+  if (next.transactions.length - prev.transactions.length > 3 || next.accounts.length - prev.accounts.length > 3) return
+  for (const m of next.members) {
+    if (!m.active || !m.email || m.id === me.id || m.email.toLowerCase() === me.email.toLowerCase()) continue
+    const first = diffNotifications(prev, next, m.id)[0]
+    if (first) void sendPush(fileId, token, { recipients: [m.email], title: first.title, body: first.body, tag: first.id }).catch(() => undefined)
+  }
+}
+
 function loadNotifs(key: string): Notif[] {
   try { return JSON.parse(localStorage.getItem(key) || '[]') as Notif[] } catch { return [] }
 }
@@ -93,6 +117,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const db = useSyncExternalStore(subscribeDb, () => dbRef.current)
 
   const meIdRef = useRef<string | null>(null)
+  const meRef = useRef<Member | null>(null)
   const onRemote = useRef<(prev: Db, next: Db) => void>(() => undefined)
 
   const apply = useCallback((fn: (prev: Db) => Db, dirty: boolean, source?: 'remote') => {
@@ -102,7 +127,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     dbRef.current = next
     listeners.current.forEach((l) => l())
     writeCache(next, engine.getSnapshot().remoteVersion)
-    if (dirty) engine.markDirty()
+    if (dirty) { engine.markDirty(); notifyPeers(prev, next, meRef.current) }
     if (source === 'remote') onRemote.current(prev, next) // dati arrivati da altri: possibili notifiche
   }, [])
 
@@ -133,7 +158,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const closeTx = useCallback(() => setTxForm(null), [])
 
   const [prefs, setPrefsState] = useState<Prefs>(() => {
-    try { return { lastAccountId: '', systemNotif: false, ...(JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') as Partial<Prefs>) } } catch { return { lastAccountId: '', systemNotif: false } }
+    try { return { lastAccountId: '', systemNotif: false, pushEnabled: false, ...(JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') as Partial<Prefs>) } } catch { return { lastAccountId: '', systemNotif: false, pushEnabled: false } }
   })
   const setPrefs = useCallback((p: Partial<Prefs>) => {
     setPrefsState((old) => {
@@ -149,7 +174,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return (e && db.members.find((m) => m.active && m.email?.toLowerCase() === e)) || null
   }, [db.members, sync.email])
   meIdRef.current = me?.id ?? null
+  meRef.current = me
   const nameOf = useCallback((id: string | null) => (id ? db.members.find((m) => m.id === id)?.name ?? 'Ex membro' : 'Conto condiviso'), [db.members])
+
+  // push: a ogni apertura si rinnova l'iscrizione; un messaggio dal service worker (app in primo piano) fa sincronizzare subito
+  useEffect(() => {
+    if (prefs.pushEnabled && sync.fileId && sync.signedIn && pushConfigured()) {
+      const t = engine.currentToken()
+      if (t) void refreshPush(sync.fileId, t).catch(() => undefined)
+    }
+  }, [prefs.pushEnabled, sync.fileId, sync.signedIn])
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return
+    const onMsg = (e: MessageEvent) => { if (e.data?.type === 'moneyduo-push') void engine.syncNow() }
+    navigator.serviceWorker.addEventListener('message', onMsg)
+    return () => navigator.serviceWorker.removeEventListener('message', onMsg)
+  }, [])
 
   // ----- notifiche (per famiglia e per membro, solo su questo dispositivo)
   const notifKey = sync.fileId && me ? `${NOTIF_PREFIX}${sync.fileId}:${me.id}` : null

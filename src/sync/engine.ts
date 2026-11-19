@@ -152,6 +152,11 @@ export class SyncEngine {
     this.rebuild()
   }
 
+  /** Token Google valido adesso, oppure null: non apre mai popup. */
+  currentToken(): string | null {
+    return cachedToken()
+  }
+
   /** Va chiamato dopo ogni modifica locale. */
   markDirty(): void {
     if (!this.p.fileId) return

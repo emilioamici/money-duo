@@ -69,7 +69,10 @@ Come funziona, senza server: ogni dispositivo confronta i dati appena ricevuti d
 - **Nell'app:** campanella con contatore, elenco (tocco = apre la transazione o i Conti) e un avviso quando arrivano con l'app in primo piano. Sono salvate per famiglia e per membro su quel dispositivo.
 - **Del dispositivo:** si attivano in *Impostazioni → Notifiche* (Android, desktop; su iPhone serve iOS 16.4+ con l'app aggiunta alla schermata Home) e partono solo se l'app è in background.
 
-> **Limite:** il sito è statico e non ha un server, quindi non c'è un push che sveglia il telefono ad app chiusa. L'app controlla Drive ogni 2 minuti finché è aperta o in background (i browser possono rallentare o sospendere i timer) e la sessione Google dura 1 ora (vedi «Sessione Google»). Un push vero richiederebbe un piccolo backend (Web Push + notifiche di modifica di Drive).
+> **Limite (senza server push):** il sito è statico e non ha un server, quindi non c'è un push che sveglia il telefono ad app chiusa. Per averlo, vedi «Server delle notifiche push» qui sotto. L'app controlla Drive ogni 2 minuti finché è aperta o in background (i browser possono rallentare o sospendere i timer) e la sessione Google dura 1 ora (vedi «Sessione Google»). Un push vero richiederebbe un piccolo backend (Web Push + notifiche di modifica di Drive).
+
+## Server delle notifiche push (facoltativo)
+Per ricevere le notifiche **anche con l'app chiusa** serve un piccolo server, gratuito su **Cloudflare Workers** (codice in `worker/`, guida passo-passo in [`worker/README.md`](worker/README.md)). È il Web Push standard, cifrato fino al dispositivo; il server conosce solo gli iscritti e **non ha accesso a Drive**: a ogni richiesta verifica il token Google di chi scrive e che abbia accesso al database della famiglia. Quando fai una modifica, la tua app comunica al server chi avvisare, con le stesse regole delle notifiche nell'app. Si attiva per dispositivo in *Impostazioni → Notifiche*. Senza server l'app funziona come prima.
 
 ## Schema del JSON (`schemaVersion: 2`)
 ```jsonc
@@ -130,4 +133,5 @@ src/sync/           google.ts (token GIS) · drive.ts (REST) · engine.ts (ciclo
 src/store/          stato + cache locale
 src/components/     UI riusabile, form, Gate (login + ricerca/creazione della famiglia), FamilyCard, FolderPicker, Notifications
 src/pages/          Transazioni, Statistiche, Conti, Impostazioni, Categorie
+worker/             server delle notifiche push (Cloudflare Worker) con guida e test
 ```
