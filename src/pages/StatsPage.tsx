@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { ChevronDown, Handshake } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
 import { NotificationBell } from '../components/Notifications'
-import { categoryBreakdown, familyBalances, filterTransactions, monthRange, sortedAccounts, summarize, type Debt } from '../lib/calc'
+import { categoryBreakdown, familyBalances, filterTransactions, periodRange, sortedAccounts, summarize, type Debt } from '../lib/calc'
 import { formatMoney } from '../lib/format'
 import { MonthNav, ScopeChips } from '../components/Nav'
 import { LiquidityChart } from '../components/LiquidityChart'
@@ -14,7 +14,7 @@ export function StatsPage() {
   const { db, view, nameOf, openTx, me } = useApp()
   const [type, setType] = useState<CategoryType>('expense')
   const [open, setOpen] = useState<string | null>(null)
-  const { from, to } = monthRange(view.month)
+  const { from, to } = periodRange(view.month, view.period)
   const txs = useMemo(() => filterTransactions(db, { from, to, scope: view.scope, accountId: view.accountId, q: '', me: me?.id ?? null }), [db, view.scope, view.accountId, me, from.getTime()]) // eslint-disable-line react-hooks/exhaustive-deps
   const items = useMemo(() => categoryBreakdown(db, txs, type), [db, txs, type])
   const total = items.reduce((s, i) => s + i.total, 0)
@@ -92,7 +92,7 @@ export function StatsPage() {
 
         <div className="card p-4">
           <div className="mb-3 flex items-center gap-2 font-bold"><Handshake size={20} className="text-brand" />Saldi tra i membri</div>
-          <p className="mb-1 text-[11px] font-semibold uppercase text-muted">Questo mese</p>
+          <p className="mb-1 text-[11px] font-semibold uppercase text-muted">{view.period === 'year' ? 'Quest\'anno' : 'Questo mese'}</p>
           <DebtList list={monthDebts} />
           <p className="mb-1 mt-4 text-[11px] font-semibold uppercase text-muted">Complessivo</p>
           <DebtList list={totalDebts} actions />

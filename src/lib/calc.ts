@@ -89,6 +89,14 @@ export function monthRange(d: Date): { from: Date; to: Date } {
   return { from: new Date(d.getFullYear(), d.getMonth(), 1), to: new Date(d.getFullYear(), d.getMonth() + 1, 1) }
 }
 
+export type Period = 'month' | 'year'
+
+/** Intervallo [from, to) del mese o dell'intero anno che contiene `d`. */
+export function periodRange(d: Date, period: Period): { from: Date; to: Date } {
+  if (period === 'year') return { from: new Date(d.getFullYear(), 0, 1), to: new Date(d.getFullYear() + 1, 0, 1) }
+  return monthRange(d)
+}
+
 export function filterTransactions(db: Db, f: Filters): Transaction[] {
   const accs = accountById(db)
   const cats = categoryById(db)

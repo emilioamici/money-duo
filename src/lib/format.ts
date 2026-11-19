@@ -39,6 +39,8 @@ export function monthLabel(d: Date): string {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
+export const periodLabel = (d: Date, period: 'month' | 'year'): string => (period === 'year' ? String(d.getFullYear()) : monthLabel(d))
+
 export function dayKey(iso: string): string {
   const d = new Date(iso)
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`

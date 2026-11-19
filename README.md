@@ -76,6 +76,8 @@ Per ricevere le notifiche **anche con l'app chiusa** serve un piccolo server, gr
 
 La notifica push parte **dopo che i dati sono arrivati su Drive** (anche per le spese fatte offline): finché non c'è rete restano in coda sul dispositivo, e vengono scartate se la spesa viene eliminata prima dell'invio.
 
+**Mese o anno.** Toccando il mese in alto (Transazioni e Statistiche) si apre un selettore con i 12 mesi: scegli un mese, oppure tocca l'**anno** per selezionare l'intero anno. In vista annuale le frecce scorrono di anno e le statistiche sommano tutto l'anno.
+
 ## Schema del JSON (`schemaVersion: 2`)
 ```jsonc
 {

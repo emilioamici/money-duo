@@ -13,6 +13,8 @@ const PREFS_KEY = 'moneyduo:prefs'
 
 export interface View {
   month: Date
+  /** mese singolo oppure intero anno (l'anno è quello di `month`) */
+  period: 'month' | 'year'
   scope: Scope
   accountId: string
   q: string
@@ -171,7 +173,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (sync.remoteVersion !== lastVersion.current) { lastVersion.current = sync.remoteVersion; writeCache(dbRef.current, sync.remoteVersion) }
   }, [sync.remoteVersion])
 
-  const [view, setViewState] = useState<View>({ month: new Date(), scope: 'all', accountId: 'all', q: '' })
+  const [view, setViewState] = useState<View>({ month: new Date(), period: 'month', scope: 'all', accountId: 'all', q: '' })
   const setView = useCallback((p: Partial<View>) => setViewState((v) => ({ ...v, ...p })), [])
 
   const [txForm, setTxForm] = useState<TxFormState | null>(null)

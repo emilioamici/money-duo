@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Receipt, Search, X } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
-import { filterTransactions, monthRange, sortedAccounts, summarize, visibleTo } from '../lib/calc'
+import { filterTransactions, periodRange, sortedAccounts, summarize, visibleTo } from '../lib/calc'
 import { dayKey, dayLabel, formatMoney } from '../lib/format'
 import { MonthNav, ScopeChips, SyncChip } from '../components/Nav'
 import { TransactionRow } from '../components/TransactionRow'
@@ -12,7 +12,7 @@ import type { Transaction } from '../types'
 export function HomePage({ onOpenSync }: { onOpenSync: () => void }) {
   const { db, view, setView, openTx, me } = useApp()
   const [search, setSearch] = useState(!!view.q)
-  const { from, to } = monthRange(view.month)
+  const { from, to } = periodRange(view.month, view.period)
   const txs = useMemo(() => filterTransactions(db, { from, to, scope: view.scope, accountId: view.accountId, q: view.q, me: me?.id ?? null }), [db, view, me, from.getTime()]) // eslint-disable-line react-hooks/exhaustive-deps
   const sum = summarize(txs)
   const groups = useMemo(() => {
