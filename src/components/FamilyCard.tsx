@@ -15,6 +15,7 @@ export function FamilyCard() {
   const { db, commit, sync, me } = useApp()
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
+  const [target, setTarget] = useState('new') // 'new' = nuovo membro, altrimenti id di un membro esistente senza account
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [info, setInfo] = useState('')
@@ -22,6 +23,7 @@ export function FamilyCard() {
   const [picking, setPicking] = useState(false)
   const owner = sync.ownerEmail?.toLowerCase() ?? ''
   const canManage = sync.canShare
+  const unclaimed = db.members.filter((m) => m.active && !m.email && m.id !== me?.id)
 
   useEffect(() => { if (sync.signedIn) engine.currentFolder().then((f) => setFolder(f?.name ?? null)).catch(() => undefined) }, [sync.signedIn, sync.fileId])
 
@@ -32,12 +34,20 @@ export function FamilyCard() {
 
   const invite = () => guard(async () => {
     const mail = email.trim()
-    if (db.members.some((m) => m.active && m.email?.toLowerCase() === mail.toLowerCase())) throw new Error('Questa persona è già nella famiglia.')
+    if (db.members.some((m) => m.active && m.email?.toLowerCase() === mail.toLowerCase())) throw new Error('Questa persona è già nella famiglia. Se non ha ancora accesso al database, usa «Reinvia invito» accanto al suo nome.')
     await engine.invite(mail, db.family.name)
     const existing = db.members.find((m) => !m.active && m.email?.toLowerCase() === mail.toLowerCase())
-    commit((d) => saveMember(d, existing ? { ...existing, active: true } : newMember(d, name.trim() || mail.split('@')[0], mail)))
+    const claimed = target !== 'new' ? db.members.find((m) => m.id === target && m.active && !m.email) : undefined
+    // l'invito si collega a un membro già presente (es. dopo un import) invece di crearne uno duplicato
+    commit((d) => saveMember(d, claimed ? { ...claimed, email: mail } : existing ? { ...existing, active: true } : newMember(d, name.trim() || mail.split('@')[0], mail)))
     setInfo(`Invito inviato a ${mail}. Deve accedere all'app con quell'account Google.`)
-    setEmail(''); setName('')
+    setEmail(''); setName(''); setTarget('new')
+  })
+
+  /** Per chi ha l'email ma non è mai entrato (es. membri importati): concede (di nuovo) l'accesso al file su Drive. */
+  const resend = (mail: string) => guard(async () => {
+    await engine.invite(mail, db.family.name)
+    setInfo(`Invito inviato a ${mail}. Deve accedere all'app con quell'account Google.`)
   })
 
   const remove = async (id: string) => {
@@ -79,6 +89,9 @@ export function FamilyCard() {
                   {!m.joinedAt && m.email && <span className="rounded-full bg-amber-500/15 px-1.5 text-amber-600">Invitato</span>}
                 </p>
               </div>
+              {canManage && !isOwner && m.id !== me?.id && m.email && !m.joinedAt && (
+                <button className="btn-soft !px-2.5 !py-1 !text-xs" disabled={busy} onClick={() => void resend(m.email!)}>Reinvia invito</button>
+              )}
               {canManage && !isOwner && m.id !== me?.id && (
                 <button className="rounded-full p-2 text-muted hover:bg-exp/10 hover:text-exp" aria-label={`Rimuovi ${m.name}`} disabled={busy} onClick={() => void remove(m.id)}><UserMinus size={18} /></button>
               )}
@@ -91,7 +104,13 @@ export function FamilyCard() {
         <div className="space-y-2 rounded-2xl bg-bg p-3">
           <p className="flex items-center gap-2 text-sm font-semibold"><Mail size={16} className="text-brand" />Invita un membro</p>
           <input className="input" type="email" placeholder="Email Google della persona" value={email} onChange={(e) => setEmail(e.target.value)} />
-          <input className="input" placeholder="Nome (opzionale)" value={name} onChange={(e) => setName(e.target.value)} />
+          {unclaimed.length > 0 && (
+            <select className="input" value={target} onChange={(e) => setTarget(e.target.value)} aria-label="Associa a">
+              <option value="new">Nuovo membro</option>
+              {unclaimed.map((m) => <option key={m.id} value={m.id}>È {m.name} (membro senza account)</option>)}
+            </select>
+          )}
+          {target === 'new' && <input className="input" placeholder="Nome (opzionale)" value={name} onChange={(e) => setName(e.target.value)} />}
           <button className="btn-primary w-full" disabled={busy || !validEmail(email)} onClick={() => void invite()}>Invia invito</button>
           <p className="text-xs text-muted">L'invito dà accesso in modifica al database su Drive. Se l'app Google è in modalità <b>Testing</b>, aggiungi la stessa email anche tra gli <b>utenti di prova</b> in Google Cloud Console, altrimenti la persona non potrà accedere.</p>
         </div>

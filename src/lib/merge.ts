@@ -4,6 +4,7 @@ import { nowIso, uid } from './ids'
 import { MEMBER_COLORS } from './defaults'
 
 type Rec = { id: string; updatedAt: string }
+const EPOCH = '1970-01-01T00:00:00.000Z'
 
 /** Unione per id: vince l'`updatedAt` più recente; le eliminazioni (tombstone) vincono se più recenti. */
 function mergeList<T extends Rec>(a: T[], b: T[], deleted: Record<string, string>): T[] {
@@ -64,7 +65,8 @@ export function replaceData(current: Db, incoming: Db): Db {
   return {
     ...incoming,
     meta: { ...current.meta, updatedAt: t },
-    family: { ...incoming.family, updatedAt: t },
+    // un file senza nome famiglia impostato (timestamp epoch: dati di esempio o migrati) non cancella quello attuale
+    family: incoming.family.updatedAt <= EPOCH ? current.family : { ...incoming.family, updatedAt: t },
     members: bump(incoming.members),
     accounts: bump(incoming.accounts),
     categories: bump(incoming.categories),
@@ -80,7 +82,6 @@ const num = (v: unknown, d = 0): number => (typeof v === 'number' && Number.isFi
 const bool = (v: unknown): boolean => v === true
 const strArr = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [])
 const pick = <T extends string>(v: unknown, allowed: readonly T[], d: T): T => (allowed.includes(v as T) ? (v as T) : d)
-const EPOCH = '1970-01-01T00:00:00.000Z'
 
 type Obj = Record<string, unknown>
 const isObj = (v: unknown): v is Obj => !!v && typeof v === 'object' && !Array.isArray(v)

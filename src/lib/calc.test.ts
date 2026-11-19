@@ -205,6 +205,15 @@ describe('merge', () => {
   })
 })
 
+describe('replaceData e nome famiglia', () => {
+  it('un import senza nome famiglia proprio mantiene quello attuale; con nome proprio lo sostituisce', () => {
+    const cur = saveFamilyName(family3(), 'Casa Rossi')
+    expect(replaceData(cur, createDefaultDb()).family.name).toBe('Casa Rossi')
+    const named = saveFamilyName(createDefaultDb(), 'Altra Famiglia')
+    expect(replaceData(cur, named).family.name).toBe('Altra Famiglia')
+  })
+})
+
 describe('parseDb e migrazione v1 -> v2', () => {
   const v1 = () => ({
     schemaVersion: 1,
