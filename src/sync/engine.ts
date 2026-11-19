@@ -1,4 +1,5 @@
 import type { Db } from '../types'
+import { createFamilyDb, isPristine } from '../lib/defaults'
 import { mergeDb, parseDb, sameData } from '../lib/merge'
 import { nowIso } from '../lib/ids'
 import * as drive from './drive'
@@ -17,6 +18,12 @@ interface Persisted {
   fileId: string | null
   fileName: string | null
   email: string | null
+  /** nome Google dell'account (usato come nome predefinito del membro) */
+  name: string | null
+  /** email del capofamiglia = proprietario del file */
+  ownerEmail: string | null
+  /** può invitare/rimuovere persone (proprietario del file) */
+  canShare: boolean
   remoteVersion: string | null
   lastSyncAt: string | null
   dirty: boolean
@@ -37,7 +44,7 @@ export interface SyncHost {
   applyDb: (fn: (prev: Db) => Db, dirty: boolean) => void
 }
 
-const EMPTY: Persisted = { fileId: null, fileName: null, email: null, remoteVersion: null, lastSyncAt: null, dirty: false }
+const EMPTY: Persisted = { fileId: null, fileName: null, email: null, name: null, ownerEmail: null, canShare: false, remoteVersion: null, lastSyncAt: null, dirty: false }
 
 function loadPersisted(): Persisted {
   try {
@@ -128,6 +135,7 @@ export class SyncEngine {
     const token = await requestToken(this.clientId, { prompt, hint: opts.selectAccount ? undefined : this.p.email ?? undefined })
     const me = await drive.about(token)
     this.p.email = me.email
+    this.p.name = me.name
     this.persist()
     if (this.status === 'auth') this.set(this.p.dirty ? 'pending' : 'synced')
     else this.rebuild()
@@ -145,14 +153,21 @@ export class SyncEngine {
     return drive.listCandidates(await this.token())
   }
 
-  /** Crea un nuovo file su Drive con il DB locale corrente. */
-  async createNew(): Promise<void> {
+  /**
+   * Crea la famiglia: un nuovo database nella cartella scelta del Drive di chi lo crea (capofamiglia).
+   * Se sul dispositivo ci sono già dati propri (es. un import) li tiene e dà solo il nome alla famiglia.
+   */
+  async createFamily(opts: { familyName: string; memberName: string; folderId: string | null }): Promise<void> {
     const token = await this.token()
-    const db = this.stamp(this.host!.getDb(), 1)
-    const f = await drive.createFile(token, JSON.stringify(db))
+    const email = this.p.email ?? ''
+    const local = this.host!.getDb()
+    const fresh = createFamilyDb(opts.familyName, { name: opts.memberName, email })
+    const db = this.stamp(isPristine(local) ? fresh : { ...local, family: fresh.family }, 1)
+    const slug = opts.familyName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'famiglia'
+    const f = await drive.createFile(token, JSON.stringify(db), `moneyduo-db-${slug}.json`, opts.folderId)
     // si riapplicano solo i metadati: eventuali modifiche fatte durante l'upload non vanno perse
-    this.host!.applyDb((prev) => ({ ...prev, meta: db.meta }), false)
-    this.p = { ...this.p, fileId: f.id, fileName: f.name, remoteVersion: f.version, lastSyncAt: nowIso(), dirty: false }
+    this.host!.applyDb((prev) => (isPristine(prev) ? db : { ...prev, family: db.family, meta: db.meta }), false)
+    this.p = { ...this.p, fileId: f.id, fileName: f.name, ownerEmail: this.p.email, canShare: true, remoteVersion: f.version, lastSyncAt: nowIso(), dirty: false }
     this.persist()
     this.set('synced')
   }
@@ -169,7 +184,7 @@ export class SyncEngine {
   async link(file: drive.DriveFile, remote: Db, mode: 'merge' | 'replace'): Promise<void> {
     // replace: si adotta il file Drive così com'è (i dati locali non ancora sincronizzati vengono scartati)
     this.host!.applyDb((prev) => (mode === 'merge' ? mergeDb(prev, remote) : remote), false)
-    this.p = { ...this.p, fileId: file.id, fileName: file.name, remoteVersion: file.version, lastSyncAt: nowIso(), dirty: mode === 'merge' }
+    this.p = { ...this.p, fileId: file.id, fileName: file.name, ownerEmail: file.owners?.[0]?.emailAddress ?? null, canShare: !!(file.ownedByMe || file.capabilities?.canShare), remoteVersion: file.version, lastSyncAt: nowIso(), dirty: mode === 'merge' }
     this.persist()
     this.set(mode === 'merge' ? 'pending' : 'synced')
     if (mode === 'merge') void this.syncNow()
@@ -181,9 +196,39 @@ export class SyncEngine {
     this.set('off')
   }
 
-  async share(email: string): Promise<void> {
+  /** Invita un account Google: concede l'accesso in modifica al file (solo il capofamiglia). */
+  async invite(email: string, familyName: string): Promise<void> {
     if (!this.p.fileId) return
-    await drive.shareFile(await this.token(), this.p.fileId, email.trim())
+    await drive.shareFile(await this.token(), this.p.fileId, email.trim(), `Ti invito nella famiglia «${familyName}» su MoneyDuo. Apri l'app e accedi con questo account Google: il database ti verrà collegato in automatico.`)
+  }
+
+  /** Revoca l'accesso al file a un account. Ritorna false se non aveva permessi. */
+  async revoke(email: string): Promise<boolean> {
+    if (!this.p.fileId) return false
+    return drive.removeShare(await this.token(), this.p.fileId, email.trim())
+  }
+
+  /** Nome della cartella che contiene il file (null se non visibile, es. file condiviso da altri). */
+  async currentFolder(): Promise<{ id: string; name: string } | null> {
+    if (!this.p.fileId) return null
+    const token = await this.token()
+    const meta = await drive.getMeta(token, this.p.fileId)
+    const id = meta.parents?.[0]
+    return id ? { id, name: await drive.folderName(token, id).catch(() => 'Cartella') } : null
+  }
+
+  async listFolders(parentId: string): Promise<drive.DriveFolder[]> {
+    return drive.listFolders(await this.token(), parentId)
+  }
+  async createFolder(name: string, parentId: string): Promise<drive.DriveFolder> {
+    return drive.createFolder(await this.token(), name, parentId)
+  }
+  /** Sposta il database in un'altra cartella (solo il proprietario). */
+  async moveTo(folderId: string): Promise<void> {
+    if (!this.p.fileId) return
+    const token = await this.token()
+    const meta = await drive.getMeta(token, this.p.fileId)
+    await drive.moveFile(token, this.p.fileId, folderId, meta.parents ?? [])
   }
 
   // ----- core -----
@@ -214,6 +259,9 @@ export class SyncEngine {
       const id = this.p.fileId
       const meta = await drive.getMeta(token, id)
       let version = meta.version
+      const owner = meta.owners?.[0]?.emailAddress ?? this.p.ownerEmail
+      const canShare = !!(meta.ownedByMe || meta.capabilities?.canShare)
+      if (owner !== this.p.ownerEmail || canShare !== this.p.canShare) { this.p.ownerEmail = owner; this.p.canShare = canShare; this.persist() }
       let needPush = this.p.dirty
 
       if (meta.version !== this.p.remoteVersion) {
@@ -254,7 +302,7 @@ export class SyncEngine {
       return this.set('auth', 'Sessione Google scaduta: riconnettiti per continuare a sincronizzare.')
     }
     if (e instanceof DriveError) {
-      if (e.status === 404) return this.set('error', 'File non trovato o non più condiviso con questo account.')
+      if (e.status === 404) return this.set('error', 'Non hai più accesso al database: forse sei stato rimosso dalla famiglia o il file è stato spostato. Puoi scollegarti da Impostazioni.')
       if (e.status === 403) return this.set('error', 'Permesso negato: serve l\'accesso in modifica al file. ' + e.message)
       return this.set('error', `Errore Google Drive (${e.status}): ${e.message}`)
     }

@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import type { Db, Transaction } from '../types'
+import type { Db, Member, Transaction } from '../types'
 import type { Scope } from '../lib/calc'
 import { createDefaultDb } from '../lib/defaults'
 import { nowIso } from '../lib/ids'
@@ -49,7 +49,12 @@ interface AppCtx {
   closeTx: () => void
   prefs: Prefs
   setPrefs: (p: Partial<Prefs>) => void
-  names: { a: string; b: string; shared: string }
+  /** il membro che corrisponde all'account Google con cui si è entrati (null = non ancora associato) */
+  me: Member | null
+  /** membri attivi della famiglia */
+  members: Member[]
+  /** nome di un membro; null = conto condiviso */
+  nameOf: (id: string | null) => string
 }
 
 const Ctx = createContext<AppCtx | null>(null)
@@ -57,13 +62,16 @@ const Ctx = createContext<AppCtx | null>(null)
 export function AppProvider({ children }: { children: ReactNode }) {
   const dbRef = useRef<Db>(null as unknown as Db)
   if (!dbRef.current) dbRef.current = loadDb()
-  const [db, setDb] = useState<Db>(dbRef.current)
+  // anche il DB è un "external store": così si aggiorna in modo sincrono insieme allo stato di sync (niente render con dati vecchi)
+  const listeners = useRef(new Set<() => void>())
+  const subscribeDb = useCallback((l: () => void) => { listeners.current.add(l); return () => { listeners.current.delete(l) } }, [])
+  const db = useSyncExternalStore(subscribeDb, () => dbRef.current)
 
   const apply = useCallback((fn: (prev: Db) => Db, dirty: boolean) => {
     const next = fn(dbRef.current)
     if (next === dbRef.current) return
     dbRef.current = next
-    setDb(next)
+    listeners.current.forEach((l) => l())
     saveDb(next)
     if (dirty) engine.markDirty()
   }, [])
@@ -98,11 +106,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const names = useMemo(() => ({ a: db.profiles.a, b: db.profiles.b, shared: db.profiles.shared }), [db.profiles])
+  const members = useMemo(() => db.members.filter((m) => m.active), [db.members])
+  const me = useMemo(() => {
+    const e = sync.email?.toLowerCase()
+    return (e && db.members.find((m) => m.active && m.email?.toLowerCase() === e)) || null
+  }, [db.members, sync.email])
+  const nameOf = useCallback((id: string | null) => (id ? db.members.find((m) => m.id === id)?.name ?? 'Ex membro' : 'Conto condiviso'), [db.members])
 
   const value = useMemo<AppCtx>(
-    () => ({ db, commit, resetLocal, sync, view, setView, txForm, openTx, closeTx, prefs, setPrefs, names }),
-    [db, commit, resetLocal, sync, view, setView, txForm, openTx, closeTx, prefs, setPrefs, names],
+    () => ({ db, commit, resetLocal, sync, view, setView, txForm, openTx, closeTx, prefs, setPrefs, me, members, nameOf }),
+    [db, commit, resetLocal, sync, view, setView, txForm, openTx, closeTx, prefs, setPrefs, me, members, nameOf],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

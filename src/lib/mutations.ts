@@ -1,5 +1,6 @@
-import type { Account, Category, Db, Profiles, Transaction } from '../types'
-import { nowIso } from './ids'
+import type { Account, Category, Db, Member, Transaction } from '../types'
+import { nowIso, uid } from './ids'
+import { MEMBER_COLORS } from './defaults'
 
 /** Funzioni pure Db -> Db. Ogni modifica aggiorna `updatedAt` del record (serve al merge). */
 
@@ -9,8 +10,7 @@ const without = (deleted: Record<string, string>, id: string) => {
 }
 
 export function saveTransaction(db: Db, tx: Transaction): Db {
-  const t = nowIso()
-  const next = { ...tx, updatedAt: t }
+  const next = { ...tx, updatedAt: nowIso() }
   const exists = db.transactions.some((x) => x.id === tx.id)
   return {
     ...db,
@@ -81,8 +81,25 @@ export function setCategoryHidden(db: Db, id: string, hidden: boolean): Db {
   }
 }
 
-export function saveProfiles(db: Db, p: Omit<Profiles, 'updatedAt'>): Db {
-  return { ...db, profiles: { ...p, updatedAt: nowIso() } }
+export function saveFamilyName(db: Db, name: string): Db {
+  return { ...db, family: { name: name.trim() || 'Famiglia', updatedAt: nowIso() } }
+}
+
+export function saveMember(db: Db, m: Member): Db {
+  const next = { ...m, updatedAt: nowIso() }
+  const exists = db.members.some((x) => x.id === m.id)
+  return { ...db, members: exists ? db.members.map((x) => (x.id === m.id ? next : x)) : [...db.members, next], deleted: without(db.deleted, m.id) }
+}
+
+export function newMember(db: Db, name: string, email: string | null, joined = false): Member {
+  const t = nowIso()
+  return { id: uid(), name, email, color: MEMBER_COLORS[db.members.length % MEMBER_COLORS.length], active: true, joinedAt: joined ? t : null, updatedAt: t }
+}
+
+/** Il membro esce dalla famiglia: resta nello storico (pagamenti, divisioni) ma non è più selezionabile. */
+export function deactivateMember(db: Db, id: string): Db {
+  const t = nowIso()
+  return { ...db, members: db.members.map((m) => (m.id === id ? { ...m, active: false, updatedAt: t } : m)) }
 }
 
 export const nextOrder = (items: Array<{ order: number }>): number => items.reduce((m, x) => Math.max(m, x.order), -1) + 1

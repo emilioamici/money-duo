@@ -15,6 +15,8 @@ export const PALETTE = [
   '#0ea5e9', '#6366f1', '#8b5cf6', '#ec4899', '#64748b', '#78716c',
 ]
 
+export const MEMBER_COLORS = ['#6366f1', '#ec4899', '#10b981', '#f59e0b', '#0ea5e9', '#ef4444', '#8b5cf6', '#14b8a6']
+
 export const ICONS = [
   '🍽️', '🛒', '🍕', '☕', '🏠', '💡', '🔧', '🚗', '⛽', '🚌', '✈️', '🎉',
   '🎬', '🏃', '💊', '🛍️', '👕', '📱', '🎓', '👶', '🐶', '🎁', '💼', '💰',
@@ -60,17 +62,19 @@ export function defaultCategories(): Category[] {
 export function defaultAccounts(): Account[] {
   const t = SEED_TIME
   return [
-    { id: 'acc-cash', name: 'Contanti', group: 'cash', owner: 'a', initialBalance: 0, excludeFromTotal: false, hidden: false, order: 0, createdAt: t, updatedAt: t },
-    { id: 'acc-shared', name: 'Conto Comune', group: 'bank', owner: 'shared', initialBalance: 0, excludeFromTotal: false, hidden: false, order: 1, createdAt: t, updatedAt: t },
+    { id: 'acc-cash', name: 'Contanti', group: 'cash', members: [], initialBalance: 0, excludeFromTotal: false, hidden: false, order: 0, createdAt: t, updatedAt: t },
+    { id: 'acc-shared', name: 'Conto Comune', group: 'bank', members: [], initialBalance: 0, excludeFromTotal: false, hidden: false, order: 1, createdAt: t, updatedAt: t },
   ]
 }
 
+/** DB locale vuoto (prima del login): nessun membro, dati di esempio mai modificati. */
 export function createDefaultDb(): Db {
   const t = nowIso()
   return {
     schemaVersion: SCHEMA_VERSION,
     meta: { dbId: uid(), createdAt: t, updatedAt: t, updatedBy: '', revision: 0 },
-    profiles: { a: 'Emilio', b: 'Sara', shared: 'In Comune', updatedAt: SEED_TIME },
+    family: { name: 'Famiglia', updatedAt: SEED_TIME },
+    members: [],
     accounts: defaultAccounts(),
     categories: defaultCategories(),
     transactions: [],
@@ -78,12 +82,26 @@ export function createDefaultDb(): Db {
   }
 }
 
-/** Dati ancora quelli di esempio, mai modificati dall'utente (nessuna transazione, nessuna modifica). */
+/** Nuovo database per una famiglia appena creata: il creatore è il primo membro. */
+export function createFamilyDb(familyName: string, me: { name: string; email: string }): Db {
+  const t = nowIso()
+  const id = uid()
+  const accounts = defaultAccounts().map((a) => (a.id === 'acc-cash' ? { ...a, members: [id], updatedAt: t } : a))
+  return {
+    ...createDefaultDb(),
+    family: { name: familyName.trim() || 'Famiglia', updatedAt: t },
+    members: [{ id, name: me.name.trim() || me.email.split('@')[0], email: me.email, color: MEMBER_COLORS[0], active: true, joinedAt: t, updatedAt: t }],
+    accounts,
+  }
+}
+
+/** Dati ancora quelli di esempio, mai modificati dall'utente (nessuna transazione, nessun membro, nessuna modifica). */
 export function isPristine(db: Db): boolean {
   return (
     db.transactions.length === 0 &&
+    db.members.length === 0 &&
     Object.keys(db.deleted).length === 0 &&
-    db.profiles.updatedAt === SEED_TIME &&
+    db.family.updatedAt === SEED_TIME &&
     [...db.accounts, ...db.categories].every((x) => x.updatedAt === SEED_TIME)
   )
 }

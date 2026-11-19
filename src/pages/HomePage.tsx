@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Receipt, Search, X } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
-import { filterTransactions, monthRange, sortedAccounts, summarize } from '../lib/calc'
+import { filterTransactions, monthRange, sortedAccounts, summarize, visibleTo } from '../lib/calc'
 import { dayKey, dayLabel, formatMoney } from '../lib/format'
 import { MonthNav, ScopeChips, SyncChip } from '../components/Nav'
 import { TransactionRow } from '../components/TransactionRow'
@@ -9,10 +9,10 @@ import { EmptyState } from '../components/ui'
 import type { Transaction } from '../types'
 
 export function HomePage({ onOpenSync }: { onOpenSync: () => void }) {
-  const { db, view, setView, openTx } = useApp()
+  const { db, view, setView, openTx, me } = useApp()
   const [search, setSearch] = useState(!!view.q)
   const { from, to } = monthRange(view.month)
-  const txs = useMemo(() => filterTransactions(db, { from, to, scope: view.scope, accountId: view.accountId, q: view.q }), [db, view, from.getTime()]) // eslint-disable-line react-hooks/exhaustive-deps
+  const txs = useMemo(() => filterTransactions(db, { from, to, scope: view.scope, accountId: view.accountId, q: view.q, me: me?.id ?? null }), [db, view, me, from.getTime()]) // eslint-disable-line react-hooks/exhaustive-deps
   const sum = summarize(txs)
   const groups = useMemo(() => {
     const m = new Map<string, Transaction[]>()
@@ -44,7 +44,7 @@ export function HomePage({ onOpenSync }: { onOpenSync: () => void }) {
 
         <select className="input !py-2 text-sm" value={view.accountId} onChange={(e) => setView({ accountId: e.target.value })} aria-label="Filtra per conto">
           <option value="all">Tutti i conti</option>
-          {sortedAccounts(db).filter((a) => !a.hidden || a.id === view.accountId).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+          {sortedAccounts(db).filter((a) => visibleTo(db, a, me?.id ?? null) && (!a.hidden || a.id === view.accountId)).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
         </select>
 
         {groups.length === 0 ? (

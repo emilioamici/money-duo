@@ -9,6 +9,7 @@ import { AccountsPage } from './pages/AccountsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { engine } from './sync/engine'
 import { Gate } from './components/Gate'
+import { IdentityGuard } from './components/IdentityGuard'
 
 type Tab = 'home' | 'stats' | 'accounts' | 'settings'
 const TABS: Array<{ id: Tab; label: string; icon: typeof Plus }> = [
@@ -59,6 +60,7 @@ function Shell() {
         ))}
       </nav>
 
+      <IdentityGuard />
       {txForm && <TransactionForm key={txForm.tx?.id ?? 'new'} state={txForm} onClose={closeTx} />}
     </div>
   )

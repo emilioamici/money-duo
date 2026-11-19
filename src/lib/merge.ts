@@ -1,6 +1,7 @@
-import type { Account, Category, Db, Profiles, Transaction } from '../types'
+import type { Account, Category, Db, Member, Transaction } from '../types'
 import { SCHEMA_VERSION } from '../types'
 import { nowIso, uid } from './ids'
+import { MEMBER_COLORS } from './defaults'
 
 type Rec = { id: string; updatedAt: string }
 
@@ -24,7 +25,6 @@ function mergeDeleted(a: Record<string, string>, b: Record<string, string>): Rec
 /** Merge a livello di record tra copia locale e copia remota. `remote` è autorevole per i metadati. */
 export function mergeDb(local: Db, remote: Db): Db {
   const deleted = mergeDeleted(local.deleted, remote.deleted)
-  const profiles: Profiles = remote.profiles.updatedAt > local.profiles.updatedAt ? remote.profiles : local.profiles
   const newerMeta = remote.meta.updatedAt >= local.meta.updatedAt ? remote.meta : local.meta
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -35,7 +35,8 @@ export function mergeDb(local: Db, remote: Db): Db {
       updatedBy: newerMeta.updatedBy,
       revision: Math.max(local.meta.revision, remote.meta.revision),
     },
-    profiles,
+    family: remote.family.updatedAt > local.family.updatedAt ? remote.family : local.family,
+    members: mergeList(local.members, remote.members, deleted),
     accounts: mergeList(local.accounts, remote.accounts, deleted).sort((x, y) => x.order - y.order),
     categories: mergeList(local.categories, remote.categories, deleted).sort((x, y) => x.order - y.order),
     transactions: mergeList(local.transactions, remote.transactions, deleted),
@@ -45,14 +46,9 @@ export function mergeDb(local: Db, remote: Db): Db {
 
 /** I due DB hanno lo stesso contenuto (ignorando i metadati)? */
 export function sameData(a: Db, b: Db): boolean {
+  const byId = <T extends { id: string }>(l: T[]) => [...l].sort((x, y) => x.id.localeCompare(y.id))
   const norm = (d: Db) =>
-    JSON.stringify([
-      d.profiles,
-      [...d.accounts].sort((x, y) => x.id.localeCompare(y.id)),
-      [...d.categories].sort((x, y) => x.id.localeCompare(y.id)),
-      [...d.transactions].sort((x, y) => x.id.localeCompare(y.id)),
-      Object.entries(d.deleted).sort(([x], [y]) => x.localeCompare(y)),
-    ])
+    JSON.stringify([d.family, byId(d.members), byId(d.accounts), byId(d.categories), byId(d.transactions), Object.entries(d.deleted).sort(([x], [y]) => x.localeCompare(y))])
   return norm(a) === norm(b)
 }
 
@@ -60,18 +56,19 @@ export function sameData(a: Db, b: Db): boolean {
 export function replaceData(current: Db, incoming: Db): Db {
   const t = nowIso()
   const deleted = mergeDeleted(current.deleted, incoming.deleted)
-  const keep = new Set([...incoming.accounts, ...incoming.categories, ...incoming.transactions].map((x) => x.id))
-  for (const x of [...current.accounts, ...current.categories, ...current.transactions]) if (!keep.has(x.id)) deleted[x.id] = t
-  // gli elementi importati devono battere eventuali tombstone preesistenti
+  const all = (d: Db) => [...d.members, ...d.accounts, ...d.categories, ...d.transactions]
+  const keep = new Set(all(incoming).map((x) => x.id))
+  for (const x of all(current)) if (!keep.has(x.id)) deleted[x.id] = t
   const bump = <T extends Rec>(list: T[]): T[] => list.map((x) => (deleted[x.id] && deleted[x.id] >= x.updatedAt ? { ...x, updatedAt: t } : x))
   for (const id of keep) delete deleted[id]
   return {
     ...incoming,
     meta: { ...current.meta, updatedAt: t },
+    family: { ...incoming.family, updatedAt: t },
+    members: bump(incoming.members),
     accounts: bump(incoming.accounts),
     categories: bump(incoming.categories),
     transactions: bump(incoming.transactions),
-    profiles: { ...incoming.profiles, updatedAt: t },
     deleted,
   }
 }
@@ -81,30 +78,66 @@ export function replaceData(current: Db, incoming: Db): Db {
 const str = (v: unknown, d = ''): string => (typeof v === 'string' ? v : d)
 const num = (v: unknown, d = 0): number => (typeof v === 'number' && Number.isFinite(v) ? v : d)
 const bool = (v: unknown): boolean => v === true
+const strArr = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [])
 const pick = <T extends string>(v: unknown, allowed: readonly T[], d: T): T => (allowed.includes(v as T) ? (v as T) : d)
 const EPOCH = '1970-01-01T00:00:00.000Z'
-const PROFILE = ['a', 'b', 'shared'] as const
 
 type Obj = Record<string, unknown>
 const isObj = (v: unknown): v is Obj => !!v && typeof v === 'object' && !Array.isArray(v)
 
-/** Valida e normalizza un JSON sconosciuto (file Drive o import locale). Lancia Error con messaggio leggibile. */
-export function parseDb(raw: unknown): Db {
-  if (!isObj(raw)) throw new Error('Il file non è un database MoneyDuo valido.')
-  if (typeof raw.schemaVersion !== 'number') throw new Error('Il file non è un database MoneyDuo (schemaVersion mancante).')
-  if (raw.schemaVersion > SCHEMA_VERSION) throw new Error('Il file è stato creato da una versione più recente dell\'app: aggiorna MoneyDuo.')
-  if (!Array.isArray(raw.accounts) || !Array.isArray(raw.categories) || !Array.isArray(raw.transactions))
+/**
+ * v1 (coppia: profili a/b/shared) -> v2 (famiglia). Deterministica: niente `now`, id fissi 'a' e 'b',
+ * timestamp originali conservati; così migrare due volte lo stesso file dà lo stesso risultato e il merge non cambia nulla.
+ */
+function migrateV1(o: Obj): Obj {
+  const prof = isObj(o.profiles) ? o.profiles : {}
+  const pt = str(prof.updatedAt, EPOCH)
+  const member = (id: string, name: string, i: number) => ({ id, name, email: null, color: MEMBER_COLORS[i], active: true, joinedAt: null, updatedAt: pt })
+  const other: Record<string, string> = { a: 'b', b: 'a' }
+  const arr = (v: unknown) => (Array.isArray(v) ? v.filter(isObj) : [])
+  return {
+    ...o,
+    schemaVersion: 2,
+    family: { name: 'Famiglia', updatedAt: pt },
+    members: [member('a', str(prof.a, 'Emilio'), 0), member('b', str(prof.b, 'Sara'), 1)],
+    accounts: arr(o.accounts).map((a) => ({ ...a, members: a.owner === 'a' ? ['a'] : a.owner === 'b' ? ['b'] : ['a', 'b'] })),
+    transactions: arr(o.transactions).map((t) => {
+      const payer = t.paidBy === 'a' || t.paidBy === 'b' ? (t.paidBy as string) : null
+      const participants = !payer ? [] : t.split === 'equal' ? ['a', 'b'] : t.split === 'advance' ? [other[payer]] : []
+      return { ...t, paidBy: payer, participants }
+    }),
+  }
+}
+
+/** Valida e normalizza un JSON sconosciuto (file Drive o import locale), migrando i file v1. Lancia Error con messaggio leggibile. */
+export function parseDb(input: unknown): Db {
+  if (!isObj(input)) throw new Error('Il file non è un database MoneyDuo valido.')
+  if (typeof input.schemaVersion !== 'number') throw new Error('Il file non è un database MoneyDuo (schemaVersion mancante).')
+  if (input.schemaVersion > SCHEMA_VERSION) throw new Error('Il file è stato creato da una versione più recente dell\'app: aggiorna MoneyDuo.')
+  if (!Array.isArray(input.accounts) || !Array.isArray(input.categories) || !Array.isArray(input.transactions))
     throw new Error('Database incompleto: mancano conti, categorie o transazioni.')
+  const raw = input.schemaVersion < 2 ? migrateV1(input) : input
 
   const meta = isObj(raw.meta) ? raw.meta : {}
-  const prof = isObj(raw.profiles) ? raw.profiles : {}
+  const fam = isObj(raw.family) ? raw.family : {}
   const now = nowIso()
+  const list = (v: unknown): Obj[] => (Array.isArray(v) ? v.filter(isObj).filter((x) => typeof x.id === 'string') : [])
 
-  const accounts: Account[] = raw.accounts.filter(isObj).filter((x) => typeof x.id === 'string').map((x, i) => ({
+  const members: Member[] = list(raw.members).map((x, i) => ({
+    id: x.id as string,
+    name: str(x.name, 'Membro'),
+    email: typeof x.email === 'string' && x.email ? x.email : null,
+    color: str(x.color, MEMBER_COLORS[i % MEMBER_COLORS.length]),
+    active: x.active !== false,
+    joinedAt: typeof x.joinedAt === 'string' ? x.joinedAt : null,
+    updatedAt: str(x.updatedAt, EPOCH),
+  }))
+
+  const accounts: Account[] = list(raw.accounts).map((x, i) => ({
     id: x.id as string,
     name: str(x.name, 'Conto'),
     group: pick(x.group, ['cash', 'bank', 'card', 'savings', 'investment', 'other'] as const, 'other'),
-    owner: pick(x.owner, PROFILE, 'shared'),
+    members: strArr(x.members),
     initialBalance: Math.round(num(x.initialBalance)),
     excludeFromTotal: bool(x.excludeFromTotal),
     hidden: bool(x.hidden),
@@ -113,7 +146,7 @@ export function parseDb(raw: unknown): Db {
     updatedAt: str(x.updatedAt, EPOCH),
   }))
 
-  const categories: Category[] = raw.categories.filter(isObj).filter((x) => typeof x.id === 'string').map((x, i) => ({
+  const categories: Category[] = list(raw.categories).map((x, i) => ({
     id: x.id as string,
     name: str(x.name, 'Categoria'),
     type: pick(x.type, ['expense', 'income'] as const, 'expense'),
@@ -125,7 +158,7 @@ export function parseDb(raw: unknown): Db {
     updatedAt: str(x.updatedAt, EPOCH),
   }))
 
-  const transactions: Transaction[] = raw.transactions.filter(isObj).filter((x) => typeof x.id === 'string').map((x) => ({
+  const transactions: Transaction[] = list(raw.transactions).map((x) => ({
     id: x.id as string,
     type: pick(x.type, ['expense', 'income', 'transfer'] as const, 'expense'),
     amount: Math.abs(Math.round(num(x.amount))),
@@ -135,8 +168,8 @@ export function parseDb(raw: unknown): Db {
     categoryId: typeof x.categoryId === 'string' ? x.categoryId : null,
     title: str(x.title),
     note: str(x.note),
-    paidBy: pick(x.paidBy, PROFILE, 'shared'),
-    split: pick(x.split, ['personal', 'equal', 'advance'] as const, 'personal'),
+    paidBy: typeof x.paidBy === 'string' ? x.paidBy : null,
+    participants: strArr(x.participants),
     createdAt: str(x.createdAt, EPOCH),
     updatedAt: str(x.updatedAt, EPOCH),
   }))
@@ -153,7 +186,8 @@ export function parseDb(raw: unknown): Db {
       updatedBy: str(meta.updatedBy),
       revision: num(meta.revision),
     },
-    profiles: { a: str(prof.a, 'Emilio'), b: str(prof.b, 'Sara'), shared: str(prof.shared, 'In Comune'), updatedAt: str(prof.updatedAt, EPOCH) },
+    family: { name: str(fam.name, 'Famiglia'), updatedAt: str(fam.updatedAt, EPOCH) },
+    members,
     accounts,
     categories,
     transactions,
