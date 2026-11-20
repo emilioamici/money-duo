@@ -14,6 +14,7 @@ class MemKV implements KV {
   async get(k: string) { return this.data.get(k) ?? null }
   async put(k: string, v: string) { this.writes++; this.data.set(k, v) }
   async delete(k: string) { this.writes++; this.data.delete(k) }
+  async list(o: { prefix: string; limit?: number }) { return { keys: [...this.data.keys()].filter((k) => k.startsWith(o.prefix)).slice(0, o.limit ?? 1000).map((name) => ({ name })) } }
 }
 
 function device(host = 'fcm.googleapis.com') {
@@ -161,5 +162,64 @@ describe('/notify', () => {
     const r = await (await call('/notify', { fileId: FILE, recipients: ['emilio@example.com', 'anna@example.com'], title: 'Prova', body: 'ok', test: true })).json() as { sent: number }
     expect(r.sent).toBe(1)
     expect(pushed[0].url).toBe(emilio.sub.endpoint)
+  })
+})
+
+describe('Apple Wallet', () => {
+  const ingest = (token: string, body: unknown, raw = false) =>
+    worker.fetch(new Request('https://push.example.workers.dev/wallet/in/' + token, { method: 'POST', body: raw ? (body as string) : JSON.stringify(body) }), env)
+  const mk = async (user = 'tok-emilio') => ((await (await call('/wallet/token', { fileId: FILE }, user)).json()) as { token?: string; exists: boolean })
+  const pull = async (user = 'tok-emilio') => (await (await call('/wallet/pull', { fileId: FILE }, user)).json()) as { enabled: boolean; items: Array<{ id: string; amount: number; merchant: string; card: string }> }
+
+  it('crea il token una sola volta (sul server resta solo l\'hash) e lo rigenera su richiesta', async () => {
+    const a = await mk()
+    expect(a.exists).toBe(false); expect(a.token).toMatch(/^[\w-]{20,}$/)
+    expect([...kv.data.entries()].some(([k, v]) => k.includes(a.token!) || v.includes(a.token!))).toBe(false)
+    expect(await mk()).toEqual({ ok: true, exists: true })
+    const b = (await (await call('/wallet/token', { fileId: FILE, rotate: true })).json()) as { token: string }
+    expect(b.token).not.toBe(a.token)
+    expect((await ingest(a.token!, { amount: '5' })).status).toBe(404)
+    expect((await ingest(b.token, { amount: '5' })).status).toBe(200)
+  })
+
+  it('riceve la spesa dal Comando Rapido e la consegna solo al proprietario', async () => {
+    const { token } = await mk()
+    expect((await ingest(token!, { amount: '€1.234,56', merchant: 'Esselunga', card: 'Carta Emilio' })).status).toBe(200)
+    expect((await ingest(token!, 'amount=12.5&merchant=Bar&card=Visa', true)).status).toBe(200)
+    const r = await pull()
+    expect(r.enabled).toBe(true)
+    expect(r.items.map((i) => [i.amount, i.merchant, i.card])).toEqual(expect.arrayContaining([[123456, 'Esselunga', 'Carta Emilio'], [1250, 'Bar', 'Visa']]))
+    expect(r.items).toHaveLength(2)
+    expect((await pull('tok-anna')).items).toEqual([]) // Anna non ha attivato nulla e non vede le spese di Emilio
+    expect((await call('/wallet/pull', { fileId: FILE }, 'tok-estraneo')).status).toBe(403)
+  })
+
+  it('cifra le spese in casella quando c\'è SESSION_KEY', async () => {
+    env.SESSION_KEY = b64u.enc(randomBytes(32))
+    const { token } = await mk()
+    await ingest(token!, { amount: '9,90', merchant: 'Pizzeria Da Mario' })
+    expect([...kv.data.values()].some((v) => v.includes('Pizzeria'))).toBe(false)
+    expect((await pull()).items[0].merchant).toBe('Pizzeria Da Mario')
+  })
+
+  it('ack cancella, importi non validi rifiutati, revoca svuota tutto', async () => {
+    const { token } = await mk()
+    for (const bad of [{ amount: 'abc' }, { amount: '-5' }, { amount: '0' }, {}]) expect((await ingest(token!, bad)).status).toBe(400)
+    await ingest(token!, { amount: '3' }); await ingest(token!, { amount: '4' })
+    const items = (await pull()).items
+    await call('/wallet/ack', { fileId: FILE, ids: [items[0].id] })
+    expect((await pull()).items.map((i) => i.id)).toEqual([items[1].id])
+    await call('/wallet/revoke', { fileId: FILE })
+    expect(await pull()).toMatchObject({ enabled: false, items: [] })
+    expect((await ingest(token!, { amount: '3' })).status).toBe(404)
+    expect([...kv.data.keys()].filter((k) => k.startsWith('wi:') || k.startsWith('wt:') || k.startsWith('wu:'))).toEqual([])
+  })
+
+  it('avvisa con una notifica push i dispositivi dell\'utente', async () => {
+    const d = device(); await sub('tok-emilio', d)
+    const { token } = await mk(); pushed.length = 0
+    await ingest(token!, { amount: '12', merchant: 'Bar' })
+    expect(pushed).toHaveLength(1)
+    expect(decrypt(d, pushed[0].body)).toMatchObject({ title: 'Spesa da approvare', body: 'Bar · 12.00 €' })
   })
 })

@@ -102,6 +102,10 @@ Limite: PayPal.Me non permette di preselezionare «Per amici e familiari» da li
 
 **Lingue.** L'app è in **italiano** e **inglese**: in Impostazioni → Aspetto → *Lingua* si sceglie Automatico (segue la lingua del telefono), Italiano o English; il cambio è immediato e si ricorda sul dispositivo. Cambiano testi, date e importi (`1.234,56 €` / `€1,234.56`; nei campi si accetta sia la virgola sia il punto decimale). Tradurre un testo: nel codice si usa `t('testo in italiano')`, e in `src/i18n/en.ts` la chiave è quel testo; un test controlla che ogni testo usato abbia la traduzione. Le categorie e i nomi dei conti che hai già nel database restano come li hai scritti (sono dati tuoi); quelli di una famiglia nuova nascono nella lingua in uso. Le notifiche arrivano nella lingua del dispositivo di chi le ha generate (per i push, di chi ha fatto la modifica). La pagina privacy resta in italiano.
 
+## Apple Wallet: spese Apple Pay in automatico
+
+Con il server delle notifiche (cartella `worker`) attivo, ogni persona può collegare i propri pagamenti con Apple Pay: da *Impostazioni → Apple Wallet* si attiva e si copia il proprio indirizzo personale, poi sull'iPhone si crea un'automazione «Transazione» nell'app Comandi (le istruzioni sono nella scheda). Ogni pagamento diventa una transazione **senza categoria e con un segno giallo «Da approvare»** (o «Da completare» se il conto non è stato riconosciuto dal nome della carta): la si approva dal menu a scorrimento, oppure la si apre e la si salva. Dettagli e privacy in `worker/README.md`.
+
 ## Permesso ristretto su Drive (`drive.file`)
 Di base l'app chiede l'accesso a **tutto Drive**. Con il selettore di Google configurato chiede invece solo **`drive.file`**: vede soltanto i file che ha creato lei (come il database) o che scegli tu con il selettore. Gli altri file non sono accessibili. Come effetto collaterale `drive.file` è un permesso non sensibile: l'app può essere pubblicata senza verifica e senza l'avviso «app non verificata».
 

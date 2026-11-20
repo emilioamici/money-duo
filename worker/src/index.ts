@@ -1,4 +1,5 @@
 import { authCallback, authConfigured, authLogout, authRefresh, authStart } from './auth'
+import { walletAck, walletIngest, walletPull, walletRevoke, walletToken } from './wallet'
 import { sendWebPush, type PushSubscriptionData, type VapidKeys } from './webpush'
 
 /** Minimo indispensabile dell'archivio KV di Cloudflare (così il codice si prova anche in Node). */
@@ -6,6 +7,7 @@ export interface KV {
   get(key: string): Promise<string | null>
   put(key: string, value: string, opts?: { expirationTtl?: number }): Promise<void>
   delete(key: string): Promise<void>
+  list(opts: { prefix: string; limit?: number }): Promise<{ keys: Array<{ name: string }> }>
 }
 
 export interface Env {
@@ -37,14 +39,14 @@ const MAX_DEVICES_PER_USER = 5
 const TTL_SECONDS = 90 * 24 * 3600
 const RENEW_AFTER_MS = 30 * 24 * 3600 * 1000
 
-class HttpError extends Error {
+export class HttpError extends Error {
   constructor(public status: number, message: string) { super(message) }
 }
 
 interface StoredSub extends PushSubscriptionData { added: number }
 const key = (fileId: string, email: string) => `s:${fileId}:${email.toLowerCase()}`
-const validFileId = (s: unknown): s is string => typeof s === 'string' && /^[\w-]{10,100}$/.test(s)
-const validEmail = (s: unknown): s is string => typeof s === 'string' && s.length < 200 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)
+export const validFileId = (s: unknown): s is string => typeof s === 'string' && /^[\w-]{10,100}$/.test(s)
+export const validEmail = (s: unknown): s is string => typeof s === 'string' && s.length < 200 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)
 
 function validSubscription(env: Env, s: unknown): s is PushSubscriptionData {
   const o = s as PushSubscriptionData
@@ -68,7 +70,7 @@ function cors(env: Env, req: Request): Record<string, string> {
  * Verifica il token Google dell'utente: ritorna la sua email (verificata da Google) e controlla che abbia
  * accesso al file del database indicato. Il server non salva mai il token.
  */
-async function authenticate(env: Env, req: Request, fileId: string): Promise<string> {
+export async function authenticate(env: Env, req: Request, fileId: string): Promise<string> {
   const google = env.GOOGLE_API || 'https://www.googleapis.com'
   const token = /^Bearer (.+)$/.exec(req.headers.get('Authorization') ?? '')?.[1]
   if (!token) throw new HttpError(401, 'Accesso mancante')
@@ -84,7 +86,7 @@ async function authenticate(env: Env, req: Request, fileId: string): Promise<str
   return email.toLowerCase()
 }
 
-async function readJson(req: Request): Promise<Record<string, unknown>> {
+export async function readJson(req: Request): Promise<Record<string, unknown>> {
   try {
     const text = await req.text()
     if (text.length > 8000) throw new HttpError(413, 'Richiesta troppo grande')
@@ -96,7 +98,7 @@ async function readJson(req: Request): Promise<Record<string, unknown>> {
   }
 }
 
-async function loadSubs(env: Env, fileId: string, email: string): Promise<StoredSub[]> {
+export async function loadSubs(env: Env, fileId: string, email: string): Promise<StoredSub[]> {
   try { return (JSON.parse((await env.SUBS.get(key(fileId, email))) ?? '[]') as StoredSub[]) } catch { return [] }
 }
 const saveSubs = (env: Env, fileId: string, email: string, list: StoredSub[]) =>
@@ -167,12 +169,19 @@ export default {
     if (req.method === 'GET' && pathname === '/auth/start') return authStart(env, req)
     if (req.method === 'GET' && pathname === '/auth/callback') return authCallback(env, req)
     if (req.method !== 'POST') return json(404, { error: 'Non trovato' })
+    // il Comando Rapido dell'iPhone scrive qui con il token personale nell'indirizzo: nessuna origine del browser
+    const wallet = /^\/wallet\/in\/([\w-]{20,100})$/.exec(pathname)
+    if (wallet) { const r = await walletIngest(env, req, wallet[1]); return new Response(JSON.stringify(r.body), { status: r.status, headers: { 'Content-Type': 'application/json' } }) }
     // le chiamate dal browser devono arrivare da un'origine autorizzata
     if (!headers['Access-Control-Allow-Origin']) return json(403, { error: 'Origine non autorizzata' })
     try {
       if (pathname === '/subscribe') return json(200, await subscribe(env, req))
       if (pathname === '/unsubscribe') return json(200, await unsubscribe(env, req))
       if (pathname === '/notify') return json(200, await notify(env, req))
+      if (pathname === '/wallet/token') return json(200, await walletToken(env, req))
+      if (pathname === '/wallet/revoke') return json(200, await walletRevoke(env, req))
+      if (pathname === '/wallet/pull') return json(200, await walletPull(env, req))
+      if (pathname === '/wallet/ack') return json(200, await walletAck(env, req))
       if (pathname === '/auth/refresh') { const r = await authRefresh(env, req); return json(r.status, r.body) }
       if (pathname === '/auth/logout') { const r = await authLogout(env, req); return json(r.status, r.body) }
       return json(404, { error: 'Non trovato' })

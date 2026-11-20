@@ -99,6 +99,13 @@ export interface Transaction {
   payments?: Payment[] | null
   /** etichette libere (es. "vacanza", "lidl") */
   tags?: string[]
+  /**
+   * Importata da Apple Wallet e non ancora controllata: 'approve' = pronta da approvare, 'complete' = il conto non è stato riconosciuto.
+   * Sparisce quando l'utente approva, oppure apre la transazione e la salva.
+   */
+  pending?: 'approve' | 'complete' | null
+  /** nome della carta come l'ha comunicato Wallet (solo informativo, per le transazioni importate) */
+  walletCard?: string
   /** membro che ha aggiunto / modificato per ultimo la transazione (serve alle notifiche) */
   by?: MemberId | null
   createdAt: string

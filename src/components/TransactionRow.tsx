@@ -5,8 +5,10 @@ import { formatMoney, timeLabel } from '../lib/format'
 import { CatBubble } from './ui'
 import { useMemo } from 'react'
 import { t } from '../i18n'
-import { ArrowLeftRight, Copy, Pencil, Trash2 } from 'lucide-react'
+import { AlertTriangle, ArrowLeftRight, Check, Copy, Pencil, Trash2 } from 'lucide-react'
 import { deleteTransaction } from '../lib/mutations'
+import { approveTransaction } from '../lib/wallet'
+import { nowIso } from '../lib/ids'
 import { ask } from './dialogs'
 import { useTxActions } from './txActions'
 import { SwipeRow } from './SwipeRow'
@@ -38,8 +40,9 @@ export function TransactionRow({ tx }: { tx: Transaction }) {
   const color = tx.type === 'income' ? 'text-inc' : tx.type === 'expense' ? 'text-exp' : 'text-trf'
 
   return (
-    <SwipeRow testId="tx-row" onTap={() => openTx({ tx })} buttonClass="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-line/30 active:bg-line/50"
+    <SwipeRow testId="tx-row" onTap={() => openTx({ tx })} buttonClass={`flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-line/30 active:bg-line/50 ${tx.pending ? 'bg-amber-500/10' : ''}`}
       actions={[
+        ...(tx.pending ? [{ label: 'Approva', icon: <Check size={18} />, className: 'bg-inc', onClick: () => commit((d) => approveTransaction(d, tx.id, nowIso())) }] : []),
         { label: 'Modifica', icon: <Pencil size={18} />, className: 'bg-brand', onClick: () => openTx({ tx }) },
         { label: 'Copia', icon: <Copy size={18} />, className: 'bg-trf', onClick: () => copy(tx) },
         { label: 'Elimina', icon: <Trash2 size={18} />, className: 'bg-exp', onClick: () => void remove() },
@@ -48,9 +51,13 @@ export function TransactionRow({ tx }: { tx: Transaction }) {
         ? <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-trf/15 text-trf"><ArrowLeftRight size={18} /></span>
         : <CatBubble icon={cat?.icon ?? '❔'} color={cat?.color ?? '#94a3b8'} />}
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-semibold">{title}</span>
+        <span className="flex items-center gap-1 font-semibold">
+          {tx.pending && <AlertTriangle size={15} className="shrink-0 text-amber-500" aria-label={t(tx.pending === 'complete' ? 'Da completare' : 'Da approvare')} />}
+          <span className="truncate">{title}</span>
+        </span>
         <span className="block truncate text-xs text-muted">{timeLabel(tx.date)} · {sub}</span>
         <span className="mt-0.5 flex flex-wrap gap-1">
+          {tx.pending && <span data-testid="pending-chip" className="inline-block rounded-lg bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold leading-tight text-amber-700 dark:text-amber-300">{t(tx.pending === 'complete' ? 'Da completare' : 'Da approvare')}</span>}
           {badge && <span className="inline-block rounded-lg bg-brand/10 px-2 py-0.5 text-[10px] font-semibold leading-tight text-brand">{badge}</span>}
           {(tx.tags ?? []).map((g) => <span key={g} className="inline-block rounded-full bg-line/70 px-2 py-0.5 text-[10px] font-medium text-muted">#{g}</span>)}
         </span>

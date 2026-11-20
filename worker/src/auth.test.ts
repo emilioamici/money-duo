@@ -12,6 +12,7 @@ class MemKV implements KV {
   async get(k: string) { return this.data.get(k) ?? null }
   async put(k: string, v: string) { this.writes++; this.data.set(k, v) }
   async delete(k: string) { this.data.delete(k) }
+  async list(o: { prefix: string }) { return { keys: [...this.data.keys()].filter((k) => k.startsWith(o.prefix)).map((name) => ({ name })) } }
 }
 
 let env: Env, kv: MemKV
