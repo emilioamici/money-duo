@@ -6,7 +6,9 @@ import { Background } from './components/Background'
 import './index.css'
 import { initCache } from './store/cache'
 import { consumeSessionFromUrl } from './sync/auth'
+import { consumeInviteFromUrl } from './sync/invite'
 
+consumeInviteFromUrl() // link d'invito (#join=…): ricordato anche dopo il giro su Google
 consumeSessionFromUrl() // ritorno dal login con il server: salva la sessione e ripulisce l'indirizzo
 
 // la copia locale (IndexedDB) si legge prima di mostrare l'app, così parte subito con i dati

@@ -105,6 +105,16 @@ Non serve altro (l'app usa lo stesso indirizzo del server delle notifiche). Sull
 - **Dopo 7 giorni chiede di nuovo l'accesso:** l'app è ancora in *Testing*; vedi il punto 1.1.
 - **«Origine non autorizzata»:** `ALLOWED_ORIGINS` deve contenere l'origine dell'app (per esempio `https://emilioamici.github.io`, senza percorso).
 
+## Ingresso con codice famiglia: il «ponte» (facoltativo)
+
+Con il permesso ristretto `drive.file` un file condiviso da altri si apre solo dal Selettore di Google, che su iPhone spesso non funziona. Con l'accesso persistente attivo, il Worker può fare da **ponte**: il capofamiglia (proprietario del file) apre l'app e la famiglia viene registrata sul Worker con la sua sessione (si ripete ogni 3 giorni e dopo ogni invito). Chi è invitato (file condiviso con lui su Drive) accede con Google e trova la famiglia da solo, oppure incolla il **codice famiglia** o apre il **link d'invito** (`…/#join=<codice>`): il database viene letto e scritto dal Worker, senza Selettore.
+
+- **L'autorizzazione resta su Drive:** il Worker ricontrolla a ogni richiesta che l'account compaia tra le condivisioni del file (in scrittura serve un ruolo con diritto di modifica). Togliere la condivisione su Drive chiude l'accesso; se il capofamiglia revoca l'accesso a Google, la famiglia si scollega.
+- **Il database non viene letto né salvato:** passa al volo (lettura e scrittura inoltrate così come sono, fino a 12 MB), quindi non pesa sulla CPU del piano gratuito.
+- **Token d'accesso:** il ponte accetta solo token emessi per questa app (`GOOGLE_CLIENT_ID`; altri client con `ALLOWED_CLIENT_IDS`, separati da virgola, nelle `[vars]`). Tutto il resto viene rifiutato.
+- **Privacy:** il contenuto passa dal Worker. Se non vuoi questo, non attivare l'accesso persistente: gli invitati useranno il Selettore di Google.
+- Un Worker vecchio (senza ponte) viene riconosciuto da `/health`, e l'app usa i percorsi di prima.
+
 ## Apple Wallet (facoltativo)
 
 Con lo stesso Worker le spese pagate con **Apple Pay** possono arrivare da sole in MoneyDuo. Non serve nessuna configurazione in più: la funzione compare in *Impostazioni → Apple Wallet* appena l'app conosce l'indirizzo del Worker.

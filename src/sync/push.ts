@@ -1,7 +1,8 @@
 import { t } from '../i18n'
 /**
  * Notifiche push dal server (Cloudflare Worker, vedi worker/README.md).
- * Il server conosce solo i dispositivi iscritti e non ha mai accesso a Drive: chi fa una modifica gli dice a chi inviare.
+ * Per le notifiche il server conosce solo i dispositivi iscritti: chi fa una modifica gli dice a chi inviare.
+ * (Per l'ingresso con codice famiglia, vedi src/sync/bridge.ts: il Worker può fare da tramite verso Drive, senza conservare i dati.)
  */
 
 const URL_KEY = 'moneyduo:pushUrl'

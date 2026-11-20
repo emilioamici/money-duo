@@ -11,6 +11,8 @@ const HASH = 'moneyduo_session='
 
 const read = (): string => { try { return localStorage.getItem(SID_KEY) || '' } catch { return '' } }
 export const hasSession = (): boolean => !!read()
+/** Identificativo della sessione di accesso persistente (serve solo a chi registra la famiglia sul ponte). */
+export const sessionId = (): string => read()
 export function clearSession(): void { try { localStorage.removeItem(SID_KEY) } catch { /* noop */ } }
 
 /** Dopo il ritorno da Google l'identificativo di sessione è nel frammento dell'indirizzo: lo si salva e lo si toglie dalla barra. */

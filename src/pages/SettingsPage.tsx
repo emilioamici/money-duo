@@ -113,7 +113,7 @@ export function SettingsPage({ syncRef, openSync = 0 }: { syncRef: React.RefObje
           <button className="btn-danger mt-3 w-full" onClick={reset}><RotateCcw size={18} />{t('Ripristina dati iniziali')}</button>
         </Accordion>
 
-        <p className="flex gap-2 px-1 pb-4 text-xs text-muted"><ShieldCheck size={16} className="shrink-0" />{t('I tuoi dati vivono solo in questo browser e nel file su Google Drive scelto da te: nessun server di terze parti e nessun dato nel repository del codice.')}</p>
+        <p className="flex gap-2 px-1 pb-4 text-xs text-muted"><ShieldCheck size={16} className="shrink-0" />{t('I tuoi dati vivono in questo browser e nel file su Google Drive della famiglia, e nessun dato è nel repository del codice. Se attivi le funzioni del server (notifiche, accesso persistente, ingresso con codice, Apple Wallet), un servizio Cloudflare gestito da chi ha installato l\'app fa solo da tramite: non legge né conserva i dati della famiglia.')}</p>
       </div>
     </div>
   )

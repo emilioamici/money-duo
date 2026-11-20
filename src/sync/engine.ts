@@ -4,11 +4,13 @@ import { mergeDb, parseDb, sameData } from '../lib/merge'
 import { nowIso } from '../lib/ids'
 import type { CacheState } from '../store/cache'
 import * as drive from './drive'
-import { DriveError } from './drive'
+import { DriveError, isBridged, setBridged } from './drive'
 import { GoogleAuthError, cachedToken, clearToken, requestToken, revokeToken, setToken, tokenRemainingMs, type Prompt } from './google'
 import { SessionExpired, brokerAvailable, hasSession, logoutBroker, refreshAccessToken, startBrokerLogin } from './auth'
 import { t } from '../i18n'
 import { pickDatabase, pickFolder, pickerConfigured, type Picked } from './picker'
+import { ensureRegistered, myHouses, type BridgeHouse } from './bridge'
+import { inviteLink } from './invite'
 
 /**
  * Motore di sincronizzazione con un file JSON su Google Drive.
@@ -303,6 +305,7 @@ export class SyncEngine {
   }
 
   unlink(): void {
+    if (this.p.fileId) setBridged(this.p.fileId, false)
     this.p = { ...this.p, fileId: null, fileName: null, remoteVersion: null, dirty: false, lastSyncAt: null }
     this.persist()
     this.set('off')
@@ -311,7 +314,9 @@ export class SyncEngine {
   /** Invita un account Google: concede l'accesso in modifica al file (solo il capofamiglia). */
   async invite(email: string, familyName: string): Promise<void> {
     if (!this.p.fileId) return
-    await drive.shareFile(await this.token(), this.p.fileId, email.trim(), t('Ti invito nella famiglia «{name}» su Money Duo. Apri l\'app e accedi con questo account Google: il database ti verrà collegato in automatico.', { name: familyName }))
+    const token = await this.token()
+    await drive.shareFile(token, this.p.fileId, email.trim(), t('Ti invito nella famiglia «{name}» su Money Duo. Apri questo link e accedi con questo account Google: {link} Oppure apri l\'app e inserisci il codice famiglia: {code}', { name: familyName, link: inviteLink(this.p.fileId), code: this.p.fileId }))
+    void this.registerFamily(true) // il nuovo invitato deve trovare subito la famiglia dal ponte
   }
 
   /** Revoca l'accesso al file a un account. Ritorna false se non aveva permessi. */
@@ -330,8 +335,22 @@ export class SyncEngine {
   }
 
   /** Selettore di Google: il database di famiglia (anche condiviso da altri). Solo con il permesso `drive.file`. */
-  async pickDatabase(): Promise<Picked | null> {
-    return pickDatabase(await this.token())
+  async pickDatabase(onlyFileId?: string): Promise<Picked | null> {
+    return pickDatabase(await this.token(), onlyFileId)
+  }
+
+  /** Le famiglie a cui sono stato invitato, aperte dal ponte del Worker (nessun selettore, nessun codice). */
+  async houses(): Promise<BridgeHouse[]> {
+    const token = cachedToken()
+    return token ? myHouses(token) : []
+  }
+
+  /** Il capofamiglia (proprietario del file, con accesso persistente) affida la famiglia al ponte del Worker: gli invitati entrano senza Selettore. */
+  async registerFamily(force = false): Promise<boolean> {
+    const id = this.p.fileId, token = cachedToken()
+    if (!id || !token || isBridged(id)) return false
+    const owner = !!this.p.ownerEmail && this.p.ownerEmail.toLowerCase() === (this.p.email ?? '').toLowerCase()
+    return ensureRegistered(id, token, { owner, force })
   }
   /** Selettore di Google: una cartella del proprio Drive. */
   async pickFolder(): Promise<Picked | null> {
@@ -418,6 +437,7 @@ export class SyncEngine {
       this.p.lastSyncAt = nowIso()
       this.persist()
       this.set(this.p.dirty ? 'pending' : 'synced')
+      void this.registerFamily(false)
       if (this.p.dirty) this.debounce = setTimeout(() => void this.syncNow(), 1000)
       else this.host.afterSync?.()
     } catch (e) {
@@ -437,6 +457,7 @@ export class SyncEngine {
       return this.set('auth', t('Sessione Google scaduta: riconnettiti per continuare a sincronizzare.'))
     }
     if (e instanceof DriveError) {
+      if (e.status === 404 && this.p.fileId && isBridged(this.p.fileId)) return this.set('error', e.message || t('Non riesco ad aprire la famiglia dal server: il capofamiglia deve riaprire l\'app con l\'accesso persistente.'))
       if (e.status === 404 && pickerConfigured()) return this.set('error', t('Non riesco ad aprire il database: scegli di nuovo il file con il selettore di Google (dalle Impostazioni → Sincronizzazione). Se non lo vedi, forse sei stato rimosso dalla famiglia o il file è stato spostato.'))
       if (e.status === 404) return this.set('error', t('Non hai più accesso al database: forse sei stato rimosso dalla famiglia o il file è stato spostato. Puoi scollegarti da Impostazioni.'))
       if (e.status === 403) return this.set('error', t('Permesso negato: serve l\'accesso in modifica al file.') + ' ' + e.message)

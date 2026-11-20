@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Crown, FolderOpen, Mail, UserMinus, Wallet } from 'lucide-react'
+import { Copy, Crown, FolderOpen, KeyRound, Mail, Share2, UserMinus, Wallet } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
 import { engine } from '../sync/engine'
 import { deactivateMember, newMember, saveFamilyName, saveMember } from '../lib/mutations'
@@ -7,6 +7,7 @@ import { Field, MemberAvatar } from './ui'
 import { ask } from './dialogs'
 import { FolderPicker } from './FolderPicker'
 import { pickerConfigured } from '../sync/picker'
+import { inviteLink } from '../sync/invite'
 import { parsePaypalHandle } from '../lib/paypal'
 import { t } from '../i18n'
 import { tb } from '../i18n/rich'
@@ -123,6 +124,7 @@ export function FamilyCard() {
       ) : (
         <p className="rounded-xl bg-bg p-3 text-xs text-muted">{t('Solo il capofamiglia ({owner}) può invitare o rimuovere membri.', { owner: sync.ownerEmail ?? t('proprietario del file') })}</p>
       )}
+      {sync.fileId && <FamilyCode fileId={sync.fileId} family={db.family.name} />}
       {err && <p className="mt-3 rounded-xl bg-exp/10 p-3 text-sm text-exp">{err}</p>}
       {info && <p className="mt-3 rounded-xl bg-inc/10 p-3 text-sm text-inc">{info}</p>}
 
@@ -159,6 +161,34 @@ function PaypalField({ handle, onSave }: { handle: string; onSave: (h: string | 
         onChange={(e) => { setText(e.target.value); setErr('') }} onBlur={save} onKeyDown={(e) => { if (e.key === 'Enter') save() }} />
       {err && <p className="mt-1 text-xs text-exp">{err}</p>}
       <p className="mt-1 text-xs text-muted">{t('È il nome dopo paypal.me/ nel tuo link (lo crei dall\'app PayPal → «Il mio link PayPal.Me»). Gli altri membri lo useranno per rimborsarti: sarà visibile a tutta la famiglia.')}</p>
+    </div>
+  )
+}
+
+/** Il codice famiglia (l'ID del file del database) e il link d'invito: chi li riceve entra nella famiglia dopo l'accesso con Google. */
+function FamilyCode({ fileId, family }: { fileId: string; family: string }) {
+  const [msg, setMsg] = useState('')
+  const link = inviteLink(fileId)
+  const copy = async (text: string, done: string) => {
+    try { await navigator.clipboard.writeText(text); setMsg(done) } catch { setMsg(t('Non riesco a copiare: tieni premuto sul testo e copialo a mano.')) }
+  }
+  const share = async () => {
+    const text = t('Entra nella famiglia «{name}» su Money Duo: apri il link e accedi con il tuo account Google.', { name: family })
+    try {
+      if (navigator.share) await navigator.share({ title: 'Money Duo', text, url: link })
+      else await copy(link, t('Link d\'invito copiato.'))
+    } catch { /* condivisione annullata */ }
+  }
+  return (
+    <div className="mt-3 space-y-2 rounded-2xl bg-bg p-3" data-testid="family-code">
+      <p className="flex items-center gap-2 text-sm font-semibold"><KeyRound size={16} className="text-brand" />{t('Codice famiglia')}</p>
+      <p className="break-all font-mono text-xs" data-testid="family-code-value">{fileId}</p>
+      <div className="grid grid-cols-2 gap-2">
+        <button className="btn-soft !px-3 !text-xs" onClick={() => void copy(fileId, t('Codice copiato.'))}><Copy size={14} />{t('Copia codice')}</button>
+        <button className="btn-soft !px-3 !text-xs" onClick={() => void share()}><Share2 size={14} />{t('Condividi link d\'invito')}</button>
+      </div>
+      <p className="text-xs text-muted">{t('Chi lo riceve entra con il link o incollando il codice dopo l\'accesso con Google. Il capofamiglia deve prima averlo invitato (email) e aver aperto l\'app con l\'accesso persistente.')}</p>
+      {msg && <p className="text-xs text-inc">{msg}</p>}
     </div>
   )
 }
