@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ChevronDown, ChevronRight, Plus, X } from 'lucide-react'
 import type { Account } from '../types'
 import { useApp } from '../store/AppProvider'
@@ -151,17 +151,20 @@ export function SelectField({ value, onChange, options, ariaLabel, className = p
 export function TitleRow({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
   const { db } = useApp()
   const [focus, setFocus] = useState(false)
+  // su iPhone toccare una proposta toglie prima il fuoco al campo: se la lista sparisse subito, il tocco andrebbe perso. Si chiude con un attimo di ritardo.
+  const closeTimer = useRef<ReturnType<typeof setTimeout>>()
+  useEffect(() => () => clearTimeout(closeTimer.current), [])
   const list = useMemo(() => (focus ? titleSuggestions(db, value) : []), [db, value, focus])
   return (
     <Row label={t('Titolo')}>
       <input className={plain} placeholder={placeholder} value={value} autoComplete="off" autoCapitalize="sentences" role="combobox" aria-expanded={list.length > 0} aria-autocomplete="list" aria-label={t('Titolo')}
-        onChange={(e) => onChange(e.target.value)} onFocus={() => setFocus(true)} onBlur={() => setFocus(false)} />
+        onChange={(e) => { onChange(e.target.value); setFocus(true) }} onFocus={() => { clearTimeout(closeTimer.current); setFocus(true) }} onBlur={() => { closeTimer.current = setTimeout(() => setFocus(false), 250) }} />
       {list.length > 0 && (
         <ul role="listbox" aria-label={t('Titoli già usati')} className="mt-1 overflow-hidden rounded-xl border border-line bg-bg">
           {list.map((t) => (
             <li key={t} role="option" aria-selected={false}>
               <button type="button" className="block w-full truncate px-3 py-2 text-left text-[15px] hover:bg-line/50 active:bg-line/70"
-                onPointerDown={(e) => e.preventDefault()} onClick={() => { onChange(t); setFocus(false) }}>{t}</button>
+                onMouseDown={(e) => e.preventDefault()} onClick={() => { clearTimeout(closeTimer.current); onChange(t); setFocus(false) }}>{t}</button>
             </li>
           ))}
         </ul>
