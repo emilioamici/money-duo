@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { BellRing, ChevronRight, Cloud, Database, Download, Palette, RotateCcw, ShieldCheck, Tags, Upload, Users } from 'lucide-react'
+import { BellRing, ChevronRight, Cloud, Database, Download, Palette, RotateCcw, ShieldCheck, Tags, Upload, Users, Wallet } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
 import { NotificationBell } from '../components/Notifications'
 import { SyncCard, STATUS_LABEL } from '../components/SyncCard'
@@ -10,6 +10,9 @@ import { THEME_NAME, getTheme } from '../lib/theme'
 import { getLangPref } from '../i18n'
 import { FamilyCard } from '../components/FamilyCard'
 import { NotificationsCard } from '../components/NotificationsCard'
+import { WalletCard } from '../components/WalletCard'
+import { walletAvailable } from '../sync/wallet'
+import { pendingCount } from '../lib/wallet'
 import { ask } from '../components/dialogs'
 import { CategoriesPage } from './CategoriesPage'
 import { mergeDb, parseDb, replaceData } from '../lib/merge'
@@ -17,12 +20,12 @@ import { t } from '../i18n'
 
 const LANG_SHORT = { auto: 'Auto', it: 'Italiano', en: 'English' } as const
 const OPEN_KEY = 'moneyduo:settingsOpen'
-type Section = 'look' | 'family' | 'sync' | 'notif' | 'data'
+type Section = 'look' | 'family' | 'sync' | 'notif' | 'wallet' | 'data'
 const loadOpen = (): Partial<Record<Section, boolean>> => { try { return JSON.parse(localStorage.getItem(OPEN_KEY) ?? '{}') } catch { return {} } }
 
 /** Impostazioni a schede: ognuna si apre e si chiude (lo stato si ricorda su questo dispositivo). `openSync` aumenta quando si arriva dal pulsante di sincronizzazione. */
 export function SettingsPage({ syncRef, openSync = 0 }: { syncRef: React.RefObject<HTMLDivElement>; openSync?: number }) {
-  const { db, commit, resetLocal, sync, prefs } = useApp()
+  const { db, commit, resetLocal, sync, prefs, me } = useApp()
   const [open, setOpen] = useState(loadOpen)
   const flip = (k: Section) => setOpen((o) => { const n = { ...o, [k]: !o[k] }; try { localStorage.setItem(OPEN_KEY, JSON.stringify(n)) } catch { /* noop */ } return n })
   useEffect(() => { if (openSync > 0) setOpen((o) => (o.sync ? o : { ...o, sync: true })) }, [openSync])
@@ -87,6 +90,13 @@ export function SettingsPage({ syncRef, openSync = 0 }: { syncRef: React.RefObje
           summary={prefs.systemNotif || prefs.pushEnabled ? t('Attive su questo dispositivo') : t('Disattivate (solo la campanella)')}>
           <NotificationsCard />
         </Accordion>
+
+        {walletAvailable() && (
+          <Accordion title={t('Apple Wallet')} icon={<Wallet size={20} />} open={!!open.wallet} onToggle={() => flip('wallet')}
+            summary={pendingCount(db, me?.id ?? null) > 0 ? t('{n} da approvare', { n: pendingCount(db, me?.id ?? null) }) : t('Importa i pagamenti Apple Pay')}>
+            <WalletCard />
+          </Accordion>
+        )}
 
         <button className="card flex w-full items-center gap-3 p-4 text-left" onClick={() => setSub('cats')}>
           <Tags className="text-brand" /><span className="flex-1"><span className="block font-bold">{t('Categorie e sottocategorie')}</span><span className="text-xs text-muted">{t('Aggiungi, modifica, nascondi o mostra')}</span></span><ChevronRight className="text-muted" />

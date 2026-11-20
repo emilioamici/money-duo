@@ -193,6 +193,8 @@ export function parseDb(input: unknown): Db {
     splitValues: numMap(x.splitValues),
     payments: parsePayments(x.payments),
     tags: strArr(x.tags),
+    ...(x.pending === 'approve' || x.pending === 'complete' ? { pending: x.pending } : {}),
+    ...(typeof x.walletCard === 'string' && x.walletCard ? { walletCard: x.walletCard } : {}),
     by: typeof x.by === 'string' ? x.by : null,
     createdAt: str(x.createdAt, EPOCH),
     updatedAt: str(x.updatedAt, EPOCH),

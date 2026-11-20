@@ -29,16 +29,16 @@ async function aesKey(env: Env): Promise<CryptoKey> {
   if (raw.length !== 32) throw new Error('SESSION_KEY deve essere di 32 byte')
   return crypto.subtle.importKey('raw', raw as BufferSource, 'AES-GCM', false, ['encrypt', 'decrypt'])
 }
-export async function seal(env: Env, s: Session): Promise<string> {
+export async function seal(env: Env, s: unknown): Promise<string> {
   const iv = crypto.getRandomValues(new Uint8Array(12))
   const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv as BufferSource }, await aesKey(env), enc.encode(JSON.stringify(s))))
   return `${b64u.enc(iv)}.${b64u.enc(ct)}`
 }
-export async function unseal(env: Env, v: string): Promise<Session | null> {
+export async function unseal<T = Session>(env: Env, v: string): Promise<T | null> {
   try {
     const [iv, ct] = v.split('.')
     const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64u.dec(iv) as BufferSource }, await aesKey(env), b64u.dec(ct) as BufferSource)
-    return JSON.parse(dec.decode(plain)) as Session
+    return JSON.parse(dec.decode(plain)) as T
   } catch { return null }
 }
 

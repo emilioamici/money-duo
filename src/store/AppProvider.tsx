@@ -6,6 +6,8 @@ import { nowIso } from '../lib/ids'
 import { diffNotifications, mergeNotifications, type Notif } from '../lib/notifications'
 import { engine, type SyncState } from '../sync/engine'
 import { PushHttpError, enablePush, pushConfigured, pushSupported, refreshPush, sendPush } from '../sync/push'
+import { ackWallet, pullWallet, walletAvailable, walletOn } from '../sync/wallet'
+import { importWallet } from '../lib/wallet'
 import { enqueue, flushQueue, type QueuedPush, type SendResult } from '../sync/pushQueue'
 import { cacheState, getCacheHealth, getLoadedCache, subscribeCacheHealth, writeCache } from './cache'
 import { t } from '../i18n'
@@ -73,6 +75,8 @@ interface AppCtx {
   setCenterOpen: (open: boolean) => void
   /** false = non riesco a salvare la copia locale */
   cacheOk: boolean
+  /** prende da Wallet le spese in attesa e le aggiunge (da approvare); ritorna quante ne ha importate */
+  importWalletNow: () => Promise<number>
 }
 
 const NOTIF_PREFIX = 'moneyduo:notifs:'
@@ -148,6 +152,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const meIdRef = useRef<string | null>(null)
   const meRef = useRef<Member | null>(null)
   const onRemote = useRef<(prev: Db, next: Db) => void>(() => undefined)
+  const walletPullRef = useRef<(force?: boolean) => Promise<number>>(async () => 0)
 
   const apply = useCallback((fn: (prev: Db) => Db, dirty: boolean, source?: 'remote') => {
     const prev = dbRef.current
@@ -164,13 +169,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const attached = useRef(false)
   if (!attached.current) {
     attached.current = true
-    engine.attach({ getDb: () => dbRef.current, applyDb: apply, afterSync: () => void flushPush(() => dbRef.current) })
+    engine.attach({ getDb: () => dbRef.current, applyDb: apply, afterSync: () => { void flushPush(() => dbRef.current); void walletPullRef.current(false) } })
   }
 
   const commit = useCallback((fn: (d: Db) => Db) => apply((prev) => { const n = fn(prev); return n === prev ? prev : { ...n, meta: { ...n.meta, updatedAt: nowIso() } } }, true), [apply])
   const resetLocal = useCallback(() => { engine.unlink(); apply(() => createDefaultDb(), false) }, [apply])
 
   const sync = useSyncExternalStore(engine.subscribe, engine.getSnapshot)
+
+  // Apple Wallet: le spese pagate con Apple Pay aspettano sul server; qui si importano (al massimo ogni 2 minuti, subito se arriva una notifica)
+  const lastWalletPull = useRef(0)
+  const walletBusy = useRef(false)
+  walletPullRef.current = async (force = false) => {
+    const snap = engine.getSnapshot(), auth = engine.currentToken(), m = meRef.current
+    if (!snap.fileId || !auth || !m || !walletAvailable() || !walletOn(snap.fileId) || walletBusy.current) return 0
+    if (!force && Date.now() - lastWalletPull.current < 120_000) return 0
+    walletBusy.current = true; lastWalletPull.current = Date.now()
+    try {
+      const r = await pullWallet(snap.fileId, auth)
+      if (!r.items.length) return 0
+      const before = dbRef.current.transactions.length
+      commit((d) => importWallet(d, m, r.items, prefsRef.current.lastAccountId, nowIso()))
+      await ackWallet(snap.fileId, auth, r.items.map((i) => i.id))
+      return dbRef.current.transactions.length - before
+    } catch { return 0 } finally { walletBusy.current = false }
+  }
+  const importWalletNow = useCallback(() => walletPullRef.current(true), [])
   const cacheOk = useSyncExternalStore(subscribeCacheHealth, getCacheHealth)
   // quando cambia la versione di Drive a cui corrisponde la copia, si aggiorna anche la copia
   const lastVersion = useRef<string | null>(sync.remoteVersion)
@@ -205,6 +229,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [db.members, sync.email])
   meIdRef.current = me?.id ?? null
   meRef.current = me
+  useEffect(() => {
+    if (!sync.signedIn || !sync.fileId || !me) return
+    void walletPullRef.current(false)
+    const onVisible = () => { if (document.visibilityState === 'visible') void walletPullRef.current(false) }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [sync.signedIn, sync.fileId, me])
   const nameOf = useCallback((id: string | null) => (id ? db.members.find((m) => m.id === id)?.name ?? t('Ex membro') : t('Conto condiviso')), [db.members])
 
   // push: a ogni apertura si rinnova l'iscrizione; un messaggio dal service worker (app in primo piano) fa sincronizzare subito
@@ -226,7 +257,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [prefs.systemNotif, prefs.pushEnabled, sync.fileId, sync.signedIn, setPrefs])
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return
-    const onMsg = (e: MessageEvent) => { if (e.data?.type === 'moneyduo-push') void engine.syncNow() }
+    const onMsg = (e: MessageEvent) => { if (e.data?.type === 'moneyduo-push') { void engine.syncNow(); void walletPullRef.current(true) } }
     navigator.serviceWorker.addEventListener('message', onMsg)
     return () => navigator.serviceWorker.removeEventListener('message', onMsg)
   }, [])
@@ -263,8 +294,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const unread = useMemo(() => notifications.filter((n) => !n.read).length, [notifications])
 
   const value = useMemo<AppCtx>(
-    () => ({ db, commit, resetLocal, sync, view, setView, txForm, openTx, openSplit, closeTx, prefs, setPrefs, me, members, nameOf, notifications, unread, markRead, markAllRead, clearNotifications, toast, dismissToast, centerOpen, setCenterOpen, cacheOk }),
-    [db, commit, resetLocal, sync, view, setView, txForm, openTx, openSplit, closeTx, prefs, setPrefs, me, members, nameOf, notifications, unread, markRead, markAllRead, clearNotifications, toast, dismissToast, centerOpen, cacheOk],
+    () => ({ db, commit, resetLocal, sync, view, setView, txForm, openTx, openSplit, closeTx, prefs, setPrefs, me, members, nameOf, notifications, unread, markRead, markAllRead, clearNotifications, toast, dismissToast, centerOpen, setCenterOpen, cacheOk, importWalletNow }),
+    [db, commit, resetLocal, sync, view, setView, txForm, openTx, openSplit, closeTx, prefs, setPrefs, me, members, nameOf, notifications, unread, markRead, markAllRead, clearNotifications, toast, dismissToast, centerOpen, cacheOk, importWalletNow],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
