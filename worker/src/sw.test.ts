@@ -46,7 +46,7 @@ describe('service worker: push', () => {
   it('messaggio non JSON o vuoto: notifica generica, nessun errore', async () => {
     const sw = loadSw([])
     await sw.push('solo testo', true)
-    expect(sw.shown[0].title).toBe('MoneyDuo')
+    expect(sw.shown[0].title).toBe('Money Duo')
     expect(sw.shown[0].opts.body).toBe('solo testo')
   })
   it('tocco sulla notifica: porta in primo piano l\'app, o la apre', async () => {

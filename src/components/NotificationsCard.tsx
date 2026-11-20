@@ -68,10 +68,10 @@ export function NotificationsCard() {
     setMsg(null); setBusy(true)
     try {
       if (prefs.pushEnabled && server && sync.fileId && me?.email) {
-        await sendPush(sync.fileId, needToken(), { recipients: [me.email], title: t('Notifica di prova'), body: t('Le notifiche di MoneyDuo funzionano.'), tag: 'moneyduo-push-test', test: true })
+        await sendPush(sync.fileId, needToken(), { recipients: [me.email], title: t('Notifica di prova'), body: t('Le notifiche di Money Duo funzionano.'), tag: 'moneyduo-push-test', test: true })
         setMsg({ text: t('Prova inviata dal server: dovrebbe arrivare tra pochi secondi (con l\'app in background).') })
       } else {
-        const opts: NotificationOptions = { body: t('Le notifiche di MoneyDuo funzionano su questo dispositivo.'), icon: './icon-192.png', tag: 'moneyduo-test' }
+        const opts: NotificationOptions = { body: t('Le notifiche di Money Duo funzionano su questo dispositivo.'), icon: './icon-192.png', tag: 'moneyduo-test' }
         const reg = await navigator.serviceWorker?.getRegistration()
         if (reg) await reg.showNotification(t('Notifica di prova'), opts)
         else new Notification(t('Notifica di prova'), opts)

@@ -68,7 +68,7 @@ export function Gate({ reconnect = false }: { reconnect?: boolean }) {
     <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-5 py-10">
       <div className="mb-8 text-center">
         <MascotImg kind="pair" className="mx-auto mb-3 w-44" />
-        <h1 className="text-3xl font-extrabold tracking-tight">Money<span className="text-brand">Duo</span></h1>
+        <h1 className="text-3xl font-extrabold tracking-tight">Money <span className="text-brand">Duo</span></h1>
         <p className="mt-2 text-sm text-muted">{t('Spese personali e conti di famiglia, nel tuo Google Drive.')}</p>
       </div>
 

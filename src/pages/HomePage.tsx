@@ -23,7 +23,7 @@ export function HomePage({ onOpenSync }: { onOpenSync: () => void }) {
     <div>
       <div className="sticky top-0 z-10 space-y-3 bg-bg/90 px-4 pb-3 pt-safe backdrop-blur">
         <div className="flex items-center justify-between pt-3">
-          <h1 className="flex items-center gap-2 text-xl font-extrabold tracking-tight"><img src="./icon-192.png" alt="" className="h-9 w-9 rounded-xl" /><span className="sr-only sm:not-sr-only">Money<span className="text-brand">Duo</span></span></h1>
+          <h1 className="flex items-center gap-2 text-xl font-extrabold tracking-tight"><img src="./icon-192.png" alt="" className="h-9 w-9 rounded-xl" /><span className="sr-only sm:not-sr-only">Money <span className="text-brand">Duo</span></span></h1>
           <div className="flex items-center gap-2">
             <SyncChip onClick={onOpenSync} />
             <NotificationBell />
