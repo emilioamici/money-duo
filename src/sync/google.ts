@@ -1,7 +1,11 @@
 import { t } from '../i18n'
+import { pickerConfigured } from './picker'
 /** Google Identity Services (token model). Il token vive in memoria + sessionStorage (scade dopo ~1h). */
 
-export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive'
+export const DRIVE_FULL_SCOPE = 'https://www.googleapis.com/auth/drive'
+export const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file'
+/** Con il selettore di Google configurato l'app chiede solo `drive.file` (i file che ha creato o che scegli tu); altrimenti tutto Drive, come prima. */
+export const driveScope = (): string => (pickerConfigured() ? DRIVE_FILE_SCOPE : DRIVE_FULL_SCOPE)
 
 export class GoogleAuthError extends Error {}
 
@@ -68,7 +72,7 @@ export async function requestToken(clientId: string, opts: { prompt?: Prompt; hi
   return new Promise<string>((resolve, reject) => {
     const client = window.google.accounts.oauth2.initTokenClient({
       client_id: clientId,
-      scope: DRIVE_SCOPE,
+      scope: driveScope(),
       prompt: opts.prompt ?? '',
       hint: opts.hint || undefined,
       callback: (r: any) => {

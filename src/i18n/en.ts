@@ -1,5 +1,13 @@
 /** Traduzioni in inglese. La chiave è il testo italiano usato nel codice con `t('…')`; i segnaposto {nome} e i <b>…</b> devono coincidere. */
 export const EN: Record<string, string> = {
+  "Impossibile caricare il selettore di Google (sei offline?).": "Could not load the Google picker (are you offline?).",
+  "Selettore di Google non configurato.": "Google picker is not configured.",
+  "Scegli il database di famiglia": "Choose the family database",
+  "Non riesco ad aprire il database: scegli di nuovo il file con il selettore di Google (dalle Impostazioni → Sincronizzazione). Se non lo vedi, forse sei stato rimosso dalla famiglia o il file è stato spostato.": "I cannot open the database: choose the file again with the Google picker (from Settings → Sync). If you cannot see it, you may have been removed from the family or the file may have been moved.",
+  "Hai ricevuto un invito?": "Did you receive an invitation?",
+  "Il capofamiglia ha condiviso il database con te: scegli quel file su Drive (lo trovi in «Condivisi con me»). Lo si fa una volta sola.": "The head of the family shared the database with you: choose that file on Drive (you will find it under “Shared with me”). You only do this once.",
+  "Hai scelto un file diverso da quello collegato: scegli «{name}».": "You chose a different file from the connected one: choose “{name}”.",
+  "Scegli di nuovo il database": "Choose the database again",
   "1 filtro attivo": "1 active filter",
   "{n} filtri attivi": "{n} active filters",
   "(ha pagato)": "(paid)",

@@ -9,6 +9,7 @@ import { linkDatabase } from './linkFlow'
 import { FolderPicker, type PickedFolder } from './FolderPicker'
 import { t } from '../i18n'
 import { tb } from '../i18n/rich'
+import { pickerConfigured } from '../sync/picker'
 
 type Phase = 'login' | 'searching' | 'choose' | 'none'
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e))
@@ -59,6 +60,8 @@ export function Gate({ reconnect = false }: { reconnect?: boolean }) {
   useEffect(() => { if (!myName && sync.name) setMyName(sync.name) }, [sync.name]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const login = (selectAccount = false) => guard(async () => { started.current = false; await engine.signIn({ selectAccount }) })
+  const pickFolderNow = () => guard(async () => { const f = await engine.pickFolder(); if (f) setFolder(f) })
+  const pickDatabaseNow = () => guard(async () => { const f = await engine.pickDatabase(); if (f) await connect(f.id) })
   const create = () => guard(() => engine.createFamily({ familyName, memberName: myName || sync.email || '', folderId: folder.id === 'root' ? null : folder.id }))
 
   return (
@@ -121,13 +124,21 @@ export function Gate({ reconnect = false }: { reconnect?: boolean }) {
               <p className="text-xs text-muted">{t('Il database sarà un file nel tuo Drive: tu sei il capofamiglia e inviti gli altri membri dalle Impostazioni.')}</p>
               <input className="input" placeholder={t('Nome della famiglia')} value={familyName} onChange={(e) => setFamilyName(e.target.value)} />
               <input className="input" placeholder={t('Il tuo nome')} value={myName} onChange={(e) => setMyName(e.target.value)} />
-              <button type="button" className="flex w-full items-center gap-3 rounded-xl border border-line px-3 py-2.5 text-left text-sm hover:bg-line/40" onClick={() => setPicking(true)}>
+              <button type="button" className="flex w-full items-center gap-3 rounded-xl border border-line px-3 py-2.5 text-left text-sm hover:bg-line/40" onClick={() => (pickerConfigured() ? void pickFolderNow() : setPicking(true))}>
                 <Folder size={18} className="shrink-0 text-brand" />
                 <span className="min-w-0 flex-1"><span className="block text-xs text-muted">{t('Cartella del database')}</span><span className="block truncate font-semibold">{folder.id === 'root' ? t('Il mio Drive') : folder.name}</span></span>
                 <span className="text-xs font-semibold text-brand">{t('Cambia')}</span>
               </button>
               <button className="btn-primary w-full" disabled={busy || !familyName.trim()} onClick={() => void create()}>{busy ? <Loader2 size={18} className="animate-spin" /> : <Users size={18} />}{t('Crea famiglia')}</button>
             </div>
+
+            {pickerConfigured() && (
+              <div className="space-y-2 rounded-2xl border border-line p-3">
+                <p className="flex items-center gap-2 text-sm font-semibold"><Folder size={16} className="text-brand" />{t('Hai ricevuto un invito?')}</p>
+                <p className="text-xs text-muted">{t('Il capofamiglia ha condiviso il database con te: scegli quel file su Drive (lo trovi in «Condivisi con me»). Lo si fa una volta sola.')}</p>
+                <button className="btn-primary w-full" disabled={busy} onClick={() => void pickDatabaseNow()}>{busy ? <Loader2 size={18} className="animate-spin" /> : <Folder size={18} />}{t('Scegli il database di famiglia')}</button>
+              </div>
+            )}
 
             <div className="rounded-xl bg-brand/10 p-3 text-sm text-muted">
               {tb('Aspetti un invito? Chiedi al capofamiglia di aggiungere <b>{email}</b> tra i membri, poi', { email: sync.email ?? t('questa email') })}
@@ -140,13 +151,13 @@ export function Gate({ reconnect = false }: { reconnect?: boolean }) {
                 <div className="mt-2"><FileList files={others} busy={busy} onPick={(id) => void guard(() => connect(id))} /></div>
               </details>
             )}
-            <details className="text-sm">
+            {!pickerConfigured() && <details className="text-sm">
               <summary className="cursor-pointer text-muted">{t('Ho il link o l\'ID del file')}</summary>
               <div className="mt-2 flex gap-2">
                 <input className="input" placeholder={t('Link o ID del file Drive')} value={link} onChange={(e) => setLink(e.target.value)} />
                 <button className="btn-primary" disabled={busy || !parseFileId(link)} onClick={() => void guard(() => connect(parseFileId(link)!))}>{t('Collega')}</button>
               </div>
-            </details>
+            </details>}
           </>
         )}
 

@@ -124,3 +124,6 @@ npm test                      # include i test del server (cifratura RFC 8291, V
 node worker/scripts/generate-vapid.mjs
 ```
 Il Worker usa solo API standard (WebCrypto, fetch): gira anche in Node 20+. È stato provato anche sul runtime Cloudflare in locale (`wrangler dev`).
+
+## Permesso ristretto
+Con il permesso ristretto `drive.file` l'app chiama `/auth/start?scope=file`: il token di rinnovo copre solo i file dell'app. Ripubblica il Worker e riattiva l'accesso persistente sui dispositivi.

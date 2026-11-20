@@ -3,6 +3,7 @@ import { Cloud, CloudOff, LogOut, RefreshCw, ShieldCheck, Unplug, UserRound } fr
 import { useApp } from '../store/AppProvider'
 import { engine } from '../sync/engine'
 import { brokerAvailable } from '../sync/auth'
+import { pickerConfigured } from '../sync/picker'
 import { dateTimeLabel } from '../lib/format'
 import { ask } from './dialogs'
 import { t } from '../i18n'
@@ -44,6 +45,14 @@ export function SyncCard() {
       ) : null}
       {!cacheOk && <p className="mb-3 rounded-xl bg-amber-500/15 p-3 text-sm text-amber-700 dark:text-amber-300">{t('Non riesco a salvare una copia dei dati su questo dispositivo (spazio del browser esaurito o archiviazione bloccata). L\'app funziona, ma a ogni apertura deve riscaricare tutto da Drive e serve la connessione.')}</p>}
       {(sync.error || err) && <p className="mb-3 rounded-xl bg-exp/10 p-3 text-sm text-exp">{err || sync.error}</p>}
+      {pickerConfigured() && sync.status === 'error' && sync.fileId && (
+        <button className="btn-soft mb-3 w-full" disabled={busy} onClick={() => run(async () => {
+          const f = await engine.pickDatabase()
+          if (!f) return
+          if (f.id !== sync.fileId) throw new Error(t('Hai scelto un file diverso da quello collegato: scegli «{name}».', { name: sync.fileName ?? '' }))
+          await engine.syncNow()
+        })}><Cloud size={18} />{t('Scegli di nuovo il database')}</button>
+      )}
       {!sync.signedIn ? (
         <button className="btn-primary w-full" disabled={busy} onClick={() => run(() => engine.signIn())}>{t('Riconnetti Google Drive')}</button>
       ) : (
