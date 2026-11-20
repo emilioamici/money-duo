@@ -28,7 +28,7 @@ export function CategoriesPage({ onBack }: { onBack: () => void }) {
   return (
     <div>
       <div className="flex items-center gap-2 px-4 pb-3 pt-safe">
-        <button className="mt-3 rounded-full p-2 hover:bg-line/60" onClick={onBack} aria-label={t('Indietro')}><ArrowLeft /></button>
+        <button className="icon-btn mt-3" onClick={onBack} aria-label={t('Indietro')}><ArrowLeft /></button>
         <h1 className="pt-3 text-xl font-extrabold tracking-tight">{t('Categorie')}</h1>
       </div>
       <div className="space-y-3 px-4">
