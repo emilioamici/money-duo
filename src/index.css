@@ -90,6 +90,12 @@ body {
   touch-action: pan-y pinch-zoom;
 }
 input, textarea { -webkit-touch-callout: default; }
+/* iPhone: un campo con testo sotto i 16 px fa ingrandire la pagina quando lo tocchi, e poi la lascia spostata di lato.
+   Sui dispositivi touch i campi restano a 16 px (sembra uguale), così non c'è più né zoom né scorrimento laterale. */
+@media (pointer: coarse) {
+  input, textarea, select { font-size: 16px !important; }
+}
+html { overflow-x: clip; }
 button { @apply select-none; }
 
 @layer components {
