@@ -148,6 +148,7 @@ export function parseDb(input: unknown): Db {
     active: x.active !== false,
     joinedAt: typeof x.joinedAt === 'string' ? x.joinedAt : null,
     paypal: typeof x.paypal === 'string' && x.paypal ? x.paypal : null,
+    ...(Array.isArray(x.walletCards) ? { walletCards: x.walletCards.filter((c): c is Obj => isObj(c) && typeof c.name === 'string' && !!c.name).map((c) => ({ name: c.name as string, accountId: typeof c.accountId === 'string' ? c.accountId : null })) } : {}),
     updatedAt: str(x.updatedAt, EPOCH),
   }))
 

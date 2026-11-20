@@ -16,12 +16,13 @@ export default {
         inc: token('inc'),
         exp: token('exp'),
         trf: token('trf'),
+        warn: token('warn'),
       },
       fontFamily: {
         sans: ['ui-rounded', 'SF Pro Rounded', 'Nunito', 'Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
       },
       keyframes: {
-        sheet: { from: { transform: 'translateY(24px)', opacity: '0' }, to: { transform: 'none', opacity: '1' } },
+        sheet: { from: { transform: 'translateY(48px)', opacity: '0' }, to: { transform: 'none', opacity: '1' } },
         fade: { from: { opacity: '0' }, to: { opacity: '1' } },
         float1: { '0%,100%': { transform: 'translate(0,0) scale(1)' }, '50%': { transform: 'translate(30px,40px) scale(1.15)' } },
         float2: { '0%,100%': { transform: 'translate(0,0) scale(1)' }, '50%': { transform: 'translate(-40px,30px) scale(1.1)' } },

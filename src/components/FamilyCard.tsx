@@ -87,9 +87,9 @@ export function FamilyCard() {
                   readOnly={!canManage && m.id !== me?.id} onChange={(e) => commit((d) => saveMember(d, { ...m, name: e.target.value }))} />
                 <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted">
                   <span className="truncate">{m.email ?? t('account non associato')}</span>
-                  {isOwner && <span className="flex items-center gap-0.5 font-semibold text-amber-600"><Crown size={12} />{t('Capofamiglia')}</span>}
+                  {isOwner && <span className="flex items-center gap-0.5 font-semibold text-warn"><Crown size={12} />{t('Capofamiglia')}</span>}
                   {m.id === me?.id && <span className="font-semibold text-brand">{t('Tu')}</span>}
-                  {!m.joinedAt && m.email && <span className="rounded-full bg-amber-500/15 px-1.5 text-amber-600">{t('Invitato')}</span>}
+                  {!m.joinedAt && m.email && <span className="rounded-full bg-warn/15 px-1.5 text-warn">{t('Invitato')}</span>}
                   {m.paypal && <span className="font-semibold text-trf">{t('PayPal ✓')}</span>}
                 </p>
               </div>

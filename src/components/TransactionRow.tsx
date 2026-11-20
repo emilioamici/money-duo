@@ -40,7 +40,7 @@ export function TransactionRow({ tx }: { tx: Transaction }) {
   const color = tx.type === 'income' ? 'text-inc' : tx.type === 'expense' ? 'text-exp' : 'text-trf'
 
   return (
-    <SwipeRow testId="tx-row" onTap={() => openTx({ tx })} buttonClass={`flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-line/30 active:bg-line/50 ${tx.pending ? 'bg-amber-500/10' : ''}`}
+    <SwipeRow testId="tx-row" onTap={() => openTx({ tx })} buttonClass={`flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-line/30 active:bg-line/50 ${tx.pending ? 'bg-warn/10' : ''}`}
       actions={[
         ...(tx.pending ? [{ label: 'Approva', icon: <Check size={18} />, className: 'bg-inc', onClick: () => commit((d) => approveTransaction(d, tx.id, nowIso())) }] : []),
         { label: 'Modifica', icon: <Pencil size={18} />, className: 'bg-brand', onClick: () => openTx({ tx }) },
@@ -52,12 +52,12 @@ export function TransactionRow({ tx }: { tx: Transaction }) {
         : <CatBubble icon={cat?.icon ?? '❔'} color={cat?.color ?? '#94a3b8'} />}
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1 font-semibold">
-          {tx.pending && <AlertTriangle size={15} className="shrink-0 text-amber-500" aria-label={t(tx.pending === 'complete' ? 'Da completare' : 'Da approvare')} />}
+          {tx.pending && <AlertTriangle size={15} className="shrink-0 text-warn" aria-label={t(tx.pending === 'complete' ? 'Da completare' : 'Da approvare')} />}
           <span className="truncate">{title}</span>
         </span>
         <span className="block truncate text-xs text-muted">{timeLabel(tx.date)} · {sub}</span>
         <span className="mt-0.5 flex flex-wrap gap-1">
-          {tx.pending && <span data-testid="pending-chip" className="inline-block rounded-lg bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold leading-tight text-amber-700 dark:text-amber-300">{t(tx.pending === 'complete' ? 'Da completare' : 'Da approvare')}</span>}
+          {tx.pending && <span data-testid="pending-chip" className="inline-block rounded-lg bg-warn/20 px-2 py-0.5 text-[11px] font-bold leading-tight text-warn">{t(tx.pending === 'complete' ? 'Da completare' : 'Da approvare')}</span>}
           {badge && <span className="inline-block rounded-lg bg-brand/10 px-2 py-0.5 text-[10px] font-semibold leading-tight text-brand">{badge}</span>}
           {(tx.tags ?? []).map((g) => <span key={g} className="inline-block rounded-full bg-line/70 px-2 py-0.5 text-[10px] font-medium text-muted">#{g}</span>)}
         </span>

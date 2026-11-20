@@ -66,7 +66,7 @@ export function SettingsPage({ syncRef, openSync = 0 }: { syncRef: React.RefObje
 
   return (
     <div>
-      <div className="px-4 pb-3 pt-safe"><div className="flex items-center justify-between pt-3"><h1 className="text-xl font-extrabold tracking-tight">{t('Impostazioni')}</h1><NotificationBell /></div></div>
+      <div className="px-4 pb-3 pt-safe"><div className="flex items-center justify-between pt-3"><h1 className="text-3xl font-extrabold tracking-tight">{t('Impostazioni')}</h1><NotificationBell /></div></div>
       <div className="space-y-3 px-4">
         <MascotPeek kind="pair">
           <Accordion title={t('Aspetto')} icon={<Palette size={20} />} open={!!open.look} onToggle={() => flip('look')} summary={`${t(THEME_NAME[getTheme()])} · ${LANG_SHORT[getLangPref()]}`}>

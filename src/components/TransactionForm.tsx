@@ -104,9 +104,9 @@ export function TransactionForm({ state, onClose }: { state: TxFormState; onClos
         </div>
       }>
       {tx?.pending && (
-        <p className="mb-3 flex gap-2 rounded-xl bg-amber-500/15 p-3 text-sm text-amber-700 dark:text-amber-300" data-testid="pending-banner">
+        <p className="mb-3 flex gap-2 rounded-xl bg-warn/15 p-3 text-sm text-warn" data-testid="pending-banner">
           <AlertTriangle size={18} className="mt-0.5 shrink-0" />
-          {tx.pending === 'complete' ? t('Importata da Apple Wallet: non ho riconosciuto il conto. Scegli quello giusto, aggiungi la categoria e salva.') : t('Importata da Apple Wallet: controlla i dati, scegli la categoria e salva per approvarla.')}
+          {tx.pending === 'complete' ? t('Importata da Apple Wallet: la carta non è ancora associata a un conto. Scegli il conto e la categoria e salva (oppure associa la carta da Impostazioni → Apple Wallet).') : t('Importata da Apple Wallet: controlla i dati, scegli la categoria e salva per approvarla.')}
         </p>
       )}
       <Segmented<TxType> value={type} onChange={changeType} options={[
