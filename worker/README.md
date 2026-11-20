@@ -111,7 +111,7 @@ Con lo stesso Worker le spese pagate con **Apple Pay** possono arrivare da sole 
 
 - iOS non permette alle app di leggere Wallet, ma l'automazione **«Transazione»** dell'app Comandi parte a ogni pagamento e può chiamare un indirizzo. L'app genera per ogni persona un indirizzo personale `…/wallet/in/<token>` (il server conserva solo l'hash del token).
 - Il Comando Rapido invia importo, commerciante e carta. Il Worker mette la spesa in una casella (KV, `wi:…`), **cifrata** con `SESSION_KEY` se è impostata e **cancellata dopo 30 giorni**, e manda una notifica push ai dispositivi dell'utente.
-- L'app, quando si sincronizza (o riceve la notifica), scarica la casella, crea le transazioni sul conto riconosciuto dal nome della carta e le segna **«Da approvare»** (conto non riconosciuto: **«Da completare»**), poi conferma e il server le cancella.
+- L'app, quando si sincronizza (o riceve la notifica), scarica la casella, crea le transazioni sul conto associato alla carta e le segna **«Da approvare»**; la prima volta la carta entra nell'elenco *«Le tue carte»* (Impostazioni → Apple Wallet) come *da associare* e la spesa è **«Da completare»**: scegliendo il conto, le spese di quella carta passano lì e quelle future vanno direttamente sul conto, poi conferma e il server le cancella.
 - Usa `KV.list` (limite del piano gratuito: 1000 al giorno): l'app interroga il server al massimo ogni 2 minuti e solo sui dispositivi dove la funzione è attiva.
 
 

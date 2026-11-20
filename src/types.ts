@@ -25,7 +25,18 @@ export interface Member {
   joinedAt: string | null
   /** nome utente PayPal.Me (es. «mario.rossi»): gli altri membri lo usano per rimborsarlo; assente = non collegato */
   paypal?: string | null
+  /**
+   * Carte di Apple Wallet usate da questa persona e conto a cui sono associate (null = ancora da associare).
+   * Le carte si aggiungono da sole al primo pagamento; l'associazione la sceglie la persona in Impostazioni → Apple Wallet.
+   */
+  walletCards?: WalletCard[]
   updatedAt: string
+}
+
+export interface WalletCard {
+  /** nome della carta come lo comunica Wallet */
+  name: string
+  accountId: string | null
 }
 
 export interface Account {

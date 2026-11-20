@@ -1,9 +1,12 @@
 import { useState } from 'react'
-import { Copy, Download, RefreshCw, Wallet, XCircle } from 'lucide-react'
+import { CreditCard, Copy, Download, RefreshCw, Trash2, Wallet, XCircle } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
 import { engine } from '../sync/engine'
 import { createToken, ingestUrl, revokeWallet, savedToken, saveToken, setWalletOn, walletAvailable, walletOn } from '../sync/wallet'
 import { ask } from './dialogs'
+import { accountMemberIds, sortedAccounts } from '../lib/calc'
+import { nowIso } from '../lib/ids'
+import { cardsOf, removeCard, setCardAccount } from '../lib/wallet'
 import { t } from '../i18n'
 
 /**
@@ -62,6 +65,7 @@ export function WalletCard() {
               <button className="btn-soft mt-2 w-full" onClick={() => void copy()}><Copy size={16} />{t('Copia indirizzo')}</button>
             </div>
           )}
+          <CardList />
           <div className="grid grid-cols-2 gap-2">
             <button className="btn-soft" disabled={busy} onClick={() => void importNow()}><Download size={16} />{t('Importa ora')}</button>
             <button className="btn-soft" disabled={busy} onClick={() => void activate(true)}><RefreshCw size={16} />{t('Nuovo indirizzo')}</button>
@@ -77,10 +81,46 @@ export function WalletCard() {
           <li>{t('Scegli le carte da collegare e seleziona «Esegui immediatamente» (così non chiede conferma a ogni pagamento).')}</li>
           <li>{t('Aggiungi l\'azione «Ottieni contenuti dell\'URL» e incolla il tuo indirizzo.')}</li>
           <li>{t('Metodo: POST. Corpo della richiesta: JSON, con tre campi di testo: amount = «Importo», merchant = «Commerciante», card = «Carta o tessera» (si scelgono dalle variabili dell\'automazione).')}</li>
-          <li>{t('Fatto: al prossimo pagamento con Apple Pay, la spesa compare qui. Perché il conto sia riconosciuto da solo, il suo nome deve contenere quello della carta (es. «Visa Emilio»).')}</li>
+          <li>{t('Fatto: al prossimo pagamento con Apple Pay la spesa compare in Transazioni e la carta compare nell\'elenco «Le tue carte»: scegli a quale conto associarla, e da lì in poi i pagamenti di quella carta vanno direttamente su quel conto.')}</li>
         </ol>
         <p className="mt-2 text-xs text-muted">{t('Funziona solo con i pagamenti Apple Pay su iPhone, non con la carta fisica. Le spese restano sul server cifrate fino all\'importazione (al massimo 30 giorni).')}</p>
       </details>
+    </div>
+  )
+}
+
+/** Le carte di Wallet usate finora: ognuna si associa a un conto (le nuove compaiono qui «da associare» al primo pagamento). */
+function CardList() {
+  const { db, commit, me } = useApp()
+  if (!me) return null
+  const cards = cardsOf(db, me.id)
+  const accounts = sortedAccounts(db).filter((a) => !a.hidden && accountMemberIds(db, a).includes(me.id))
+  const unlinked = cards.filter((c) => !c.accountId || !accounts.some((a) => a.id === c.accountId)).length
+  return (
+    <div data-testid="wallet-cards" className="rounded-xl bg-bg p-3">
+      <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-muted"><CreditCard size={14} />{t('Le tue carte')}{unlinked > 0 && <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-300">{t('{n} da associare', { n: unlinked })}</span>}</p>
+      {cards.length === 0 ? (
+        <p className="text-muted">{t('Nessuna carta ancora: compare qui al primo pagamento con Apple Pay, e poi scegli a quale conto va associata.')}</p>
+      ) : (
+        <ul className="space-y-2">
+          {cards.map((c) => {
+            const linked = !!c.accountId && accounts.some((a) => a.id === c.accountId)
+            return (
+              <li key={c.name} data-testid="wallet-card" className="flex items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold">{c.name}</p>
+                  <select aria-label={t('Conto per la carta {name}', { name: c.name })} value={linked ? c.accountId! : ''} className="input mt-1 !py-1.5 text-sm"
+                    onChange={(e) => commit((d) => setCardAccount(d, me.id, c.name, e.target.value || null, nowIso()))}>
+                    <option value="">{t('Da associare')}</option>
+                    {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  </select>
+                </div>
+                <button className="icon-btn text-muted" aria-label={t('Rimuovi la carta {name}', { name: c.name })} onClick={() => commit((d) => removeCard(d, me.id, c.name, nowIso()))}><Trash2 size={16} /></button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
     </div>
   )
 }

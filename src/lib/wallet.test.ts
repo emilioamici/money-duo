@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createDefaultDb } from './defaults'
-import { approveTransaction, importWallet, matchAccount, pendingCount, walletTxId, type WalletItem } from './wallet'
+import { approveTransaction, cardAccount, cardsOf, importWallet, pendingCount, removeCard, setCardAccount, walletTxId, type WalletItem } from './wallet'
 import { deleteTransaction, saveAccount } from './mutations'
 import { parseDb } from './merge'
 import type { Account, Db, Member } from '../types'
@@ -18,32 +18,49 @@ const base = (): Db => {
 }
 const item = (over: Partial<WalletItem> = {}): WalletItem => ({ id: 'x1', amount: 1250, merchant: 'Esselunga', card: 'Visa Emilio', at: NOW, ...over })
 
-describe('Apple Wallet: abbinamento del conto', () => {
-  it('nome uguale o contenuto, ignorando maiuscole e accenti', () => {
-    const db = base()
-    expect(matchAccount(db, 'a', 'visa emilio')?.id).toBe('visa')
-    expect(matchAccount(db, 'a', 'Visa')?.id).toBe('visa')
-    expect(matchAccount(db, 'a', 'Cassa')?.id).toBe('casa')
+describe('Apple Wallet: associazione carta → conto', () => {
+  it('senza associazione nessun conto, anche se il nome somiglia', () => {
+    expect(cardAccount(base(), 'a', 'Visa Emilio')).toBeNull()
   })
-  it('non usa i conti degli altri né quelli nascosti, e non abbina nomi troppo corti', () => {
-    const db = base()
-    expect(matchAccount(db, 'a', 'Visa Sara')?.id).not.toBe('sara')
-    expect(matchAccount(db, 'a', 'XY')).toBeNull()
-    expect(matchAccount(saveAccount(db, { ...db.accounts[0], hidden: true }), 'a', 'Visa Emilio')).toBeNull()
+  it('con l\'associazione: nome della carta senza badare a maiuscole e punteggiatura', () => {
+    const db = setCardAccount(base(), 'a', 'Visa •••• 1234', 'visa', NOW)
+    expect(cardAccount(db, 'a', 'VISA 1234')?.id).toBe('visa')
+    expect(cardAccount(db, 'b', 'Visa 1234')).toBeNull() // l'associazione è di chi l'ha fatta
+  })
+  it('non usa conti degli altri né nascosti', () => {
+    const db = setCardAccount(base(), 'a', 'Visa 1', 'sara', NOW)
+    expect(cardAccount(db, 'a', 'Visa 1')).toBeNull()
+    const db2 = setCardAccount(base(), 'a', 'Visa 1', 'visa', NOW)
+    expect(cardAccount(saveAccount(db2, { ...db2.accounts[0], hidden: true }), 'a', 'Visa 1')).toBeNull()
   })
 })
 
 describe('Apple Wallet: importazione', () => {
-  it('crea un\'uscita senza categoria, da approvare, sul conto riconosciuto', () => {
-    const db = importWallet(base(), emilio, [item()], undefined, NOW)
+  it('crea un\'uscita senza categoria, da approvare, sul conto associato alla carta', () => {
+    const db = importWallet(setCardAccount(base(), 'a', 'Visa Emilio', 'visa', NOW), emilio, [item()], undefined, NOW)
     const x = db.transactions[0]
     expect(x).toMatchObject({ id: walletTxId(item()), type: 'expense', amount: 1250, accountId: 'visa', categoryId: null, title: 'Esselunga', pending: 'approve', paidBy: 'a', participants: [], by: 'a' })
     expect(pendingCount(db, 'a')).toBe(1)
   })
-  it('conto non riconosciuto: usa quello personale e segna «da completare» con la carta nelle note', () => {
-    const db = importWallet(base(), emilio, [item({ card: 'Revolut' })], undefined, NOW)
-    expect(db.transactions[0]).toMatchObject({ accountId: 'visa', pending: 'complete', walletCard: 'Revolut' })
-    expect(db.transactions[0].note).toContain('Revolut')
+  it('prima volta: la carta entra nell\'elenco «da associare» e la spesa è «da completare» sul conto personale', () => {
+    const db = importWallet(base(), emilio, [item(), item({ id: 'x2' })], undefined, NOW)
+    expect(db.transactions[0]).toMatchObject({ accountId: 'visa', pending: 'complete', walletCard: 'Visa Emilio' })
+    expect(db.transactions[0].note).toContain('Visa Emilio')
+    expect(cardsOf(db, 'a')).toEqual([{ name: 'Visa Emilio', accountId: null }]) // una sola volta, anche con due spese
+  })
+  it('associando la carta, le spese «da completare» passano al conto scelto e diventano «da approvare»', () => {
+    let db = importWallet(base(), emilio, [item()], undefined, NOW)
+    db = setCardAccount(db, 'a', 'visa emilio', 'casa', NOW)
+    expect(db.transactions[0]).toMatchObject({ accountId: 'casa', pending: 'approve', paidBy: null, note: '' })
+    expect(cardsOf(db, 'a')).toEqual([{ name: 'Visa Emilio', accountId: 'casa' }])
+    // le spese successive vanno direttamente lì
+    expect(importWallet(db, emilio, [item({ id: 'x9' })], undefined, NOW).transactions[1]).toMatchObject({ accountId: 'casa', pending: 'approve' })
+  })
+  it('togliere la carta la rimette «da associare» alla spesa successiva', () => {
+    let db = setCardAccount(base(), 'a', 'Visa Emilio', 'visa', NOW)
+    db = removeCard(db, 'a', 'Visa Emilio', NOW)
+    expect(cardsOf(db, 'a')).toEqual([])
+    expect(importWallet(db, emilio, [item()], undefined, NOW).transactions[0].pending).toBe('complete')
   })
   it('non duplica: stessa spesa due volte, né dopo averla eliminata', () => {
     let db = importWallet(base(), emilio, [item()], undefined, NOW)
@@ -60,6 +77,7 @@ describe('Apple Wallet: importazione', () => {
     const db = importWallet(base(), emilio, [item({ card: 'Revolut' })], undefined, NOW)
     const back = parseDb(JSON.parse(JSON.stringify(db)))
     expect(back.transactions[0]).toMatchObject({ pending: 'complete', walletCard: 'Revolut' })
+    expect(cardsOf(back, 'a')).toEqual([{ name: 'Revolut', accountId: null }])
     expect(parseDb(JSON.parse(JSON.stringify(approveTransaction(db, walletTxId(item({ card: 'Revolut' })), NOW)))).transactions[0].pending).toBeUndefined()
   })
 })
