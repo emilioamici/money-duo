@@ -311,7 +311,7 @@ export class SyncEngine {
   /** Invita un account Google: concede l'accesso in modifica al file (solo il capofamiglia). */
   async invite(email: string, familyName: string): Promise<void> {
     if (!this.p.fileId) return
-    await drive.shareFile(await this.token(), this.p.fileId, email.trim(), t('Ti invito nella famiglia «{name}» su MoneyDuo. Apri l\'app e accedi con questo account Google: il database ti verrà collegato in automatico.', { name: familyName }))
+    await drive.shareFile(await this.token(), this.p.fileId, email.trim(), t('Ti invito nella famiglia «{name}» su Money Duo. Apri l\'app e accedi con questo account Google: il database ti verrà collegato in automatico.', { name: familyName }))
   }
 
   /** Revoca l'accesso al file a un account. Ritorna false se non aveva permessi. */

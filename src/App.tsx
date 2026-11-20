@@ -32,12 +32,12 @@ function Shell() {
   const [syncReq, setSyncReq] = useState(0)
   const goSync = () => { setTab('settings'); setSyncReq((n) => n + 1); setTimeout(() => syncRef.current?.scrollIntoView({ behavior: 'smooth' }), 80) }
 
-  useEffect(() => { document.title = 'MoneyDuo' }, [])
+  useEffect(() => { document.title = 'Money Duo' }, [])
 
   return (
     <div className="mx-auto flex min-h-full max-w-5xl">
       <aside className="glass sticky top-0 m-3 hidden h-[calc(100dvh-1.5rem)] w-56 shrink-0 flex-col gap-1 rounded-[28px] p-4 md:flex">
-        <p className="mb-4 px-3 text-xl font-extrabold tracking-tight">Money<span className="text-brand">Duo</span></p>
+        <p className="mb-4 px-3 text-xl font-extrabold tracking-tight">Money <span className="text-brand">Duo</span></p>
         {TABS.map((tb) => (
           <button key={tb.id} onClick={() => setTab(tb.id)} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold ${tab === tb.id ? 'bg-brand/10 text-brand' : 'text-muted hover:bg-line/50'}`}><tb.icon size={20} />{t(tb.label)}</button>
         ))}
