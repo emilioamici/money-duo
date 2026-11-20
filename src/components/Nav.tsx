@@ -36,7 +36,7 @@ function PeriodPicker({ onClose }: { onClose: () => void }) {
   const pick = (patch: Partial<View>) => { setView(patch); onClose() }
   const now = new Date()
   return (
-    <div ref={ref} role="group" aria-label={t('Scegli il periodo')} className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-2xl border border-line bg-surface shadow-xl">
+    <div ref={ref} role="group" aria-label={t('Scegli il periodo')} className="absolute left-0 right-0 top-full z-30 mt-2 glass-strong overflow-hidden rounded-3xl">
       <div className="flex items-center justify-between bg-brand/15 px-4 py-2.5 text-sm font-semibold">
         <span>{t('Periodo')}</span>
         <span className="flex items-center gap-1">
@@ -86,7 +86,7 @@ export function SyncChip({ onClick }: { onClick: () => void }) {
     off: { icon: null, cls: '', label: '' },
   }[sync.status]
   return (
-    <button onClick={sync.status === 'auth' ? () => void engine.signIn().catch(() => undefined) : onClick} className={`flex items-center gap-1.5 rounded-full bg-surface px-3 py-1.5 text-xs font-semibold shadow-sm ${cfg.cls}`} aria-label={t('Stato sincronizzazione')}>
+    <button onClick={sync.status === 'auth' ? () => void engine.signIn().catch(() => undefined) : onClick} className={`flex items-center gap-1.5 glass rounded-full px-3 py-1.5 text-xs font-semibold ${cfg.cls}`} aria-label={t('Stato sincronizzazione')}>
       {cfg.icon}{cfg.label}
     </button>
   )
