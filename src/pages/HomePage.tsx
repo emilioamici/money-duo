@@ -21,17 +21,17 @@ export function HomePage({ onOpenSync }: { onOpenSync: () => void }) {
   const sum = summarize(txs)
   return (
     <div>
-      <div className="sticky top-0 z-10 space-y-3 bg-bg/90 px-4 pb-3 pt-safe backdrop-blur">
+      <div className="sticky top-0 z-10 space-y-3 bg-bg/35 px-4 pb-3 pt-safe backdrop-blur-xl">
         <div className="flex items-center justify-between pt-3">
           <h1 className="flex items-center gap-2 text-xl font-extrabold tracking-tight"><img src="./icon-192.png" alt="" className="h-9 w-9 rounded-xl" /><span className="sr-only sm:not-sr-only">Money <span className="text-brand">Duo</span></span></h1>
           <div className="flex items-center gap-2">
             <SyncChip onClick={onOpenSync} />
             <NotificationBell />
-            <button className="relative rounded-full p-2 hover:bg-line/60" aria-label={t('Filtri')} onClick={() => setFiltering(true)}>
+            <button className="icon-btn" aria-label={t('Filtri')} onClick={() => setFiltering(true)}>
               <SlidersHorizontal size={20} />
               {nFilters > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[10px] font-bold text-onbrand">{nFilters}</span>}
             </button>
-            <button className="rounded-full p-2 hover:bg-line/60" aria-label={t('Cerca')} onClick={() => { setSearch((s) => !s); if (search) setView({ q: '' }) }}>{search ? <X size={20} /> : <Search size={20} />}</button>
+            <button className="icon-btn" aria-label={t('Cerca')} onClick={() => { setSearch((s) => !s); if (search) setView({ q: '' }) }}>{search ? <X size={20} /> : <Search size={20} />}</button>
           </div>
         </div>
         <MonthNav />

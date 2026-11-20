@@ -24,8 +24,10 @@
   --glass-edge: 255 255 255 / 0.75;
   --glass-edge-soft: 255 255 255 / 0.35;
   --glass-shade: 67 50 42 / 0.16;
-  --ambient-a: 176 82 15 / 0.13;
-  --ambient-b: 255 190 120 / 0.2;
+  /* macchie di colore dietro a tutto: il vetro le sfoca e le rifrange (stessa palette) */
+  --blob-a: 255 160 80 / 0.38;
+  --blob-b: 255 205 150 / 0.5;
+  --blob-c: 240 130 110 / 0.28;
   color-scheme: light dark;
 }
 :root[data-theme='light'] { color-scheme: light; }
@@ -47,8 +49,9 @@
     --glass-edge: 255 255 255 / 0.22;
     --glass-edge-soft: 255 255 255 / 0.08;
     --glass-shade: 0 0 0 / 0.5;
-    --ambient-a: 230 187 120 / 0.12;
-    --ambient-b: 124 140 190 / 0.1;
+    --blob-a: 230 187 120 / 0.2;
+    --blob-b: 124 140 190 / 0.22;
+    --blob-c: 90 110 160 / 0.2;
     color-scheme: dark;
   }
 }
@@ -69,8 +72,9 @@
   --glass-edge: 255 255 255 / 0.22;
   --glass-edge-soft: 255 255 255 / 0.08;
   --glass-shade: 0 0 0 / 0.5;
-  --ambient-a: 230 187 120 / 0.12;
-  --ambient-b: 124 140 190 / 0.1;
+  --blob-a: 230 187 120 / 0.2;
+  --blob-b: 124 140 190 / 0.22;
+  --blob-c: 90 110 160 / 0.2;
   color-scheme: dark;
 }
 
@@ -80,9 +84,6 @@ html, body, #root { height: 100%; }
 html { overscroll-behavior: none; }
 body {
   @apply bg-bg text-ink font-sans antialiased;
-  /* un'ombra di colore dietro a tutto: dà al vetro qualcosa da sfocare e rifrangere (stessa palette, molto tenue) */
-  background-image: radial-gradient(120% 60% at 100% -10%, rgb(var(--ambient-a)), transparent 60%), radial-gradient(90% 50% at -10% 105%, rgb(var(--ambient-b)), transparent 60%);
-  background-attachment: fixed;
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
   overscroll-behavior: none;
@@ -95,16 +96,21 @@ input, textarea { -webkit-touch-callout: default; }
 @media (pointer: coarse) {
   input, textarea, select { font-size: 16px !important; }
 }
-html { overflow-x: clip; }
 button { @apply select-none; }
 
 @layer components {
   .card { @apply rounded-3xl bg-surface border border-line/80 shadow-[0_1px_2px_rgb(var(--ink)/0.04),0_4px_14px_-6px_rgb(var(--ink)/0.08)]; }
-  .btn { @apply inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold transition active:scale-[.98] disabled:opacity-50 disabled:pointer-events-none; }
-  .btn-primary { @apply btn bg-brand text-onbrand hover:opacity-90; }
-  .btn-soft { @apply btn bg-brand/10 text-brand hover:bg-brand/15; }
+  /* Pulsanti: pillole di vetro con riflesso che scorre al tocco; il principale è pieno, in colore, con luce e bagliore */
+  .btn { @apply relative inline-flex select-none items-center justify-center gap-2 overflow-hidden rounded-full px-4 py-2.5 text-sm font-semibold transition duration-200 active:scale-95 disabled:opacity-50 disabled:pointer-events-none; }
+  .btn::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(105deg, transparent 30%, rgb(255 255 255 / 0.5) 50%, transparent 70%); transform: translateX(-120%) skewX(-20deg); }
+  .btn:hover::after, .btn:active::after { animation: shine 0.9s ease-out; }
+  .btn-primary { @apply btn text-onbrand; background: rgb(var(--brand)); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.35), 0 8px 20px -8px rgb(var(--brand) / 0.7); }
+  .btn-soft, .btn-danger, .icon-btn { background: rgb(var(--glass)); -webkit-backdrop-filter: blur(18px) saturate(1.8); backdrop-filter: blur(18px) saturate(1.8);
+    border: 1px solid rgb(var(--glass-edge-soft)); box-shadow: inset 0 1.5px 0 rgb(var(--glass-edge)), 0 6px 18px -8px rgb(var(--glass-shade)); }
+  .btn-soft { @apply btn text-brand; }
   .btn-ghost { @apply btn bg-transparent text-ink hover:bg-line/50; }
-  .btn-danger { @apply btn bg-exp/10 text-exp hover:bg-exp/15; }
+  .btn-danger { @apply btn text-exp; }
+  .icon-btn { @apply relative inline-flex select-none items-center justify-center rounded-full p-2.5 text-ink transition duration-200 active:scale-90; }
   .input { @apply w-full rounded-2xl border border-line bg-bg px-3.5 py-2.5 text-[15px] outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/25; }
   .label { @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted; }
   .chip { @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-line bg-surface/80 px-3.5 py-1.5 text-sm font-medium text-ink transition active:scale-95; }
@@ -118,6 +124,8 @@ button { @apply select-none; }
   .chip-on { @apply border-brand bg-brand text-onbrand; }
 }
 
+@keyframes shine { 0% { transform: translateX(-120%) skewX(-20deg); } 100% { transform: translateX(220%) skewX(-20deg); } }
+@media (prefers-reduced-motion: reduce) { .btn::after { display: none; } .animate-float1, .animate-float2, .animate-float3 { animation: none; } }
 .pb-safe { padding-bottom: max(env(safe-area-inset-bottom), 0px); }
 .pt-safe { padding-top: env(safe-area-inset-top); }
 .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -129,5 +137,4 @@ button { @apply select-none; }
 }
 @media (prefers-reduced-transparency: reduce) {
   .glass, .glass-strong { background: rgb(var(--surface)); -webkit-backdrop-filter: none; backdrop-filter: none; }
-  body { background-image: none; }
 }

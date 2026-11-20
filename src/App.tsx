@@ -33,6 +33,8 @@ function Shell() {
   const goSync = () => { setTab('settings'); setSyncReq((n) => n + 1); setTimeout(() => syncRef.current?.scrollIntoView({ behavior: 'smooth' }), 80) }
 
   useEffect(() => { document.title = 'Money Duo' }, [])
+  // cambiando scheda si riparte dall'alto (la pagina è una sola e manterrebbe la posizione di scorrimento di quella prima)
+  useEffect(() => { window.scrollTo(0, 0) }, [tab])
 
   return (
     <div className="mx-auto flex min-h-full max-w-5xl">
@@ -74,10 +76,13 @@ function Shell() {
         </button>
       </div>
 
-      <nav className="glass fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-20 grid grid-cols-4 gap-1 rounded-[30px] p-1.5 md:hidden">
+      <nav className="glass fixed inset-x-4 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-20 grid grid-cols-4 !rounded-full p-1.5 md:hidden">
+        {/* la «goccia» di vetro che segna la scheda attiva scivola da una voce all'altra */}
+        <span aria-hidden className="glass-active absolute bottom-1.5 left-1.5 top-1.5 rounded-full transition-transform duration-300 ease-[cubic-bezier(.3,1.3,.5,1)]"
+          style={{ width: 'calc((100% - 0.75rem) / 4)', transform: `translateX(${Math.max(0, TABS.findIndex((x) => x.id === tab)) * 100}%)` }} />
         {TABS.map((tb) => (
           <button key={tb.id} onClick={() => setTab(tb.id)} aria-current={tab === tb.id ? 'page' : undefined}
-            className={`flex flex-col items-center gap-0.5 rounded-3xl py-2 text-[11px] font-semibold transition ${tab === tb.id ? 'glass-active text-brand' : 'text-muted'}`}><tb.icon size={22} />{t(tb.label)}</button>
+            className="relative flex flex-col items-center gap-0.5 rounded-full py-2 text-[11px] font-semibold transition active:scale-90"><span className={`flex flex-col items-center gap-0.5 transition ${tab === tb.id ? 'text-brand' : 'text-muted'}`}><tb.icon size={22} strokeWidth={tab === tb.id ? 2.5 : 2} />{t(tb.label)}</span></button>
         ))}
       </nav>
 

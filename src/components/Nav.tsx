@@ -14,9 +14,9 @@ export function MonthNav() {
   const shift = (n: number) => setView({ month: year ? new Date(view.month.getFullYear() + n, view.month.getMonth(), 1) : new Date(view.month.getFullYear(), view.month.getMonth() + n, 1) })
   return (
     <div className="relative flex items-center justify-between">
-      <button className="rounded-full p-2 hover:bg-line/60" onClick={() => shift(-1)} aria-label={year ? t('Anno precedente') : t('Mese precedente')}><ChevronLeft /></button>
+      <button className="icon-btn" onClick={() => shift(-1)} aria-label={year ? t('Anno precedente') : t('Mese precedente')}><ChevronLeft /></button>
       <button className="flex items-center gap-1 text-lg font-bold" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-label={t('Scegli mese o anno')}>{periodLabel(view.month, view.period)}<ChevronDown size={16} className="text-muted" /></button>
-      <button className="rounded-full p-2 hover:bg-line/60" onClick={() => shift(1)} aria-label={year ? t('Anno successivo') : t('Mese successivo')}><ChevronRight /></button>
+      <button className="icon-btn" onClick={() => shift(1)} aria-label={year ? t('Anno successivo') : t('Mese successivo')}><ChevronRight /></button>
       {open && <PeriodPicker onClose={() => setOpen(false)} />}
     </div>
   )

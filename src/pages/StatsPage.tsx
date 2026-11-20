@@ -80,7 +80,7 @@ export function StatsPage() {
         </MascotPeek>
         <LiquidityPanel />
       </div>
-      <div className="sticky top-0 z-10 mt-3 space-y-3 bg-bg/90 px-4 pb-3 pt-2 backdrop-blur">
+      <div className="sticky top-0 z-10 mt-3 space-y-3 bg-bg/35 px-4 pb-3 pt-2 backdrop-blur-xl">
         <MonthNav />
         <ScopeChips />
       </div>

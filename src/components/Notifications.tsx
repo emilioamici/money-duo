@@ -8,7 +8,7 @@ import { locale, t } from '../i18n'
 export function NotificationBell() {
   const { unread, setCenterOpen } = useApp()
   return (
-    <button className="relative rounded-full p-2 hover:bg-line/60" aria-label={unread ? t('Notifiche ({n} non lette)', { n: unread }) : t('Notifiche')} onClick={() => setCenterOpen(true)}>
+    <button className="icon-btn" aria-label={unread ? t('Notifiche ({n} non lette)', { n: unread }) : t('Notifiche')} onClick={() => setCenterOpen(true)}>
       <Bell size={20} />
       {unread > 0 && <span className="absolute right-0.5 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-exp px-1 text-[10px] font-bold text-white">{unread > 9 ? '9+' : unread}</span>}
     </button>

@@ -30,7 +30,7 @@ export function Sheet({ open, onClose, title, children, footer }: { open: boolea
       <div role="dialog" aria-modal="true" aria-label={title} className="relative flex max-h-[92dvh] w-full animate-sheet flex-col glass-strong rounded-t-[2rem] shadow-2xl md:max-w-lg md:rounded-[2rem]">
         <div className="flex items-center justify-between px-5 pb-2 pt-4">
           <h2 className="text-lg font-bold">{title}</h2>
-          <button onClick={onClose} aria-label={t('Chiudi')} className="rounded-full p-2 text-muted hover:bg-line/60"><X size={20} /></button>
+          <button onClick={onClose} aria-label={t('Chiudi')} className="icon-btn text-muted"><X size={20} /></button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4">{children}</div>
         {footer && <div className="pb-safe border-t border-line/70 px-5 py-3">{footer}</div>}
