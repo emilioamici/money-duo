@@ -1,4 +1,5 @@
 import { t } from '../i18n'
+import { bridgeFetch } from './bridge'
 /** Wrapper minimale della Drive REST API v3. */
 
 const API = 'https://www.googleapis.com/drive/v3'
@@ -60,11 +61,33 @@ export async function listCandidates(token: string): Promise<DriveFile[]> {
   return ((await (await call(token, url)).json()) as { files: DriveFile[] }).files
 }
 
+// ---------- famiglie aperte dal ponte del Worker (senza accesso diretto al file) ----------
+const BRIDGED_KEY = 'moneyduo:bridged'
+const bridgedIds = (): string[] => { try { return JSON.parse(localStorage.getItem(BRIDGED_KEY) ?? '[]') as string[] } catch { return [] } }
+export const isBridged = (fileId: string): boolean => bridgedIds().includes(fileId)
+export function setBridged(fileId: string, on: boolean): void {
+  try {
+    const rest = bridgedIds().filter((x) => x !== fileId)
+    localStorage.setItem(BRIDGED_KEY, JSON.stringify(on ? [...rest, fileId] : rest))
+  } catch { /* noop */ }
+}
+
+/** Chiamata al ponte con gli stessi errori di Drive: 401 = sessione scaduta, 403/404/410 = niente accesso (con il messaggio del server). */
+async function bridgeCall(token: string, path: string, fileId: string, body?: string): Promise<Response> {
+  const r = await bridgeFetch(`${path}?fileId=${enc(fileId)}`, token, body)
+  if (r.ok) return r
+  let msg = r.statusText
+  try { msg = ((await r.json()) as { error?: string }).error || msg } catch { /* corpo non JSON */ }
+  throw new DriveError([403, 404, 410].includes(r.status) ? 404 : r.status, msg)
+}
+
 export async function getMeta(token: string, id: string): Promise<DriveFile> {
+  if (isBridged(id)) return (await bridgeCall(token, '/db/meta', id)).json()
   return (await call(token, `${API}/files/${enc(id)}?fields=${FIELDS}&supportsAllDrives=true`)).json()
 }
 
 export async function download(token: string, id: string): Promise<unknown> {
+  if (isBridged(id)) return (await bridgeCall(token, '/db/read', id)).json()
   return (await call(token, `${API}/files/${enc(id)}?alt=media&supportsAllDrives=true`)).json()
 }
 
@@ -88,6 +111,7 @@ export async function createFile(token: string, content: string, name: string, f
 }
 
 export async function updateFile(token: string, id: string, content: string): Promise<DriveFile> {
+  if (isBridged(id)) return (await bridgeCall(token, '/db/write', id, content)).json()
   const r = await call(token, `${UPLOAD}/files/${enc(id)}?uploadType=media&fields=${FIELDS}&supportsAllDrives=true`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json; charset=UTF-8' },

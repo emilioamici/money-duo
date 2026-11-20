@@ -12,6 +12,8 @@ VAPID_SUBJECT = "https://<utente>.github.io/money-duo/"
 # Solo per l'accesso persistente (facoltativo): ID del client OAuth di Google Cloud (è un identificativo pubblico).
 # Il client secret e SESSION_KEY NON vanno qui: si impostano con `npx wrangler secret put` (vedi README).
 # GOOGLE_CLIENT_ID = "xxxx.apps.googleusercontent.com"
+# Facoltativo, per il «ponte» (ingresso con codice famiglia): altri client OAuth i cui token sono accettati, separati da virgola.
+# ALLOWED_CLIENT_IDS = ""
 
 [[kv_namespaces]]
 binding = "SUBS"

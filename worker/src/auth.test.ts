@@ -183,8 +183,8 @@ describe('/auth/logout e /health', () => {
     expect(vi.mocked(fetch).mock.calls.some(([u]) => String(u).includes('/revoke'))).toBe(false) // non si revoca su Google: scollegherebbe gli altri dispositivi
   })
   it('/health dice se l\'accesso persistente è configurato', async () => {
-    expect(await (await get('/health')).json()).toEqual({ ok: true, auth: true })
+    expect(await (await get('/health')).json()).toEqual({ ok: true, auth: true, bridge: true })
     env.SESSION_KEY = undefined
-    expect(await (await get('/health')).json()).toEqual({ ok: true, auth: false })
+    expect(await (await get('/health')).json()).toEqual({ ok: true, auth: false, bridge: false })
   })
 })

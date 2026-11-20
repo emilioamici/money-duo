@@ -1,9 +1,11 @@
 import { MascotImg } from './Mascots'
 import { useEffect, useRef, useState } from 'react'
-import { Folder, Loader2, RefreshCw, UserRound, Users } from 'lucide-react'
+import { Folder, KeyRound, Loader2, RefreshCw, UserRound, Users } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
 import { engine } from '../sync/engine'
-import { isDatabaseFile, parseFileId, type DriveFile } from '../sync/drive'
+import { DriveError, isDatabaseFile, setBridged, type DriveFile } from '../sync/drive'
+import { bridgeAvailable } from '../sync/bridge'
+import { clearInvite, parseFamilyCode, pendingInvite } from '../sync/invite'
 import { dateTimeLabel } from '../lib/format'
 import { linkDatabase } from './linkFlow'
 import { FolderPicker, type PickedFolder } from './FolderPicker'
@@ -11,7 +13,7 @@ import { t } from '../i18n'
 import { tb } from '../i18n/rich'
 import { pickerConfigured } from '../sync/picker'
 
-type Phase = 'login' | 'searching' | 'choose' | 'none'
+type Phase = 'login' | 'searching' | 'choose' | 'none' | 'invite'
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
 /** Schermata iniziale: accesso con Google, poi la famiglia viene trovata e collegata in automatico (o se ne crea una). */
@@ -22,7 +24,9 @@ export function Gate({ reconnect = false }: { reconnect?: boolean }) {
   const [others, setOthers] = useState<DriveFile[]>([])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
-  const [link, setLink] = useState('')
+  const [code, setCode] = useState('')
+  /** famiglie trovate dal ponte del Worker: si aprono senza accesso diretto al file */
+  const [bridged, setBridgedIds] = useState<Set<string>>(new Set())
   const [familyName, setFamilyName] = useState(() => t('Famiglia'))
   const [myName, setMyName] = useState(sync.name ?? '')
   const [folder, setFolder] = useState<PickedFolder>({ id: 'root', name: 'Il mio Drive' })
@@ -38,15 +42,55 @@ export function Gate({ reconnect = false }: { reconnect?: boolean }) {
     const ok = await linkDatabase(db, id)
     if (!ok) setPhase('choose')
   }
+  const notFound = (e: unknown) => e instanceof DriveError && e.status === 404
+  /** Apre una famiglia dal ponte del Worker. false se il ponte non c'è o non ti riconosce. */
+  const viaBridge = async (id: string): Promise<boolean> => {
+    if (!(await bridgeAvailable())) return false
+    setBridged(id, true)
+    try { await connect(id); return true } catch (e) {
+      setBridged(id, false)
+      if (notFound(e)) return false
+      throw e
+    }
+  }
+  /** Con il codice famiglia: prima l'accesso diretto, poi il ponte del Worker; con `picker` anche il Selettore di Google (serve un tocco). */
+  const openFamily = async (id: string, picker: boolean): Promise<boolean> => {
+    try { await connect(id); return true } catch (e) { if (!notFound(e)) throw e }
+    if (await viaBridge(id)) return true
+    if (picker && pickerConfigured()) {
+      const f = await engine.pickDatabase(id)
+      if (f) { await connect(f.id); return true }
+      return false
+    }
+    return false
+  }
+  const joinWithCode = () => guard(async () => {
+    const id = parseFamilyCode(code)
+    if (!id) throw new Error(t('Il codice famiglia non è valido: incolla il codice o il link d\'invito che ti ha mandato il capofamiglia.'))
+    if (!(await openFamily(id, true)) && !pickerConfigured()) throw new Error(t('Non riesco ad aprire la famiglia: controlla il codice e che il capofamiglia ti abbia invitato con questo account Google (e che abbia aperto l\'app di recente).'))
+  })
 
+  const connectListed = async (id: string, viaHouse: boolean) => { if (viaHouse) { if (!(await viaBridge(id))) throw new Error(t('Non riesco ad aprire la famiglia dal server: il capofamiglia deve riaprire l\'app con l\'accesso persistente.')) } else await connect(id) }
   const search = async () => {
     setPhase('searching'); setErr('')
     try {
+      // un link d'invito aperto: si prova ad aprire quella famiglia (diretto, poi ponte); se serve il Selettore si chiede un tocco
+      const inv = pendingInvite()
+      if (inv) {
+        try {
+          if (await openFamily(inv, false)) { clearInvite(); return }
+          setPhase('invite'); return
+        } catch (e) { setErr(msg(e)) }
+      }
       const all = await engine.listCandidates()
       const found = all.filter(isDatabaseFile)
-      setDbs(found); setOthers(all.filter((f) => !isDatabaseFile(f)))
-      if (found.length === 1) return await connect(found[0].id) // una sola famiglia: collegamento automatico
-      setPhase(found.length > 1 ? 'choose' : 'none')
+      // le famiglie a cui sono stato invitato, aperte dal ponte del Worker (nessun selettore, nessun codice)
+      const extra = (await engine.houses()).filter((h) => !found.some((f) => f.id === h.id))
+      setBridgedIds(new Set(extra.map((h) => h.id)))
+      const list = [...found, ...extra.map((h): DriveFile => ({ id: h.id, name: h.name, version: '', modifiedTime: h.modifiedTime }))]
+      setDbs(list); setOthers(all.filter((f) => !isDatabaseFile(f)))
+      if (list.length === 1) return await connectListed(list[0].id, extra.some((h) => h.id === list[0].id)) // una sola famiglia: collegamento automatico
+      setPhase(list.length > 1 ? 'choose' : 'none')
     } catch (e) {
       setErr(msg(e)); setPhase('none')
     }
@@ -111,7 +155,16 @@ export function Gate({ reconnect = false }: { reconnect?: boolean }) {
         {phase === 'choose' && (
           <>
             <p className="text-sm text-muted">{t('Hai accesso a più famiglie. Quale vuoi aprire?')}</p>
-            <FileList files={dbs} busy={busy} onPick={(id) => void guard(() => connect(id))} />
+            <FileList files={dbs} busy={busy} onPick={(id) => void guard(() => connectListed(id, bridged.has(id)))} />
+          </>
+        )}
+
+        {phase === 'invite' && (
+          <>
+            <p className="flex items-center gap-2 text-sm font-semibold"><Users size={16} className="text-brand" />{t('Hai ricevuto un invito')}</p>
+            <p className="text-sm text-muted">{t('Il capofamiglia ti ha invitato: manca un tocco per dare all\'app il permesso sul database di famiglia (il selettore di Google ti mostra solo quel file).')}</p>
+            <button className="btn-primary w-full" disabled={busy} onClick={() => void guard(async () => { const id = pendingInvite(); if (id && (await openFamily(id, true))) clearInvite() })}>{busy ? <Loader2 size={18} className="animate-spin" /> : <Folder size={18} />}{t('Apri la famiglia')}</button>
+            <button className="btn-ghost w-full !text-xs" disabled={busy} onClick={() => { clearInvite(); void search() }}>{t('Non è il mio invito: cerca o crea un\'altra famiglia')}</button>
           </>
         )}
 
@@ -132,13 +185,13 @@ export function Gate({ reconnect = false }: { reconnect?: boolean }) {
               <button className="btn-primary w-full" disabled={busy || !familyName.trim()} onClick={() => void create()}>{busy ? <Loader2 size={18} className="animate-spin" /> : <Users size={18} />}{t('Crea famiglia')}</button>
             </div>
 
-            {pickerConfigured() && (
-              <div className="space-y-2 rounded-2xl border border-line p-3">
-                <p className="flex items-center gap-2 text-sm font-semibold"><Folder size={16} className="text-brand" />{t('Hai ricevuto un invito?')}</p>
-                <p className="text-xs text-muted">{t('Il capofamiglia ha condiviso il database con te: scegli quel file su Drive (lo trovi in «Condivisi con me»). Lo si fa una volta sola.')}</p>
-                <button className="btn-primary w-full" disabled={busy} onClick={() => void pickDatabaseNow()}>{busy ? <Loader2 size={18} className="animate-spin" /> : <Folder size={18} />}{t('Scegli il database di famiglia')}</button>
-              </div>
-            )}
+            <div className="space-y-2 rounded-2xl border border-line p-3">
+              <p className="flex items-center gap-2 text-sm font-semibold"><KeyRound size={16} className="text-brand" />{t('Hai ricevuto un invito?')}</p>
+              <p className="text-xs text-muted">{t('Incolla il codice famiglia (o il link d\'invito) che ti ha mandato il capofamiglia: lo trova in Impostazioni → Famiglia.')}</p>
+              <input className="input font-mono !text-xs" placeholder={t('Codice famiglia')} aria-label={t('Codice famiglia')} value={code} onChange={(e) => setCode(e.target.value)} autoCapitalize="none" autoCorrect="off" />
+              <button className="btn-primary w-full" disabled={busy || !code.trim()} onClick={() => void joinWithCode()}>{busy ? <Loader2 size={18} className="animate-spin" /> : <KeyRound size={18} />}{t('Entra in famiglia')}</button>
+              {pickerConfigured() && <button className="btn-ghost w-full !text-xs" disabled={busy} onClick={() => void pickDatabaseNow()}>{t('Scegli il database di famiglia')}</button>}
+            </div>
 
             <div className="rounded-xl bg-brand/10 p-3 text-sm text-muted">
               {tb('Aspetti un invito? Chiedi al capofamiglia di aggiungere <b>{email}</b> tra i membri, poi', { email: sync.email ?? t('questa email') })}
@@ -151,13 +204,6 @@ export function Gate({ reconnect = false }: { reconnect?: boolean }) {
                 <div className="mt-2"><FileList files={others} busy={busy} onPick={(id) => void guard(() => connect(id))} /></div>
               </details>
             )}
-            {!pickerConfigured() && <details className="text-sm">
-              <summary className="cursor-pointer text-muted">{t('Ho il link o l\'ID del file')}</summary>
-              <div className="mt-2 flex gap-2">
-                <input className="input" placeholder={t('Link o ID del file Drive')} value={link} onChange={(e) => setLink(e.target.value)} />
-                <button className="btn-primary" disabled={busy || !parseFileId(link)} onClick={() => void guard(() => connect(parseFileId(link)!))}>{t('Collega')}</button>
-              </div>
-            </details>}
           </>
         )}
 
@@ -165,7 +211,7 @@ export function Gate({ reconnect = false }: { reconnect?: boolean }) {
           <button className="btn-ghost w-full !text-xs" disabled={busy} onClick={() => void login(true)}>{t('Usa un altro account Google')}</button>
         )}
       </div>
-      <p className="mt-6 text-center text-xs text-muted">{t('I dati restano nel Drive del capofamiglia e in questo browser: nessun server di terze parti.')}</p>
+      <p className="mt-6 text-center text-xs text-muted">{t('I dati restano nel Drive del capofamiglia e in questo browser. Il server, se c\'è, fa solo da tramite e non conserva i dati.')}</p>
       {picking && <FolderPicker onClose={() => setPicking(false)} onPick={(f) => { setFolder(f); setPicking(false) }} />}
     </div>
   )

@@ -73,11 +73,15 @@ async function open(token: string, views: (g: any) => any[], title: string): Pro
 }
 
 /** Sceglie il file del database di famiglia (anche uno condiviso da un altro account). */
-export function pickDatabase(token: string): Promise<Picked | null> {
-  return open(token, (g) => [
-    new g.DocsView(g.ViewId.DOCS).setMimeTypes('application/json').setIncludeFolders(false).setOwnedByMe(false),
-    new g.DocsView(g.ViewId.DOCS).setMimeTypes('application/json').setIncludeFolders(false),
-  ], t('Scegli il database di famiglia'))
+export function pickDatabase(token: string, onlyFileId?: string): Promise<Picked | null> {
+  // con un codice famiglia (invito) il selettore mostra solo quel file: basta un tocco
+  const view = (owned?: boolean) => (g: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+    const v = new g.DocsView(g.ViewId.DOCS).setMimeTypes('application/json').setIncludeFolders(false)
+    if (owned === false) v.setOwnedByMe(false)
+    if (onlyFileId) v.setFileIds(onlyFileId)
+    return v
+  }
+  return open(token, (g) => (onlyFileId ? [view()(g)] : [view(false)(g), view()(g)]), t('Scegli il database di famiglia'))
 }
 
 /** Sceglie una cartella del proprio Drive. */

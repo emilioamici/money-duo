@@ -1,3 +1,4 @@
+import { bridgeAccess, bridgeEnabled, dbMeta, dbRead, dbWrite, houseMine, houseRegister } from './bridge'
 import { authCallback, authConfigured, authLogout, authRefresh, authStart } from './auth'
 import { walletAck, walletIngest, walletPull, walletRevoke, walletToken } from './wallet'
 import { sendWebPush, type PushSubscriptionData, type VapidKeys } from './webpush'
@@ -30,6 +31,8 @@ export interface Env {
   /** solo test: indirizzi di Google per OAuth */
   GOOGLE_AUTH_URL?: string
   GOOGLE_OAUTH_API?: string
+  /** altri client OAuth (oltre a GOOGLE_CLIENT_ID) i cui token il ponte accetta, separati da virgola */
+  ALLOWED_CLIENT_IDS?: string
 }
 
 /** Servizi di push dei browser: gli unici indirizzi a cui il server accetta di inviare. */
@@ -70,7 +73,7 @@ function cors(env: Env, req: Request): Record<string, string> {
  * Verifica il token Google dell'utente: ritorna la sua email (verificata da Google) e controlla che abbia
  * accesso al file del database indicato. Il server non salva mai il token.
  */
-export async function authenticate(env: Env, req: Request, fileId: string): Promise<string> {
+export async function authenticate(env: Env, req: Request, fileId: string, directOnly = false): Promise<string> {
   const google = env.GOOGLE_API || 'https://www.googleapis.com'
   const token = /^Bearer (.+)$/.exec(req.headers.get('Authorization') ?? '')?.[1]
   if (!token) throw new HttpError(401, 'Accesso mancante')
@@ -81,7 +84,11 @@ export async function authenticate(env: Env, req: Request, fileId: string): Prom
   const email = ((await about.json()) as { user?: { emailAddress?: string } }).user?.emailAddress
   if (!email) throw new HttpError(401, 'Account Google non riconosciuto')
   const file = await fetch(`${google}/drive/v3/files/${encodeURIComponent(fileId)}?fields=id&supportsAllDrives=true`, { headers: auth })
-  if (file.status === 404 || file.status === 403) throw new HttpError(403, 'Nessun accesso al database della famiglia')
+  if (file.status === 404 || file.status === 403) {
+    // niente accesso diretto (permesso `drive.file`): passa chi ha il file condiviso e la famiglia collegata al ponte
+    if (!directOnly && (await bridgeAccess(env, token, email, fileId))) return email.toLowerCase()
+    throw new HttpError(403, 'Nessun accesso al database della famiglia')
+  }
   if (!file.ok) throw new HttpError(502, 'Google non risponde')
   return email.toLowerCase()
 }
@@ -164,7 +171,7 @@ export default {
     const json = (status: number, data: unknown) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json', ...headers } })
     const { pathname } = new URL(req.url)
     if (req.method === 'OPTIONS') return new Response(null, { status: headers['Access-Control-Allow-Origin'] ? 204 : 403, headers })
-    if (pathname === '/health') return json(200, { ok: true, auth: authConfigured(env) })
+    if (pathname === '/health') return json(200, { ok: true, auth: authConfigured(env), bridge: bridgeEnabled(env) })
     // l'accesso persistente passa da due pagine aperte nel browser (GET): Google rimanda qui dopo il consenso
     if (req.method === 'GET' && pathname === '/auth/start') return authStart(env, req)
     if (req.method === 'GET' && pathname === '/auth/callback') return authCallback(env, req)
@@ -178,6 +185,11 @@ export default {
       if (pathname === '/subscribe') return json(200, await subscribe(env, req))
       if (pathname === '/unsubscribe') return json(200, await unsubscribe(env, req))
       if (pathname === '/notify') return json(200, await notify(env, req))
+      if (pathname === '/house/register') return json(200, await houseRegister(env, req))
+      if (pathname === '/house/mine') return json(200, await houseMine(env, req))
+      if (pathname === '/db/meta') return json(200, await dbMeta(env, req))
+      if (pathname === '/db/read') return await dbRead(env, req, headers)
+      if (pathname === '/db/write') return json(200, await dbWrite(env, req))
       if (pathname === '/wallet/token') return json(200, await walletToken(env, req))
       if (pathname === '/wallet/revoke') return json(200, await walletRevoke(env, req))
       if (pathname === '/wallet/pull') return json(200, await walletPull(env, req))

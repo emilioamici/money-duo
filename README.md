@@ -102,6 +102,10 @@ Limite: PayPal.Me non permette di preselezionare «Per amici e familiari» da li
 
 **Lingue.** L'app è in **italiano** e **inglese**: in Impostazioni → Aspetto → *Lingua* si sceglie Automatico (segue la lingua del telefono), Italiano o English; il cambio è immediato e si ricorda sul dispositivo. Cambiano testi, date e importi (`1.234,56 €` / `€1,234.56`; nei campi si accetta sia la virgola sia il punto decimale). Tradurre un testo: nel codice si usa `t('testo in italiano')`, e in `src/i18n/en.ts` la chiave è quel testo; un test controlla che ogni testo usato abbia la traduzione. Le categorie e i nomi dei conti che hai già nel database restano come li hai scritti (sono dati tuoi); quelli di una famiglia nuova nascono nella lingua in uso. Le notifiche arrivano nella lingua del dispositivo di chi le ha generate (per i push, di chi ha fatto la modifica). La pagina privacy resta in italiano.
 
+## Famiglia: codice, link d'invito e ponte
+
+Come in Clean Duo, un invitato entra in tre modi: la famiglia a cui è stato invitato compare da sola dopo l'accesso con Google; oppure apre il **link d'invito** (`#join=<codice>`); oppure incolla il **codice famiglia**. Il codice e il link si trovano in *Impostazioni → Famiglia* (copia e condividi). L'app prova nell'ordine: accesso diretto al file, **ponte del Worker** (se il capofamiglia ha l'accesso persistente) e, per ultimo, il Selettore di Google limitato a quel file (un tocco). Dettagli e privacy in `worker/README.md`.
+
 ## Stile (design system di Clean Duo)
 
 Money Duo segue il design system di `clean-duo` (`DESIGN_SYSTEM.md`): token RGB per i colori (`bg`, `surface`, `ink`, `muted`, `line`, `brand`, `inc`, `exp`, `trf`, più `warn` per gli avvisi gialli), nessun `dark:` e nessun colore fisso nei componenti, contenuto su card piene e vetro solo su barra, pulsanti, fogli e avvisi, sfondo con tre macchie animate, fallback per «Riduci trasparenza» e «Riduci movimento».
