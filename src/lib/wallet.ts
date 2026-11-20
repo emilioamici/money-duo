@@ -9,6 +9,8 @@ export interface WalletItem { id: string; amount: number; merchant: string; card
 export const cardKey = (s: string): string => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 
 export const walletTxId = (item: WalletItem): string => `w-${item.id}`
+/** La spesa è arrivata da Apple Wallet (riconoscibile dall'id, che resta uguale anche dopo l'approvazione o la modifica). */
+export const isWalletTx = (tx: { id: string }): boolean => tx.id.startsWith('w-')
 
 const usable = (db: Db, me: string): Account[] => sortedAccounts(db).filter((a) => !a.hidden && accountMemberIds(db, a).includes(me))
 const noteFor = (card: string): string => t('Carta Wallet: {card}', { card })

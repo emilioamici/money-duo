@@ -8,6 +8,7 @@ import { nowIso, uid } from '../lib/ids'
 import { deleteTransaction, saveTransaction } from '../lib/mutations'
 import { Segmented, Sheet } from './ui'
 import { ask } from './dialogs'
+import { WalletTag } from './WalletBadge'
 import { TxFooterActions } from './txActions'
 import { CategoryRow, Row, SelectField, TagsRow, TitleRow, accountLabel, plain } from './formParts'
 import { t } from '../i18n'
@@ -113,7 +114,8 @@ export function TransactionForm({ state, onClose }: { state: TxFormState; onClos
         { value: 'expense', label: t('Uscita'), color: 'text-exp' }, { value: 'income', label: t('Entrata'), color: 'text-inc' }, { value: 'transfer', label: t('Trasferimento'), color: 'text-trf' },
       ]} />
 
-      <div className="my-4 rounded-2xl bg-bg p-4 text-center">
+      <div className="relative my-4 rounded-2xl bg-bg p-4 text-center">
+        <WalletTag tx={tx} />
         <input inputMode="decimal" autoFocus={!tx} placeholder={t('0,00')} value={amount} onChange={(e) => { setAmount(e.target.value); setError('') }}
           className={`w-full bg-transparent text-center text-4xl font-bold outline-none placeholder:text-line ${type === 'expense' ? 'text-exp' : type === 'income' ? 'text-inc' : 'text-trf'}`} />
         <span className="text-xs text-muted">{t('Importo in euro')}</span>

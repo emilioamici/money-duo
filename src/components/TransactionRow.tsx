@@ -12,6 +12,7 @@ import { nowIso } from '../lib/ids'
 import { ask } from './dialogs'
 import { useTxActions } from './txActions'
 import { SwipeRow } from './SwipeRow'
+import { WalletMark } from './WalletBadge'
 
 /** Riga della lista: scorrendola verso sinistra compaiono «Modifica», «Copia» ed «Elimina». */
 export function TransactionRow({ tx }: { tx: Transaction }) {
@@ -62,7 +63,10 @@ export function TransactionRow({ tx }: { tx: Transaction }) {
           {(tx.tags ?? []).map((g) => <span key={g} className="inline-block rounded-full bg-line/70 px-2 py-0.5 text-[10px] font-medium text-muted">#{g}</span>)}
         </span>
       </span>
-      <span className={`shrink-0 font-bold tabular-nums ${color}`}>{tx.type === 'expense' ? '−' : tx.type === 'income' ? '+' : ''}{formatMoney(tx.amount)}</span>
+      <span className="flex shrink-0 flex-col items-end gap-0.5">
+        <WalletMark tx={tx} />
+        <span className={`font-bold tabular-nums ${color}`}>{tx.type === 'expense' ? '−' : tx.type === 'income' ? '+' : ''}{formatMoney(tx.amount)}</span>
+      </span>
     </SwipeRow>
   )
 }

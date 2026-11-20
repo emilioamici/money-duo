@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createDefaultDb } from './defaults'
-import { approveTransaction, cardAccount, cardsOf, importWallet, pendingCount, removeCard, setCardAccount, walletTxId, type WalletItem } from './wallet'
+import { approveTransaction, isWalletTx, cardAccount, cardsOf, importWallet, pendingCount, removeCard, setCardAccount, walletTxId, type WalletItem } from './wallet'
 import { deleteTransaction, saveAccount } from './mutations'
 import { parseDb } from './merge'
 import type { Account, Db, Member } from '../types'
@@ -67,6 +67,12 @@ describe('Apple Wallet: importazione', () => {
     expect(importWallet(db, emilio, [item()], undefined, NOW)).toBe(db)
     db = deleteTransaction(db, walletTxId(item()))
     expect(importWallet(db, emilio, [item()], undefined, NOW).transactions).toHaveLength(0)
+  })
+  it('una spesa di Wallet si riconosce sempre, anche dopo l\'approvazione; una normale no', () => {
+    const db = importWallet(base(), emilio, [item()], undefined, NOW)
+    expect(isWalletTx(db.transactions[0])).toBe(true)
+    expect(isWalletTx(approveTransaction(db, walletTxId(item()), NOW).transactions[0])).toBe(true)
+    expect(isWalletTx({ id: 'abc123' })).toBe(false)
   })
   it('approvare toglie il segno; il salvataggio dal modulo (record nuovo senza pending) fa lo stesso', () => {
     const db = importWallet(base(), emilio, [item()], undefined, NOW)
