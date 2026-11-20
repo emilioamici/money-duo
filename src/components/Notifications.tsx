@@ -25,7 +25,7 @@ const ago = (iso: string): string => {
 }
 
 const Icon = ({ n }: { n: Notif }) => (
-  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${n.kind === 'tx' ? 'bg-brand/15 text-brand' : 'bg-inc/15 text-inc'}`}>
+  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${n.kind === 'tx' || n.kind === 'wallet' ? 'bg-brand/15 text-brand' : 'bg-inc/15 text-inc'}`}>
     {n.kind === 'tx' ? <Receipt size={18} /> : <Wallet size={18} />}
   </span>
 )

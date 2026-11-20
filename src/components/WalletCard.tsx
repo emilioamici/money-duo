@@ -14,7 +14,7 @@ import { t } from '../i18n'
  * scrive su un indirizzo personale; l'app importa le spese come «da approvare».
  */
 export function WalletCard() {
-  const { sync, me, importWalletNow } = useApp()
+  const { sync, me, importWalletNow, prefs } = useApp()
   const fileId = sync.fileId
   const [on, setOn] = useState(() => !!fileId && walletOn(fileId))
   const [token, setToken] = useState<string | null>(() => (fileId ? savedToken(fileId) : null))
@@ -73,6 +73,7 @@ export function WalletCard() {
           <button className="btn-danger w-full" data-testid="wallet-off" disabled={busy} onClick={() => void deactivate()}><XCircle size={16} />{t('Disattiva')}</button>
         </>
       )}
+      {on && !prefs.pushEnabled && <p className="rounded-xl bg-warn/15 p-3 text-warn">{t('Per ricevere una notifica a ogni pagamento, anche con l\'app chiusa, attiva le notifiche in Impostazioni → Notifiche.')}</p>}
       {msg && <p className={msg.bad ? 'font-medium text-exp' : 'text-muted'}>{msg.text}</p>}
       <details className="rounded-xl bg-bg p-3">
         <summary className="cursor-pointer font-semibold">{t('Come si configura sull\'iPhone')}</summary>

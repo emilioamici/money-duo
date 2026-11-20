@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Plus, Trash2, X } from 'lucide-react'
+import { WalletTag } from './WalletBadge'
 import type { Payment, Transaction } from '../types'
 import { useApp, type TxFormState } from '../store/AppProvider'
 import { accountMemberIds, expenseShares, familyBalances, sortedAccounts, txPayments, visibleTo } from '../lib/calc'
@@ -152,7 +153,8 @@ export function SplitForm({ state, onClose }: { state: TxFormState; onClose: () 
           <button className="btn-primary flex-1" onClick={save}>{t('Salva')}</button>
         </div>
       }>
-      <div className="mb-4 rounded-2xl bg-bg p-4 text-center">
+      <div className="relative mb-4 rounded-2xl bg-bg p-4 text-center">
+        <WalletTag tx={tx} />
         <input inputMode="decimal" autoFocus={!tx} placeholder={t('0,00')} value={amount} onChange={(e) => { setAmount(e.target.value); setError('') }}
           className="w-full bg-transparent text-center text-4xl font-bold text-exp outline-none placeholder:text-line" />
         <span className="text-xs text-muted">{t('Importo totale della spesa, in euro')}</span>
