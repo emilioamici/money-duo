@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { AnimatePresence, m } from 'framer-motion'
 import { ListChecks, PieChart, Plus, Receipt, Settings, Star, Users, Wallet, X } from 'lucide-react'
 import { AppProvider, useApp } from './store/AppProvider'
 import { DialogHost } from './components/dialogs'
@@ -49,10 +50,14 @@ function Shell() {
       </aside>
 
       <main className="min-w-0 flex-1 pb-40 md:pb-10">
-        {tab === 'home' && <HomePage onOpenSync={goSync} />}
-        {tab === 'stats' && <StatsPage />}
-        {tab === 'accounts' && <AccountsPage />}
-        {tab === 'settings' && <SettingsPage syncRef={syncRef} openSync={syncReq} />}
+        <AnimatePresence mode="wait" initial={false}>
+          <m.div key={tab} initial={{ opacity: 0, y: 10, filter: 'blur(6px)' }} animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }} exit={{ opacity: 0, y: -6, filter: 'blur(6px)' }} transition={{ duration: 0.18 }}>
+            {tab === 'home' && <HomePage onOpenSync={goSync} />}
+            {tab === 'stats' && <StatsPage />}
+            {tab === 'accounts' && <AccountsPage />}
+            {tab === 'settings' && <SettingsPage syncRef={syncRef} openSync={syncReq} />}
+          </m.div>
+        </AnimatePresence>
       </main>
 
       {fabOpen && <div className="fixed inset-0 z-20 animate-fade bg-ink/30 md:hidden" onClick={() => setFabOpen(false)} />}
@@ -70,19 +75,20 @@ function Shell() {
             </button>
           </>
         )}
-        <button onClick={() => setFabOpen((o) => !o)} aria-label={fabOpen ? t('Chiudi') : t('Aggiungi')} aria-expanded={fabOpen}
-          className="flex h-14 w-14 items-center justify-center rounded-full bg-brand text-onbrand shadow-lg shadow-brand/30 ring-1 ring-inset ring-white/30 transition active:scale-95">
+        <m.button whileTap={{ scale: 0.9 }} onClick={() => setFabOpen((o) => !o)} aria-label={fabOpen ? t('Chiudi') : t('Aggiungi')} aria-expanded={fabOpen}
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-brand text-onbrand shadow-lg shadow-brand/30 ring-1 ring-inset ring-white/30">
           {fabOpen ? <X size={26} /> : <Plus size={28} />}
-        </button>
+        </m.button>
       </div>
 
       <nav className="glass fixed inset-x-4 bottom-4 z-40 grid grid-cols-4 !rounded-full p-1.5 md:hidden" style={{ marginBottom: 'env(safe-area-inset-bottom)' }}>
-        {/* la «goccia» di vetro che segna la scheda attiva scivola da una voce all'altra */}
-        <span aria-hidden className="glass-active absolute bottom-1.5 left-1.5 top-1.5 rounded-full transition-transform duration-[350ms] ease-[cubic-bezier(.3,1.3,.5,1)]"
-          style={{ width: 'calc((100% - 0.75rem) / 4)', transform: `translateX(${Math.max(0, TABS.findIndex((x) => x.id === tab)) * 100}%)` }} />
         {TABS.map((tb) => (
           <button key={tb.id} onClick={() => setTab(tb.id)} aria-current={tab === tb.id ? 'page' : undefined}
-            className="relative flex flex-col items-center gap-0.5 rounded-full py-2 text-[10px] font-semibold transition active:scale-90"><span className={`flex flex-col items-center gap-0.5 transition ${tab === tb.id ? 'text-brand' : 'text-muted'}`}><tb.icon size={22} strokeWidth={tab === tb.id ? 2.6 : 2.1} />{t(tb.label)}</span></button>
+            className="relative flex flex-col items-center gap-0.5 rounded-full py-2 text-[10px] font-semibold transition active:scale-90">
+            {/* la «goccia» di vetro è un solo elemento che passa da una scheda all'altra: Framer Motion la anima con una molla */}
+            {tab === tb.id && <m.span layoutId="nav-drop" className="glass-active absolute inset-0 rounded-full" transition={{ type: 'spring', stiffness: 420, damping: 30, mass: 0.9 }} />}
+            <span className={`relative flex flex-col items-center gap-0.5 transition ${tab === tb.id ? 'text-brand' : 'text-muted'}`}><tb.icon size={22} strokeWidth={tab === tb.id ? 2.6 : 2.1} />{t(tb.label)}</span>
+          </button>
         ))}
       </nav>
 
