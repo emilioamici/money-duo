@@ -78,7 +78,7 @@ export function NotificationToast() {
   if (!toast) return null
   return (
     <div className="pt-safe fixed inset-x-0 top-0 z-[60] flex justify-center px-3 pt-3" role="status" aria-live="polite">
-      <div className="flex w-full max-w-md animate-sheet items-start gap-3 rounded-2xl border border-line bg-surface p-3 shadow-xl">
+      <div className="flex w-full max-w-md animate-sheet items-start gap-3 glass-strong rounded-3xl p-3">
         <button className="flex min-w-0 flex-1 items-start gap-3 text-left" onClick={() => { dismissToast(); setCenterOpen(true) }}>
           <Icon n={toast} />
           <span className="min-w-0"><span className="block text-sm font-bold">{toast.title}</span><span className="block truncate text-xs text-muted">{toast.body}</span></span>

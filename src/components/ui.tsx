@@ -26,8 +26,8 @@ export function Sheet({ open, onClose, title, children, footer }: { open: boolea
   if (!open) return null
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center md:items-center">
-      <div className="absolute inset-0 animate-fade bg-black/50" onClick={onClose} />
-      <div role="dialog" aria-modal="true" aria-label={title} className="relative flex max-h-[92dvh] w-full animate-sheet flex-col rounded-t-3xl bg-surface shadow-2xl md:max-w-lg md:rounded-3xl">
+      <div className="absolute inset-0 animate-fade bg-black/40 backdrop-blur-[3px]" onClick={onClose} />
+      <div role="dialog" aria-modal="true" aria-label={title} className="relative flex max-h-[92dvh] w-full animate-sheet flex-col glass-strong rounded-t-[2rem] shadow-2xl md:max-w-lg md:rounded-[2rem]">
         <div className="flex items-center justify-between px-5 pb-2 pt-4">
           <h2 className="text-lg font-bold">{title}</h2>
           <button onClick={onClose} aria-label={t('Chiudi')} className="rounded-full p-2 text-muted hover:bg-line/60"><X size={20} /></button>
