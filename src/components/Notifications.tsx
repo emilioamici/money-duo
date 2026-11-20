@@ -1,3 +1,4 @@
+import { AnimatePresence, m } from 'framer-motion'
 import { MascotImg } from './Mascots'
 import { Bell, Receipt, Wallet, X } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
@@ -75,16 +76,20 @@ export function NotificationCenter({ onOpenAccounts }: { onOpenAccounts: () => v
 /** Avviso in primo piano quando arriva una nuova notifica mentre l'app è aperta. */
 export function NotificationToast() {
   const { toast, dismissToast, setCenterOpen } = useApp()
-  if (!toast) return null
   return (
-    <div className="pt-safe fixed inset-x-0 top-0 z-[65] flex justify-center px-3 pt-3" role="status" aria-live="polite">
-      <div className="flex w-full max-w-md animate-sheet items-start gap-3 glass-strong rounded-3xl p-3">
+    <AnimatePresence>
+      {toast && (
+    <m.div key={toast.id} className="pt-safe fixed inset-x-0 top-0 z-[65] flex justify-center px-3 pt-3" role="status" aria-live="polite"
+      initial={{ opacity: 0, y: -20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -20, scale: 0.95 }} transition={{ type: 'spring', stiffness: 380, damping: 32 }}>
+      <div className="flex w-full max-w-md items-start gap-3 glass-strong rounded-3xl p-3">
         <button className="flex min-w-0 flex-1 items-start gap-3 text-left" onClick={() => { dismissToast(); setCenterOpen(true) }}>
           <Icon n={toast} />
           <span className="min-w-0"><span className="block text-sm font-bold">{toast.title}</span><span className="block truncate text-xs text-muted">{toast.body}</span></span>
         </button>
         <button className="rounded-full p-1 text-muted hover:bg-line/60" aria-label={t('Chiudi')} onClick={dismissToast}><X size={16} /></button>
       </div>
-    </div>
+    </m.div>
+      )}
+    </AnimatePresence>
   )
 }

@@ -106,7 +106,7 @@ Limite: PayPal.Me non permette di preselezionare «Per amici e familiari» da li
 
 Money Duo segue il design system di `clean-duo` (`DESIGN_SYSTEM.md`): token RGB per i colori (`bg`, `surface`, `ink`, `muted`, `line`, `brand`, `inc`, `exp`, `trf`, più `warn` per gli avvisi gialli), nessun `dark:` e nessun colore fisso nei componenti, contenuto su card piene e vetro solo su barra, pulsanti, fogli e avvisi, sfondo con tre macchie animate, fallback per «Riduci trasparenza» e «Riduci movimento».
 
-Differenze volute rispetto a Clean Duo: niente Framer Motion (l'indicatore della barra e dei segmenti scivola in CSS), la pagina scorre nella finestra (non in un contenitore unico) e su schermi larghi c'è una barra laterale di vetro invece della cornice «telefono».
+Anche le transizioni sono quelle di Clean Duo, con Framer Motion (`LazyMotion`: le funzioni di layout si caricano in un file a parte e «Riduci movimento» le spegne): goccia della barra e indicatore dei segmenti con `layoutId` e molla, cambio scheda con dissolvenza, scorrimento e sfocatura, righe che entrano ed escono, fogli e avvisi con molla. Differenze volute: la pagina scorre nella finestra (non in un contenitore unico) e su schermi larghi c'è una barra laterale di vetro invece della cornice «telefono».
 
 ## Apple Wallet: spese Apple Pay in automatico
 

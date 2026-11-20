@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { animate, m, useMotionValue } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { Check, ChevronDown, X } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
@@ -9,11 +10,19 @@ import { t } from '../i18n'
 const sheetStack: symbol[] = []
 
 export function Sheet({ open, onClose, title, children, footer }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode }) {
+  const [closing, setClosing] = useState(false)
+  const closingRef = useRef(false)
+  // chiusura con l'uscita verso il basso; a fine animazione il genitore smonta il foglio
+  const close = useCallback(() => {
+    if (closingRef.current) return
+    closingRef.current = true; setClosing(true)
+  }, [])
   useEffect(() => {
     if (!open) return
+    closingRef.current = false; setClosing(false)
     const id = Symbol('sheet')
     sheetStack.push(id)
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && sheetStack[sheetStack.length - 1] === id && onClose()
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && sheetStack[sheetStack.length - 1] === id && close()
     document.addEventListener('keydown', onKey)
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -22,35 +31,38 @@ export function Sheet({ open, onClose, title, children, footer }: { open: boolea
       sheetStack.splice(sheetStack.indexOf(id), 1)
       document.body.style.overflow = prev
     }
-  }, [open, onClose])
-  // trascinamento verso il basso dalla maniglia (non dal contenuto, per non litigare con lo scorrimento): oltre 120 px o veloce → chiude
-  const [dragY, setDragY] = useState(0)
-  const drag = useRef<{ y: number; t: number } | null>(null)
-  useEffect(() => { if (open) setDragY(0) }, [open])
-  const onHandleDown = (e: React.PointerEvent) => { drag.current = { y: e.clientY, t: Date.now() }; e.currentTarget.setPointerCapture(e.pointerId) }
-  const onHandleMove = (e: React.PointerEvent) => { if (drag.current) setDragY(Math.max(0, e.clientY - drag.current.y)) }
-  const onHandleUp = (e: React.PointerEvent) => {
-    const d = drag.current; drag.current = null
-    if (!d) return
-    const dy = e.clientY - d.y, v = dy / Math.max(1, Date.now() - d.t)
-    if (dy > 120 || (dy > 30 && v > 0.6)) onClose(); else setDragY(0)
+  }, [open, close])
+
+  // si trascina verso il basso solo dalla maniglia, per non litigare con lo scorrimento del contenuto: oltre 120 px, o veloce, chiude; altrimenti torna su a molla
+  const dragY = useMotionValue(0)
+  const grab = useRef<{ y: number; t: number } | null>(null)
+  const onDown = (e: React.PointerEvent) => { grab.current = { y: e.clientY, t: performance.now() }; e.currentTarget.setPointerCapture(e.pointerId) }
+  const onMove = (e: React.PointerEvent) => { if (grab.current) { const dy = e.clientY - grab.current.y; dragY.set(dy > 0 ? dy : 0) } }
+  const onUp = (e: React.PointerEvent) => {
+    const g = grab.current; grab.current = null
+    if (!g) return
+    const dy = e.clientY - g.y, v = (dy / Math.max(1, performance.now() - g.t)) * 1000
+    if (dy > 120 || v > 600) close(); else animate(dragY, 0, { type: 'spring', stiffness: 380, damping: 38 })
   }
   if (!open) return null
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center md:items-center">
-      <div className="absolute inset-0 animate-fade bg-ink/30 backdrop-blur-sm" onClick={onClose} />
-      <div role="dialog" aria-modal="true" aria-label={title} className="relative flex max-h-[92dvh] w-full animate-sheet flex-col glass-strong rounded-t-[2rem] shadow-2xl md:max-w-lg md:rounded-[2rem]"
-        style={dragY ? { transform: `translateY(${dragY}px)`, transition: drag.current ? 'none' : 'transform .2s' } : undefined}>
-        <div className="flex cursor-grab touch-none justify-center pb-1 pt-3" data-testid="sheet-handle" onPointerDown={onHandleDown} onPointerMove={onHandleMove} onPointerUp={onHandleUp} onPointerCancel={onHandleUp}>
-          <div className="h-1.5 w-10 rounded-full bg-muted/50" />
-        </div>
-        <div className="flex items-center justify-between px-5 pb-2">
-          <h2 className="text-lg font-bold">{title}</h2>
-          <button onClick={onClose} aria-label={t('Chiudi')} className="icon-btn text-muted"><X size={20} /></button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4">{children}</div>
-        {footer && <div className="pb-safe border-t border-line/70 px-5 py-3">{footer}</div>}
-      </div>
+      <m.div className="absolute inset-0 bg-ink/30 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: closing ? 0 : 1 }} transition={{ duration: 0.2 }} onClick={close} />
+      <m.div style={{ y: dragY }} className="relative flex w-full justify-center md:max-w-lg">
+        <m.div role="dialog" aria-modal="true" aria-label={title} className="glass-strong relative flex max-h-[92dvh] w-full flex-col rounded-t-[2rem] shadow-2xl md:rounded-[2rem]"
+          initial={{ y: 48, opacity: 0 }} animate={closing ? { y: '100%', opacity: 0 } : { y: 0, opacity: 1 }} transition={{ type: 'spring', stiffness: 380, damping: 38 }}
+          onAnimationComplete={() => { if (closingRef.current) onClose() }}>
+          <div className="flex cursor-grab touch-none justify-center pb-1 pt-3" data-testid="sheet-handle" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
+            <div className="h-1.5 w-10 rounded-full bg-muted/50" />
+          </div>
+          <div className="flex items-center justify-between px-5 pb-2">
+            <h2 className="text-lg font-bold">{title}</h2>
+            <button onClick={close} aria-label={t('Chiudi')} className="icon-btn text-muted"><X size={20} /></button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4">{children}</div>
+          {footer && <div className="pb-safe border-t border-line/70 px-5 py-3">{footer}</div>}
+        </m.div>
+      </m.div>
     </div>,
     document.body,
   )
@@ -67,16 +79,16 @@ export function Field({ label, children, hint }: { label: string; children: Reac
 }
 
 export function Segmented<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: Array<{ value: T; label: string; color?: string }> }) {
-  const idx = Math.max(0, options.findIndex((o) => o.value === value))
+  const group = `seg-${options.map((o) => o.value).join('-')}` // due selettori nella stessa pagina non si «rubano» l'indicatore
   return (
     <div className="relative flex rounded-full border border-line bg-line/40 p-1">
-      {/* l'indicatore scivola da un segmento all'altro (solo transform) */}
-      <span aria-hidden className="absolute bottom-1 left-1 top-1 rounded-full bg-surface shadow-[0_2px_8px_rgb(var(--ink)/0.15)] transition-transform duration-300 ease-[cubic-bezier(.3,1.3,.5,1)]"
-        style={{ width: `calc((100% - 0.5rem) / ${options.length})`, transform: `translateX(${idx * 100}%)` }} />
       {options.map((o) => (
         <button key={o.value} type="button" onClick={() => onChange(o.value)}
-          className={`relative flex-1 whitespace-nowrap rounded-full px-2 py-1.5 text-sm font-semibold transition active:scale-95 ${value === o.value ? (o.color ?? 'text-brand') : 'text-muted'}`}>
-          {o.label}
+          className="relative flex-1 whitespace-nowrap rounded-full px-2 py-1.5 text-sm font-semibold transition active:scale-95">
+          {value === o.value && (
+            <m.span layoutId={group} className="absolute inset-0 rounded-full bg-surface shadow-[0_2px_8px_rgb(var(--ink)/0.15)]" transition={{ type: 'spring', stiffness: 500, damping: 35 }} />
+          )}
+          <span className={`relative ${value === o.value ? (o.color ?? 'text-brand') : 'text-muted'}`}>{o.label}</span>
         </button>
       ))}
     </div>
