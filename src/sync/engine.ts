@@ -8,6 +8,7 @@ import { DriveError } from './drive'
 import { GoogleAuthError, cachedToken, clearToken, requestToken, revokeToken, setToken, tokenRemainingMs, type Prompt } from './google'
 import { SessionExpired, brokerAvailable, hasSession, logoutBroker, refreshAccessToken, startBrokerLogin } from './auth'
 import { t } from '../i18n'
+import { pickDatabase, pickFolder, pickerConfigured, type Picked } from './picker'
 
 /**
  * Motore di sincronizzazione con un file JSON su Google Drive.
@@ -328,6 +329,15 @@ export class SyncEngine {
     return id ? { id, name: await drive.folderName(token, id).catch(() => t('Cartella')) } : null
   }
 
+  /** Selettore di Google: il database di famiglia (anche condiviso da altri). Solo con il permesso `drive.file`. */
+  async pickDatabase(): Promise<Picked | null> {
+    return pickDatabase(await this.token())
+  }
+  /** Selettore di Google: una cartella del proprio Drive. */
+  async pickFolder(): Promise<Picked | null> {
+    return pickFolder(await this.token())
+  }
+
   async listFolders(parentId: string): Promise<drive.DriveFolder[]> {
     return drive.listFolders(await this.token(), parentId)
   }
@@ -427,6 +437,7 @@ export class SyncEngine {
       return this.set('auth', t('Sessione Google scaduta: riconnettiti per continuare a sincronizzare.'))
     }
     if (e instanceof DriveError) {
+      if (e.status === 404 && pickerConfigured()) return this.set('error', t('Non riesco ad aprire il database: scegli di nuovo il file con il selettore di Google (dalle Impostazioni → Sincronizzazione). Se non lo vedi, forse sei stato rimosso dalla famiglia o il file è stato spostato.'))
       if (e.status === 404) return this.set('error', t('Non hai più accesso al database: forse sei stato rimosso dalla famiglia o il file è stato spostato. Puoi scollegarti da Impostazioni.'))
       if (e.status === 403) return this.set('error', t('Permesso negato: serve l\'accesso in modifica al file.') + ' ' + e.message)
       return this.set('error', t('Errore Google Drive ({status}): {message}', { status: e.status, message: e.message }))

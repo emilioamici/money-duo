@@ -51,6 +51,12 @@ async function login(): Promise<{ sid: string; location: string }> {
 }
 
 describe('/auth/start', () => {
+  it('con scope=file chiede solo il permesso ristretto drive.file', async () => {
+    const r = await get(`/auth/start?return=${encodeURIComponent(APP)}&scope=file`)
+    expect(new URL(r.headers.get('Location')!).searchParams.get('scope')).toBe('https://www.googleapis.com/auth/drive.file')
+    const other = await get(`/auth/start?return=${encodeURIComponent(APP)}&scope=qualunque`)
+    expect(new URL(other.headers.get('Location')!).searchParams.get('scope')).toBe('https://www.googleapis.com/auth/drive')   // valori sconosciuti: come prima
+  })
   it('reindirizza a Google chiedendo il token di rinnovo e il consenso', async () => {
     const r = await get(`/auth/start?return=${encodeURIComponent(APP)}&hint=emilio@example.com`)
     expect(r.status).toBe(302)

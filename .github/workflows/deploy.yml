@@ -32,6 +32,9 @@ jobs:
           # Facoltative: server delle notifiche push (worker/README.md). Valori pubblici, non segreti.
           VITE_PUSH_URL: ${{ vars.VITE_PUSH_URL }}
           VITE_VAPID_PUBLIC_KEY: ${{ vars.VITE_VAPID_PUBLIC_KEY }}
+          # Facoltative: selettore di Google e permesso ristretto drive.file (vedi README). Valori pubblici, non segreti.
+          VITE_GOOGLE_API_KEY: ${{ vars.VITE_GOOGLE_API_KEY }}
+          VITE_GOOGLE_APP_ID: ${{ vars.VITE_GOOGLE_APP_ID }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

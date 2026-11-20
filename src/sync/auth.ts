@@ -3,6 +3,7 @@
  * ottiene token Google freschi da sola, senza popup né tocchi. Qui si conserva solo un identificativo di sessione casuale.
  */
 import { pushUrl } from './push'
+import { pickerConfigured } from './picker'
 import { t } from '../i18n'
 
 const SID_KEY = 'moneyduo:session'
@@ -38,6 +39,7 @@ export function startBrokerLogin(hint?: string | null): void {
   const back = window.location.origin + window.location.pathname
   const q = new URLSearchParams({ return: back })
   if (hint) q.set('hint', hint)
+  if (pickerConfigured()) q.set('scope', 'file')   // permesso ristretto: solo i file dell'app
   window.location.assign(`${pushUrl()}/auth/start?${q}`)
 }
 

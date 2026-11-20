@@ -6,6 +6,7 @@ import { deactivateMember, newMember, saveFamilyName, saveMember } from '../lib/
 import { Field, MemberAvatar } from './ui'
 import { ask } from './dialogs'
 import { FolderPicker } from './FolderPicker'
+import { pickerConfigured } from '../sync/picker'
 import { parsePaypalHandle } from '../lib/paypal'
 import { t } from '../i18n'
 import { tb } from '../i18n/rich'
@@ -28,7 +29,7 @@ export function FamilyCard() {
   const canManage = sync.canShare
   const unclaimed = db.members.filter((m) => m.active && !m.email && m.id !== me?.id)
 
-  useEffect(() => { if (sync.signedIn) engine.currentFolder().then((f) => setFolder(f?.name ?? null)).catch(() => undefined) }, [sync.signedIn, sync.fileId])
+  useEffect(() => { if (sync.signedIn && !pickerConfigured()) engine.currentFolder().then((f) => setFolder(f?.name ?? null)).catch(() => undefined) }, [sync.signedIn, sync.fileId])
 
   const guard = async (fn: () => Promise<void>) => {
     setBusy(true); setErr(''); setInfo('')
@@ -131,7 +132,7 @@ export function FamilyCard() {
           <p className="font-semibold">{t('Posizione del database')}</p>
           <p className="truncate text-xs text-muted">{sync.fileName}{folder ? ` · ${folder}` : ''}</p>
         </div>
-        {canManage && <button className="btn-soft !px-3 !py-1.5 !text-xs" disabled={busy} onClick={() => setPicking(true)}>{t('Sposta…')}</button>}
+        {canManage && !pickerConfigured() && <button className="btn-soft !px-3 !py-1.5 !text-xs" disabled={busy} onClick={() => setPicking(true)}>{t('Sposta…')}</button>}
       </div>
       {picking && (
         <FolderPicker title={t('Sposta il database in…')} onClose={() => setPicking(false)}

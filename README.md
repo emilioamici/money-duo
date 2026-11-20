@@ -102,6 +102,19 @@ Limite: PayPal.Me non permette di preselezionare «Per amici e familiari» da li
 
 **Lingue.** L'app è in **italiano** e **inglese**: in Impostazioni → Aspetto → *Lingua* si sceglie Automatico (segue la lingua del telefono), Italiano o English; il cambio è immediato e si ricorda sul dispositivo. Cambiano testi, date e importi (`1.234,56 €` / `€1,234.56`; nei campi si accetta sia la virgola sia il punto decimale). Tradurre un testo: nel codice si usa `t('testo in italiano')`, e in `src/i18n/en.ts` la chiave è quel testo; un test controlla che ogni testo usato abbia la traduzione. Le categorie e i nomi dei conti che hai già nel database restano come li hai scritti (sono dati tuoi); quelli di una famiglia nuova nascono nella lingua in uso. Le notifiche arrivano nella lingua del dispositivo di chi le ha generate (per i push, di chi ha fatto la modifica). La pagina privacy resta in italiano.
 
+## Permesso ristretto su Drive (`drive.file`)
+Di base l'app chiede l'accesso a **tutto Drive**. Con il selettore di Google configurato chiede invece solo **`drive.file`**: vede soltanto i file che ha creato lei (come il database) o che scegli tu con il selettore. Gli altri file non sono accessibili. Come effetto collaterale `drive.file` è un permesso non sensibile: l'app può essere pubblicata senza verifica e senza l'avviso «app non verificata».
+
+**Attivarlo** (una volta sola):
+1. *Google Cloud Console → API e servizi → Libreria*: abilita **Google Picker API**.
+2. *Credenziali → Crea credenziali → Chiave API*: limitala a **Siti web** (`https://<utente>.github.io/*`) e alla sola **Google Picker API**.
+3. Il **numero del progetto** è in *Dashboard → Informazioni sul progetto*.
+4. In GitHub, *Settings → Secrets and variables → Actions → Variables*: crea `VITE_GOOGLE_API_KEY` (la chiave) e `VITE_GOOGLE_APP_ID` (il numero del progetto), poi rilancia il deploy. Sono valori pubblici.
+5. Dopo aver provato, in *Google Auth Platform → Accesso ai dati* aggiungi `drive.file` e togli `drive`.
+6. Se usi l'accesso persistente, ripubblica il Worker (`npx wrangler deploy`) e su ogni dispositivo disattiva e riattiva l'accesso persistente (così il token di rinnovo diventa quello ristretto); poi puoi revocare il vecchio permesso su myaccount.google.com/permissions.
+
+**Cosa cambia nell'uso:** il capofamiglia non vede differenze (il suo database l'ha creato l'app). Chi viene invitato, al primo accesso sceglie il file con **«Scegli il database di famiglia»** (lo trova in «Condivisi con me»); poi l'app lo ricorda. La cartella del nuovo database si sceglie con il selettore di Google; *Sposta…* non c'è più (il file si sposta da Drive e l'app lo trova lo stesso). Se Google non riconosce più il permesso su un file, in Sincronizzazione compare «Scegli di nuovo il database». Senza le due variabili tutto resta come prima.
+
 ## Schema del JSON (`schemaVersion: 2`)
 ```jsonc
 {

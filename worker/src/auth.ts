@@ -9,7 +9,8 @@ import type { Env } from './index'
  * Il token di rinnovo non esce mai dal Worker.
  */
 
-const SCOPE = 'https://www.googleapis.com/auth/drive'
+const SCOPE_FULL = 'https://www.googleapis.com/auth/drive'
+const SCOPE_FILE = 'https://www.googleapis.com/auth/drive.file'
 const SESSION_TTL = 180 * 24 * 3600
 const TOUCH_AFTER_MS = 30 * 24 * 3600 * 1000
 const STATE_TTL = 600
@@ -56,7 +57,7 @@ function page(status: number, title: string, text: string, back?: string): Respo
   return new Response(html, { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } })
 }
 
-/** GET /auth/start?return=<indirizzo dell'app>&hint=<email> → reindirizza a Google chiedendo il token di rinnovo. */
+/** GET /auth/start?return=<indirizzo dell'app>&hint=<email>&scope=file → reindirizza a Google chiedendo il token di rinnovo. `scope=file` chiede solo `drive.file` (i file creati dall'app o scelti dall'utente), altrimenti tutto Drive. */
 export async function authStart(env: Env, req: Request): Promise<Response> {
   if (!authConfigured(env)) return page(503, 'Accesso persistente non configurato', 'Mancano le credenziali Google sul server: segui la guida in worker/README.md.')
   const u = new URL(req.url)
@@ -67,7 +68,7 @@ export async function authStart(env: Env, req: Request): Promise<Response> {
   const state = randomId(16)
   await env.SUBS.put(`st:${state}`, back.toString(), { expirationTtl: STATE_TTL })
   const q = new URLSearchParams({
-    client_id: env.GOOGLE_CLIENT_ID!, redirect_uri: `${u.origin}/auth/callback`, response_type: 'code', scope: SCOPE,
+    client_id: env.GOOGLE_CLIENT_ID!, redirect_uri: `${u.origin}/auth/callback`, response_type: 'code', scope: u.searchParams.get('scope') === 'file' ? SCOPE_FILE : SCOPE_FULL,
     access_type: 'offline', prompt: 'consent', state, include_granted_scopes: 'false',
   })
   const hint = u.searchParams.get('hint')
