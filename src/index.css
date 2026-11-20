@@ -17,6 +17,7 @@
   --inc: 35 118 75;
   --exp: 192 40 63;
   --trf: 42 107 153;
+  --warn: 133 77 14;
   --chart-line: 176 82 15;
   /* Liquid Glass: velo (colore e opacità), luce sul bordo e ombra. Il vetro è solo per navigazione, comandi e fogli; il contenuto resta pieno. */
   --glass: 255 253 249 / 0.78;
@@ -43,6 +44,7 @@
     --inc: 111 214 163;
     --exp: 244 144 154;
     --trf: 124 196 234;
+    --warn: 246 196 83;
     --chart-line: 230 187 120;
     --glass: 33 36 43 / 0.72;
     --glass-strong: 33 36 43 / 0.9;
@@ -66,6 +68,7 @@
   --inc: 111 214 163;
   --exp: 244 144 154;
   --trf: 124 196 234;
+  --warn: 246 196 83;
   --chart-line: 230 187 120;
   --glass: 33 36 43 / 0.72;
   --glass-strong: 33 36 43 / 0.9;
@@ -105,13 +108,13 @@ button { @apply select-none; }
   .btn::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(105deg, transparent 30%, rgb(255 255 255 / 0.5) 50%, transparent 70%); transform: translateX(-120%) skewX(-20deg); }
   .btn:hover::after, .btn:active::after { animation: shine 0.9s ease-out; }
   .btn-primary { @apply btn text-onbrand; background: rgb(var(--brand)); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.35), 0 8px 20px -8px rgb(var(--brand) / 0.7); }
-  .btn-soft, .btn-danger, .icon-btn { background: rgb(var(--glass)); -webkit-backdrop-filter: blur(18px) saturate(1.8); backdrop-filter: blur(18px) saturate(1.8);
+  .btn-soft, .btn-danger, .icon-btn { background: rgb(var(--glass)); -webkit-backdrop-filter: blur(22px) saturate(1.8); backdrop-filter: blur(22px) saturate(1.8);
     border: 1px solid rgb(var(--glass-edge-soft)); box-shadow: inset 0 1.5px 0 rgb(var(--glass-edge)), 0 6px 18px -8px rgb(var(--glass-shade)); }
   .btn-soft { @apply btn text-brand; }
   .btn-ghost { @apply btn bg-transparent text-ink hover:bg-line/50; }
   .btn-danger { @apply btn text-exp; }
   .icon-btn { @apply relative inline-flex select-none items-center justify-center rounded-full p-2.5 text-ink transition duration-200 active:scale-90; }
-  .input { @apply w-full rounded-2xl border border-line bg-bg px-3.5 py-2.5 text-[15px] outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/25; }
+  .input { @apply w-full rounded-2xl border border-line bg-bg px-3.5 py-2.5 text-[15px] outline-none transition placeholder:text-muted/70 focus:border-brand focus:ring-2 focus:ring-brand/25; }
   .label { @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted; }
   .chip { @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-line bg-surface/80 px-3.5 py-1.5 text-sm font-medium text-ink transition active:scale-95; }
   /* Liquid Glass: materiale traslucente con sfocatura, luce speculare sul bordo alto e ombra morbida. */

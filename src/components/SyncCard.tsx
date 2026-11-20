@@ -43,7 +43,7 @@ export function SyncCard() {
       ) : broker && sync.fileId ? (
         <button className="btn-soft mb-3 w-full" disabled={busy} onClick={() => run(() => engine.signIn())}><ShieldCheck size={18} />{t('Attiva l\'accesso persistente')}</button>
       ) : null}
-      {!cacheOk && <p className="mb-3 rounded-xl bg-amber-500/15 p-3 text-sm text-amber-700 dark:text-amber-300">{t('Non riesco a salvare una copia dei dati su questo dispositivo (spazio del browser esaurito o archiviazione bloccata). L\'app funziona, ma a ogni apertura deve riscaricare tutto da Drive e serve la connessione.')}</p>}
+      {!cacheOk && <p className="mb-3 rounded-xl bg-warn/15 p-3 text-sm text-warn">{t('Non riesco a salvare una copia dei dati su questo dispositivo (spazio del browser esaurito o archiviazione bloccata). L\'app funziona, ma a ogni apertura deve riscaricare tutto da Drive e serve la connessione.')}</p>}
       {(sync.error || err) && <p className="mb-3 rounded-xl bg-exp/10 p-3 text-sm text-exp">{err || sync.error}</p>}
       {pickerConfigured() && sync.status === 'error' && sync.fileId && (
         <button className="btn-soft mb-3 w-full" disabled={busy} onClick={() => run(async () => {

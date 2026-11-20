@@ -98,7 +98,7 @@ function CardList() {
   const unlinked = cards.filter((c) => !c.accountId || !accounts.some((a) => a.id === c.accountId)).length
   return (
     <div data-testid="wallet-cards" className="rounded-xl bg-bg p-3">
-      <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-muted"><CreditCard size={14} />{t('Le tue carte')}{unlinked > 0 && <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-300">{t('{n} da associare', { n: unlinked })}</span>}</p>
+      <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-muted"><CreditCard size={14} />{t('Le tue carte')}{unlinked > 0 && <span className="rounded-full bg-warn/20 px-2 py-0.5 text-[11px] font-bold text-warn">{t('{n} da associare', { n: unlinked })}</span>}</p>
       {cards.length === 0 ? (
         <p className="text-muted">{t('Nessuna carta ancora: compare qui al primo pagamento con Apple Pay, e poi scegli a quale conto va associata.')}</p>
       ) : (

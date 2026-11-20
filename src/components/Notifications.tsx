@@ -24,7 +24,7 @@ const ago = (iso: string): string => {
 }
 
 const Icon = ({ n }: { n: Notif }) => (
-  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${n.kind === 'tx' ? 'bg-brand/15 text-brand' : 'bg-emerald-500/15 text-emerald-600'}`}>
+  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${n.kind === 'tx' ? 'bg-brand/15 text-brand' : 'bg-inc/15 text-inc'}`}>
     {n.kind === 'tx' ? <Receipt size={18} /> : <Wallet size={18} />}
   </span>
 )
@@ -77,7 +77,7 @@ export function NotificationToast() {
   const { toast, dismissToast, setCenterOpen } = useApp()
   if (!toast) return null
   return (
-    <div className="pt-safe fixed inset-x-0 top-0 z-[60] flex justify-center px-3 pt-3" role="status" aria-live="polite">
+    <div className="pt-safe fixed inset-x-0 top-0 z-[65] flex justify-center px-3 pt-3" role="status" aria-live="polite">
       <div className="flex w-full max-w-md animate-sheet items-start gap-3 glass-strong rounded-3xl p-3">
         <button className="flex min-w-0 flex-1 items-start gap-3 text-left" onClick={() => { dismissToast(); setCenterOpen(true) }}>
           <Icon n={toast} />

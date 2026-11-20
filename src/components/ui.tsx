@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, ChevronDown, X } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
@@ -23,12 +23,28 @@ export function Sheet({ open, onClose, title, children, footer }: { open: boolea
       document.body.style.overflow = prev
     }
   }, [open, onClose])
+  // trascinamento verso il basso dalla maniglia (non dal contenuto, per non litigare con lo scorrimento): oltre 120 px o veloce → chiude
+  const [dragY, setDragY] = useState(0)
+  const drag = useRef<{ y: number; t: number } | null>(null)
+  useEffect(() => { if (open) setDragY(0) }, [open])
+  const onHandleDown = (e: React.PointerEvent) => { drag.current = { y: e.clientY, t: Date.now() }; e.currentTarget.setPointerCapture(e.pointerId) }
+  const onHandleMove = (e: React.PointerEvent) => { if (drag.current) setDragY(Math.max(0, e.clientY - drag.current.y)) }
+  const onHandleUp = (e: React.PointerEvent) => {
+    const d = drag.current; drag.current = null
+    if (!d) return
+    const dy = e.clientY - d.y, v = dy / Math.max(1, Date.now() - d.t)
+    if (dy > 120 || (dy > 30 && v > 0.6)) onClose(); else setDragY(0)
+  }
   if (!open) return null
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center md:items-center">
-      <div className="absolute inset-0 animate-fade bg-black/40 backdrop-blur-[3px]" onClick={onClose} />
-      <div role="dialog" aria-modal="true" aria-label={title} className="relative flex max-h-[92dvh] w-full animate-sheet flex-col glass-strong rounded-t-[2rem] shadow-2xl md:max-w-lg md:rounded-[2rem]">
-        <div className="flex items-center justify-between px-5 pb-2 pt-4">
+      <div className="absolute inset-0 animate-fade bg-ink/30 backdrop-blur-sm" onClick={onClose} />
+      <div role="dialog" aria-modal="true" aria-label={title} className="relative flex max-h-[92dvh] w-full animate-sheet flex-col glass-strong rounded-t-[2rem] shadow-2xl md:max-w-lg md:rounded-[2rem]"
+        style={dragY ? { transform: `translateY(${dragY}px)`, transition: drag.current ? 'none' : 'transform .2s' } : undefined}>
+        <div className="flex cursor-grab touch-none justify-center pb-1 pt-3" data-testid="sheet-handle" onPointerDown={onHandleDown} onPointerMove={onHandleMove} onPointerUp={onHandleUp} onPointerCancel={onHandleUp}>
+          <div className="h-1.5 w-10 rounded-full bg-muted/50" />
+        </div>
+        <div className="flex items-center justify-between px-5 pb-2">
           <h2 className="text-lg font-bold">{title}</h2>
           <button onClick={onClose} aria-label={t('Chiudi')} className="icon-btn text-muted"><X size={20} /></button>
         </div>
@@ -51,11 +67,15 @@ export function Field({ label, children, hint }: { label: string; children: Reac
 }
 
 export function Segmented<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: Array<{ value: T; label: string; color?: string }> }) {
+  const idx = Math.max(0, options.findIndex((o) => o.value === value))
   return (
-    <div className="flex rounded-xl bg-line/50 p-1">
+    <div className="relative flex rounded-full border border-line bg-line/40 p-1">
+      {/* l'indicatore scivola da un segmento all'altro (solo transform) */}
+      <span aria-hidden className="absolute bottom-1 left-1 top-1 rounded-full bg-surface shadow-[0_2px_8px_rgb(var(--ink)/0.15)] transition-transform duration-300 ease-[cubic-bezier(.3,1.3,.5,1)]"
+        style={{ width: `calc((100% - 0.5rem) / ${options.length})`, transform: `translateX(${idx * 100}%)` }} />
       {options.map((o) => (
         <button key={o.value} type="button" onClick={() => onChange(o.value)}
-          className={`flex-1 rounded-lg px-2 py-2 text-sm font-semibold transition ${value === o.value ? 'bg-surface shadow ' + (o.color ?? 'text-brand') : 'text-muted'}`}>
+          className={`relative flex-1 whitespace-nowrap rounded-full px-2 py-1.5 text-sm font-semibold transition active:scale-95 ${value === o.value ? (o.color ?? 'text-brand') : 'text-muted'}`}>
           {o.label}
         </button>
       ))}
@@ -71,7 +91,7 @@ export function Toggle({ checked, onChange, label, hint }: { checked: boolean; o
         {hint && <span className="block text-xs text-muted">{hint}</span>}
       </span>
       <span className={`relative h-6 w-11 shrink-0 rounded-full transition ${checked ? 'bg-brand' : 'bg-line'}`}>
-        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${checked ? 'left-[22px]' : 'left-0.5'}`} />
+        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-surface shadow transition-all ${checked ? 'left-[22px]' : 'left-0.5'}`} />
       </span>
     </button>
   )
@@ -116,7 +136,7 @@ export function MembersBadge({ ids }: { ids: string[] }) {
   const { db } = useApp()
   const text = ids.length === 0 ? t('Tutta la famiglia') : ids.map((id) => db.members.find((m) => m.id === id)?.name ?? '?').join(', ')
   const shared = ids.length !== 1
-  return <span className={`max-w-[12rem] truncate rounded-full px-2 py-0.5 text-[11px] font-semibold ${shared ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-300' : 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-300'}`}>{text}</span>
+  return <span className={`max-w-[12rem] truncate rounded-full px-2 py-0.5 text-[11px] font-semibold ${shared ? 'bg-inc/15 text-inc' : 'bg-trf/15 text-trf'}`}>{text}</span>
 }
 
 export function EmptyState({ title, text, action }: { icon?: ReactNode; title: string; text?: string; action?: ReactNode }) {

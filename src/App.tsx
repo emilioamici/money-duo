@@ -55,8 +55,8 @@ function Shell() {
         {tab === 'settings' && <SettingsPage syncRef={syncRef} openSync={syncReq} />}
       </main>
 
-      {fabOpen && <div className="fixed inset-0 z-30 animate-fade bg-black/40 md:hidden" onClick={() => setFabOpen(false)} />}
-      <div className="fixed bottom-[calc(5.75rem+env(safe-area-inset-bottom))] right-4 z-40 flex flex-col items-end gap-3 md:hidden">
+      {fabOpen && <div className="fixed inset-0 z-20 animate-fade bg-ink/30 md:hidden" onClick={() => setFabOpen(false)} />}
+      <div className="fixed bottom-[calc(5.75rem+env(safe-area-inset-bottom))] right-5 z-30 flex flex-col items-end gap-3 md:hidden">
         {fabOpen && (
           <>
             <button onClick={() => { setFabOpen(false); setFavOpen(true) }} className="flex animate-sheet items-center gap-2 glass rounded-full py-3 pl-4 pr-5 text-sm font-semibold">
@@ -76,13 +76,13 @@ function Shell() {
         </button>
       </div>
 
-      <nav className="glass fixed inset-x-4 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-20 grid grid-cols-4 !rounded-full p-1.5 md:hidden">
+      <nav className="glass fixed inset-x-4 bottom-4 z-40 grid grid-cols-4 !rounded-full p-1.5 md:hidden" style={{ marginBottom: 'env(safe-area-inset-bottom)' }}>
         {/* la «goccia» di vetro che segna la scheda attiva scivola da una voce all'altra */}
-        <span aria-hidden className="glass-active absolute bottom-1.5 left-1.5 top-1.5 rounded-full transition-transform duration-300 ease-[cubic-bezier(.3,1.3,.5,1)]"
+        <span aria-hidden className="glass-active absolute bottom-1.5 left-1.5 top-1.5 rounded-full transition-transform duration-[350ms] ease-[cubic-bezier(.3,1.3,.5,1)]"
           style={{ width: 'calc((100% - 0.75rem) / 4)', transform: `translateX(${Math.max(0, TABS.findIndex((x) => x.id === tab)) * 100}%)` }} />
         {TABS.map((tb) => (
           <button key={tb.id} onClick={() => setTab(tb.id)} aria-current={tab === tb.id ? 'page' : undefined}
-            className="relative flex flex-col items-center gap-0.5 rounded-full py-2 text-[11px] font-semibold transition active:scale-90"><span className={`flex flex-col items-center gap-0.5 transition ${tab === tb.id ? 'text-brand' : 'text-muted'}`}><tb.icon size={22} strokeWidth={tab === tb.id ? 2.5 : 2} />{t(tb.label)}</span></button>
+            className="relative flex flex-col items-center gap-0.5 rounded-full py-2 text-[10px] font-semibold transition active:scale-90"><span className={`flex flex-col items-center gap-0.5 transition ${tab === tb.id ? 'text-brand' : 'text-muted'}`}><tb.icon size={22} strokeWidth={tab === tb.id ? 2.6 : 2.1} />{t(tb.label)}</span></button>
         ))}
       </nav>
 

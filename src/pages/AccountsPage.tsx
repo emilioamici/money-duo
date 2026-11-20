@@ -39,7 +39,7 @@ export function AccountsPage() {
 
   return (
     <div>
-      <div className="px-4 pb-3 pt-safe"><div className="flex items-center justify-between pt-3"><h1 className="text-xl font-extrabold tracking-tight">{t('Conti')}</h1><NotificationBell /></div></div>
+      <div className="px-4 pb-3 pt-safe"><div className="flex items-center justify-between pt-3"><h1 className="text-3xl font-extrabold tracking-tight">{t('Conti')}</h1><NotificationBell /></div></div>
       <div className="space-y-3 px-4">
         <MascotPeek kind="mochi">
           <Panel id="accounts-liquidity" label={t('Liquidità totale')} icon={<Wallet size={22} />}

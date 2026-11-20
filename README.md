@@ -102,6 +102,12 @@ Limite: PayPal.Me non permette di preselezionare «Per amici e familiari» da li
 
 **Lingue.** L'app è in **italiano** e **inglese**: in Impostazioni → Aspetto → *Lingua* si sceglie Automatico (segue la lingua del telefono), Italiano o English; il cambio è immediato e si ricorda sul dispositivo. Cambiano testi, date e importi (`1.234,56 €` / `€1,234.56`; nei campi si accetta sia la virgola sia il punto decimale). Tradurre un testo: nel codice si usa `t('testo in italiano')`, e in `src/i18n/en.ts` la chiave è quel testo; un test controlla che ogni testo usato abbia la traduzione. Le categorie e i nomi dei conti che hai già nel database restano come li hai scritti (sono dati tuoi); quelli di una famiglia nuova nascono nella lingua in uso. Le notifiche arrivano nella lingua del dispositivo di chi le ha generate (per i push, di chi ha fatto la modifica). La pagina privacy resta in italiano.
 
+## Stile (design system di Clean Duo)
+
+Money Duo segue il design system di `clean-duo` (`DESIGN_SYSTEM.md`): token RGB per i colori (`bg`, `surface`, `ink`, `muted`, `line`, `brand`, `inc`, `exp`, `trf`, più `warn` per gli avvisi gialli), nessun `dark:` e nessun colore fisso nei componenti, contenuto su card piene e vetro solo su barra, pulsanti, fogli e avvisi, sfondo con tre macchie animate, fallback per «Riduci trasparenza» e «Riduci movimento».
+
+Differenze volute rispetto a Clean Duo: niente Framer Motion (l'indicatore della barra e dei segmenti scivola in CSS), la pagina scorre nella finestra (non in un contenitore unico) e su schermi larghi c'è una barra laterale di vetro invece della cornice «telefono».
+
 ## Apple Wallet: spese Apple Pay in automatico
 
 Con il server delle notifiche (cartella `worker`) attivo, ogni persona può collegare i propri pagamenti con Apple Pay: da *Impostazioni → Apple Wallet* si attiva e si copia il proprio indirizzo personale, poi sull'iPhone si crea un'automazione «Transazione» nell'app Comandi (le istruzioni sono nella scheda). Ogni pagamento diventa una transazione **senza categoria e con un segno giallo «Da approvare»** (o «Da completare» finché la carta non è associata a un conto: le carte usate compaiono in *Impostazioni → Apple Wallet → Le tue carte* e si associano con un tocco): la si approva dal menu a scorrimento, oppure la si apre e la si salva. Dettagli e privacy in `worker/README.md`.

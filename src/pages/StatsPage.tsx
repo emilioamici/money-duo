@@ -64,7 +64,7 @@ export function StatsPage() {
   return (
     <div>
       <div className="space-y-3 px-4 pt-safe">
-        <div className="flex items-center justify-between pt-3"><h1 className="text-xl font-extrabold tracking-tight">{t('Statistiche')}</h1><NotificationBell /></div>
+        <div className="flex items-center justify-between pt-3"><h1 className="text-3xl font-extrabold tracking-tight">{t('Statistiche')}</h1><NotificationBell /></div>
         <MascotPeek kind="zenitsu" side="left">
           <Panel id="debts" label={t('Saldi tra i membri')} icon={<Handshake size={22} />}
             headline={head
@@ -80,7 +80,7 @@ export function StatsPage() {
         </MascotPeek>
         <LiquidityPanel />
       </div>
-      <div className="sticky top-0 z-10 mt-3 space-y-3 bg-bg/35 px-4 pb-3 pt-2 backdrop-blur-xl">
+      <div className="mt-3 space-y-3 px-4 pb-3 pt-2">
         <MonthNav />
         <ScopeChips />
       </div>

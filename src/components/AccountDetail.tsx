@@ -21,10 +21,10 @@ export function AccountDetail({ account, onBack, onEdit }: { account: Account; o
 
   return (
     <div>
-      <div className="sticky top-0 z-10 space-y-3 bg-bg/35 px-4 pb-3 pt-safe backdrop-blur-xl">
+      <div className="space-y-3 px-4 pb-3 pt-safe">
         <div className="flex items-center gap-2 pt-3">
           <button className="icon-btn" onClick={onBack} aria-label={t('Torna ai conti')}><ArrowLeft size={22} /></button>
-          <h1 className="min-w-0 flex-1 truncate text-xl font-extrabold tracking-tight">{account.name}</h1>
+          <h1 className="min-w-0 flex-1 truncate text-2xl font-extrabold tracking-tight">{account.name}</h1>
           <button className="icon-btn" onClick={onEdit} aria-label={t('Modifica conto')}><Pencil size={20} /></button>
         </div>
         <MonthNav />

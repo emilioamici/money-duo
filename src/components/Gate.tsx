@@ -72,7 +72,7 @@ export function Gate({ reconnect = false }: { reconnect?: boolean }) {
         <p className="mt-2 text-sm text-muted">{t('Spese personali e conti di famiglia, nel tuo Google Drive.')}</p>
       </div>
 
-      <div className="card space-y-4 p-5">
+      <div className="glass-strong space-y-4 p-5">
         {err && <p className="rounded-xl bg-exp/10 p-3 text-sm text-exp">{err}</p>}
 
         {phase === 'login' && reconnect && (
