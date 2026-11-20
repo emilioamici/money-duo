@@ -7,7 +7,7 @@ import { diffNotifications, mergeNotifications, type Notif } from '../lib/notifi
 import { engine, type SyncState } from '../sync/engine'
 import { PushHttpError, enablePush, pushConfigured, pushSupported, refreshPush, sendPush } from '../sync/push'
 import { ackWallet, pullWallet, walletAvailable, walletOn } from '../sync/wallet'
-import { importWallet } from '../lib/wallet'
+import { importWallet, walletNotifications, walletTxId } from '../lib/wallet'
 import { enqueue, flushQueue, type QueuedPush, type SendResult } from '../sync/pushQueue'
 import { cacheState, getCacheHealth, getLoadedCache, subscribeCacheHealth, writeCache } from './cache'
 import { t } from '../i18n'
@@ -153,6 +153,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const meRef = useRef<Member | null>(null)
   const onRemote = useRef<(prev: Db, next: Db) => void>(() => undefined)
   const walletPullRef = useRef<(force?: boolean) => Promise<number>>(async () => 0)
+  const walletNotifyRef = useRef<(list: Notif[]) => void>(() => undefined)
 
   const apply = useCallback((fn: (prev: Db) => Db, dirty: boolean, source?: 'remote') => {
     const prev = dbRef.current
@@ -188,10 +189,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const r = await pullWallet(snap.fileId, auth)
       if (!r.items.length) return 0
-      const before = dbRef.current.transactions.length
+      const known = new Set(dbRef.current.transactions.map((x) => x.id))
       commit((d) => importWallet(d, m, r.items, prefsRef.current.lastAccountId, nowIso()))
       await ackWallet(snap.fileId, auth, r.items.map((i) => i.id))
-      return dbRef.current.transactions.length - before
+      // le spese davvero nuove avvisano l'utente (campanella e, con l'app aperta, un avviso in alto)
+      const added = r.items.map((i) => dbRef.current.transactions.find((x) => x.id === walletTxId(i))).filter((x): x is Transaction => !!x && !known.has(x.id))
+      walletNotifyRef.current(walletNotifications(added, nowIso()))
+      return added.length
     } catch { return 0 } finally { walletBusy.current = false }
   }
   const importWalletNow = useCallback(() => walletPullRef.current(true), [])
@@ -285,6 +289,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setNotifications((cur) => { const merged = mergeNotifications(cur, fresh); persistNotifs(merged); return merged })
     if (document.visibilityState === 'visible') setToast(fresh[0])
     else if (prefsRef.current.systemNotif) for (const n of fresh.slice(0, 3)) void systemNotify(n)
+  }
+  walletNotifyRef.current = (list) => {
+    if (!list.length) return
+    setNotifications((cur) => { const merged = mergeNotifications(cur, list); persistNotifs(merged); return merged })
+    if (document.visibilityState === 'visible') setToast(list[0])
+    // con l'app in secondo piano ma aperta, e senza push dal server, la notifica la mostra il dispositivo
+    else if (prefsRef.current.systemNotif && !prefsRef.current.pushEnabled) for (const n of list.slice(0, 3)) void systemNotify(n)
   }
   const markRead = useCallback((id: string) => setNotifications((cur) => { const n = cur.map((x) => (x.id === id ? { ...x, read: true } : x)); persistNotifs(n); return n }), [persistNotifs])
   const markAllRead = useCallback(() => setNotifications((cur) => { const n = cur.map((x) => ({ ...x, read: true })); persistNotifs(n); return n }), [persistNotifs])

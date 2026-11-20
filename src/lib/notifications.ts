@@ -4,7 +4,7 @@ import { formatMoney } from './format'
 import { nowIso } from './ids'
 import { t as tr } from '../i18n'
 
-export type NotifKind = 'tx' | 'account-new' | 'account-shared'
+export type NotifKind = 'tx' | 'account-new' | 'account-shared' | 'wallet'
 
 export interface Notif {
   id: string

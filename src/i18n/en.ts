@@ -1,5 +1,9 @@
 /** Traduzioni in inglese. La chiave è il testo italiano usato nel codice con `t('…')`; i segnaposto {nome} e i <b>…</b> devono coincidere. */
 export const EN: Record<string, string> = {
+  "{n} spese da Wallet da approvare": "{n} Wallet expenses to approve",
+  "Spesa da Wallet da completare": "Wallet expense to complete",
+  "Spesa da Wallet da approvare": "Wallet expense to approve",
+  "Per ricevere una notifica a ogni pagamento, anche con l'app chiusa, attiva le notifiche in Impostazioni → Notifiche.": "To get a notification at every payment, even with the app closed, turn on notifications in Settings → Notifications.",
   "Aggiunta via Wallet": "Added via Wallet",
   "Importata da Apple Wallet: la carta non è ancora associata a un conto. Scegli il conto e la categoria e salva (oppure associa la carta da Impostazioni → Apple Wallet).": "Imported from Apple Wallet: the card is not linked to an account yet. Choose the account and category and save (or link the card in Settings → Apple Wallet).",
   "Fatto: al prossimo pagamento con Apple Pay la spesa compare in Transazioni e la carta compare nell'elenco «Le tue carte»: scegli a quale conto associarla, e da lì in poi i pagamenti di quella carta vanno direttamente su quel conto.": "Done: at the next Apple Pay payment the expense shows up in Transactions and the card appears in the “Your cards” list: choose which account to link it to, and from then on payments with that card go straight to that account.",

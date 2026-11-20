@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createDefaultDb } from './defaults'
-import { approveTransaction, isWalletTx, cardAccount, cardsOf, importWallet, pendingCount, removeCard, setCardAccount, walletTxId, type WalletItem } from './wallet'
+import { approveTransaction, isWalletTx, walletNotifications, cardAccount, cardsOf, importWallet, pendingCount, removeCard, setCardAccount, walletTxId, type WalletItem } from './wallet'
 import { deleteTransaction, saveAccount } from './mutations'
 import { parseDb } from './merge'
 import type { Account, Db, Member } from '../types'
@@ -32,6 +32,23 @@ describe('Apple Wallet: associazione carta → conto', () => {
     expect(cardAccount(db, 'a', 'Visa 1')).toBeNull()
     const db2 = setCardAccount(base(), 'a', 'Visa 1', 'visa', NOW)
     expect(cardAccount(saveAccount(db2, { ...db2.accounts[0], hidden: true }), 'a', 'Visa 1')).toBeNull()
+  })
+})
+
+describe('Apple Wallet: notifiche', () => {
+  it('una per spesa, con esercente e importo; «da completare» se la carta non è associata', () => {
+    const db = importWallet(setCardAccount(base(), 'a', 'Visa Emilio', 'visa', NOW), emilio, [item(), item({ id: 'x2', card: 'Revolut', merchant: 'Bar' })], undefined, NOW)
+    const n = walletNotifications(db.transactions, NOW)
+    expect(n).toHaveLength(2)
+    expect(n[0]).toMatchObject({ kind: 'wallet', id: 'wallet:w-x1', txId: 'w-x1', title: 'Spesa da Wallet da approvare' })
+    expect(n[0].body).toContain('Esselunga'); expect(n[0].body).toContain('12,50')
+    expect(n[1].title).toBe('Spesa da Wallet da completare')
+  })
+  it('oltre 3 spese un solo riepilogo; nessuna spesa nessuna notifica', () => {
+    const db = importWallet(base(), emilio, [1, 2, 3, 4].map((i) => item({ id: 'y' + i })), undefined, NOW)
+    expect(walletNotifications(db.transactions, NOW)).toHaveLength(1)
+    expect(walletNotifications(db.transactions, NOW)[0].title).toBe('4 spese da Wallet da approvare')
+    expect(walletNotifications([], NOW)).toEqual([])
   })
 })
 

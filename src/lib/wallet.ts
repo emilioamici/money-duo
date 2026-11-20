@@ -1,6 +1,8 @@
 import type { Account, Db, Member, Transaction, WalletCard } from '../types'
 import { accountMemberIds, sortedAccounts } from './calc'
 import { t } from '../i18n'
+import { formatMoney } from './format'
+import type { Notif } from './notifications'
 
 /** Spesa arrivata da Apple Wallet attraverso il server (vedi worker/src/wallet.ts). */
 export interface WalletItem { id: string; amount: number; merchant: string; card: string; at: string }
@@ -79,6 +81,20 @@ export function setCardAccount(db: Db, memberId: string, card: string, accountId
 /** Toglie la carta dall'elenco (ricomparirà da associare al prossimo pagamento). */
 export const removeCard = (db: Db, memberId: string, card: string, nowIso: string): Db =>
   withCards(db, memberId, cardsOf(db, memberId).filter((c) => cardKey(c.name) !== cardKey(card)), nowIso)
+
+/**
+ * Notifiche per le spese appena importate da Wallet (una per spesa; oltre 3, un riepilogo). Funzione pura.
+ * Compaiono nella campanella, e come avviso se l'app è aperta; con l'app chiusa le manda il server come notifica push.
+ */
+export function walletNotifications(added: Transaction[], nowIso: string): Notif[] {
+  if (!added.length) return []
+  if (added.length > 3) {
+    return [{ id: `wallet:group:${added.map((x) => x.id).sort()[0]}:${added.length}`, kind: 'wallet', at: nowIso, read: false, txId: added[0].id,
+      title: t('{n} spese da Wallet da approvare', { n: added.length }), body: added.slice(0, 3).map((x) => x.title || 'Apple Pay').join(', ') + '…' }]
+  }
+  return added.map((x) => ({ id: `wallet:${x.id}`, kind: 'wallet' as const, at: nowIso, read: false, txId: x.id,
+    title: t(x.pending === 'complete' ? 'Spesa da Wallet da completare' : 'Spesa da Wallet da approvare'), body: `${x.title || 'Apple Pay'} · ${formatMoney(x.amount)}` }))
+}
 
 /** Approva: la transazione diventa una come le altre. */
 export function approveTransaction(db: Db, id: string, nowIso: string): Db {
