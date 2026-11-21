@@ -31,5 +31,7 @@ async function post<T>(path: string, auth: string, body: unknown): Promise<T> {
 /** `rotate` = genera un nuovo token (il Comando Rapido va aggiornato). Senza, se esiste già, `token` è assente. */
 export const createToken = (fileId: string, auth: string, rotate = false) => post<{ exists: boolean; token?: string }>('/wallet/token', auth, { fileId, rotate })
 export const revokeWallet = (fileId: string, auth: string) => post<{ ok: true }>('/wallet/revoke', auth, { fileId })
-export const pullWallet = (fileId: string, auth: string) => post<{ enabled: boolean; items: WalletItem[] }>('/wallet/pull', auth, { fileId })
+/** Un arrivo dal Comando Rapido registrato dal server: esito e, se rifiutato, il motivo e cosa è arrivato. */
+export interface WalletLogEntry { at: string; status: number; reason?: string; amount?: string; fields?: string[] }
+export const pullWallet = (fileId: string, auth: string) => post<{ enabled: boolean; items: WalletItem[]; log?: WalletLogEntry[] }>('/wallet/pull', auth, { fileId })
 export const ackWallet = (fileId: string, auth: string, ids: string[]) => post<{ ok: true }>('/wallet/ack', auth, { fileId, ids })

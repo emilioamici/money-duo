@@ -1,5 +1,15 @@
 /** Traduzioni in inglese. La chiave è il testo italiano usato nel codice con `t('…')`; i segnaposto {nome} e i <b>…</b> devono coincidere. */
 export const EN: Record<string, string> = {
+  "Su questo database non risulta nessun indirizzo attivo (l'hai creato con un altro database?): premi «Nuovo indirizzo» e aggiorna il Comando Rapido.": "No address is active on this database (did you create it with another database?): press “New address” and update the Shortcut.",
+  "Sul server ci sono {n} spese in attesa ma non sono state importate: controlla di avere un conto che puoi usare.": "There are {n} expenses waiting on the server but they were not imported: check that you have an account you can use.",
+  "Nessuna nuova spesa da importare. Se ne hai appena fatta una, guarda «Ultimi arrivi» qui sotto: dice cosa ha ricevuto il server.": "No new expenses to import. If you just made one, look at “Latest arrivals” below: it shows what the server received.",
+  "Ultimi arrivi dal Comando Rapido": "Latest arrivals from the Shortcut",
+  "Aggiorna": "Refresh",
+  "Controllo…": "Checking…",
+  "Nessun arrivo registrato: il Comando Rapido non ha ancora contattato il server (oppure il Worker non è aggiornato all'ultima versione).": "No arrival recorded: the Shortcut has not contacted the server yet (or the Worker is not up to date).",
+  "ricevuta": "received",
+  "rifiutata: {reason}": "rejected: {reason}",
+  "arrivato: importo «{amount}», campi {fields}": "received: amount “{amount}”, fields {fields}",
   "L'iscrizione di questo dispositivo era scaduta e il server l'ha tolta: disattiva e riattiva le notifiche, poi riprova.": "This device's subscription had expired and the server removed it: turn notifications off and on again, then retry.",
   "Il server ha provato a inviare ma il servizio di notifiche del telefono ha rifiutato (codice {codes}). Disattiva e riattiva le notifiche; se continua, controlla le chiavi VAPID del server.": "The server tried to send but the phone's notification service refused (code {codes}). Turn notifications off and on again; if it continues, check the server's VAPID keys.",
   "Il server non ha nessun dispositivo iscritto per la tua email ({email}): disattiva e riattiva le notifiche e riprova. Se non cambia, l'iscrizione sta fallendo.": "The server has no subscribed device for your email ({email}): turn notifications off and on again and retry. If nothing changes, the subscription is failing.",
