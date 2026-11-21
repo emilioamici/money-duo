@@ -1,12 +1,13 @@
 import { useState } from 'react'
-import { CreditCard, Copy, Download, RefreshCw, Trash2, Wallet, XCircle } from 'lucide-react'
+import { CreditCard, Copy, Download, RefreshCw, Star, Store, Trash2, Wallet, XCircle } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
 import { engine } from '../sync/engine'
 import { createToken, ingestUrl, revokeWallet, savedToken, saveToken, setWalletOn, walletAvailable, walletOn } from '../sync/wallet'
 import { ask } from './dialogs'
 import { accountMemberIds, sortedAccounts } from '../lib/calc'
 import { nowIso } from '../lib/ids'
-import { cardsOf, removeCard, setCardAccount } from '../lib/wallet'
+import { cardsOf, favoritesForMerchants, merchantsOf, removeCard, removeMerchant, setCardAccount, setMerchantFavorite } from '../lib/wallet'
+import { formatMoney } from '../lib/format'
 import { t } from '../i18n'
 
 /**
@@ -66,6 +67,7 @@ export function WalletCard() {
             </div>
           )}
           <CardList />
+          <MerchantList />
           <div className="grid grid-cols-2 gap-2">
             <button className="btn-soft" disabled={busy} onClick={() => void importNow()}><Download size={16} />{t('Importa ora')}</button>
             <button className="btn-soft" disabled={busy} onClick={() => void activate(true)}><RefreshCw size={16} />{t('Nuovo indirizzo')}</button>
@@ -117,6 +119,45 @@ function CardList() {
                   </select>
                 </div>
                 <button className="icon-btn text-muted" aria-label={t('Rimuovi la carta {name}', { name: c.name })} onClick={() => commit((d) => removeCard(d, me.id, c.name, nowIso()))}><Trash2 size={16} /></button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+/** Gli esercenti da cui sono arrivate spese: ognuno si lega a un preferito, e le sue spese arrivano già compilate e approvate. */
+function MerchantList() {
+  const { db, commit, me } = useApp()
+  if (!me) return null
+  const list = [...merchantsOf(db, me.id)].reverse() // i più recenti in alto
+  const favs = favoritesForMerchants(db, me.id)
+  const cats = new Map(db.categories.map((c) => [c.id, c.name]))
+  const label = (f: (typeof favs)[number]) => `${f.title || (f.categoryId && cats.get(f.categoryId)) || t('Preferito')} · ${formatMoney(f.amount)}`
+  const linked = list.filter((m) => m.favoriteId && favs.some((f) => f.id === m.favoriteId)).length
+  return (
+    <div data-testid="wallet-merchants" className="rounded-xl bg-bg p-3">
+      <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-muted"><Store size={14} />{t('I tuoi esercenti')}{linked > 0 && <span className="rounded-full bg-trf/15 px-2 py-0.5 text-[11px] font-bold text-trf">{t('{n} con preferito', { n: linked })}</span>}</p>
+      <p className="mb-2 text-xs text-muted">{t('Lega un esercente a un preferito: quando arriva una sua spesa è già compilata come il preferito (con l\'importo pagato) e approvata.')}</p>
+      {list.length === 0 ? (
+        <p className="text-muted">{t('Nessun esercente ancora: compare qui al primo pagamento con Apple Pay.')}</p>
+      ) : (
+        <ul className="max-h-72 space-y-2 overflow-y-auto">
+          {list.map((m) => {
+            const ok = !!m.favoriteId && favs.some((f) => f.id === m.favoriteId)
+            return (
+              <li key={m.name} data-testid="wallet-merchant" className="flex items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="flex items-center gap-1 truncate font-semibold">{ok && <Star size={12} className="shrink-0 text-warn" />}{m.name}</p>
+                  <select aria-label={t('Preferito per {name}', { name: m.name })} value={ok ? m.favoriteId! : ''} className="input mt-1 !py-1.5 text-sm"
+                    onChange={(e) => commit((d) => setMerchantFavorite(d, me.id, m.name, e.target.value || null, nowIso()))}>
+                    <option value="">{t('Nessun preferito')}</option>
+                    {favs.map((f) => <option key={f.id} value={f.id}>{label(f)}</option>)}
+                  </select>
+                </div>
+                <button className="icon-btn text-muted" aria-label={t('Rimuovi l\'esercente {name}', { name: m.name })} onClick={() => commit((d) => removeMerchant(d, me.id, m.name, nowIso()))}><Trash2 size={16} /></button>
               </li>
             )
           })}

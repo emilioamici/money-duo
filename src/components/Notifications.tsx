@@ -1,5 +1,6 @@
 import { AnimatePresence, m } from 'framer-motion'
 import { MascotImg } from './Mascots'
+import { WalletGlyph } from './WalletBadge'
 import { Bell, Receipt, Wallet, X } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
 import { Sheet } from './ui'
@@ -24,8 +25,10 @@ const ago = (iso: string): string => {
   return new Intl.DateTimeFormat(locale(), { day: 'numeric', month: 'short' }).format(new Date(iso))
 }
 
-const Icon = ({ n }: { n: Notif }) => (
-  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${n.kind === 'tx' || n.kind === 'wallet' ? 'bg-brand/15 text-brand' : 'bg-inc/15 text-inc'}`}>
+const Icon = ({ n }: { n: Notif }) => n.kind === 'wallet' ? (
+  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-trf/15"><WalletGlyph size={20} /></span>
+) : (
+  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${n.kind === 'tx' ? 'bg-brand/15 text-brand' : 'bg-inc/15 text-inc'}`}>
     {n.kind === 'tx' ? <Receipt size={18} /> : <Wallet size={18} />}
   </span>
 )

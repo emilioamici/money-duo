@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { createDefaultDb } from './defaults'
-import { approveTransaction, isWalletTx, walletNotifications, cardAccount, cardsOf, importWallet, pendingCount, removeCard, setCardAccount, walletTxId, type WalletItem } from './wallet'
+import { favoriteForMerchant, merchantsOf, removeMerchant, setMerchantFavorite, approveTransaction, isWalletTx, walletNotifications, cardAccount, cardsOf, importWallet, pendingCount, removeCard, setCardAccount, walletTxId, type WalletItem } from './wallet'
 import { deleteTransaction, saveAccount } from './mutations'
 import { parseDb } from './merge'
-import type { Account, Db, Member } from '../types'
+import type { Account, Db, Favorite, Member } from '../types'
 
 const NOW = '2026-05-01T10:00:00.000Z'
 const emilio: Member = { id: 'a', name: 'Emilio', email: 'e@x.it', color: '#000', active: true, joinedAt: NOW, updatedAt: NOW }
@@ -102,5 +102,57 @@ describe('Apple Wallet: importazione', () => {
     expect(back.transactions[0]).toMatchObject({ pending: 'complete', walletCard: 'Revolut' })
     expect(cardsOf(back, 'a')).toEqual([{ name: 'Revolut', accountId: null }])
     expect(parseDb(JSON.parse(JSON.stringify(approveTransaction(db, walletTxId(item({ card: 'Revolut' })), NOW)))).transactions[0].pending).toBeUndefined()
+  })
+})
+
+const fav = (over: Partial<Favorite> = {}): Favorite => ({
+  id: 'f1', by: 'a', type: 'expense', amount: 3000, accountId: 'casa', toAccountId: null, categoryId: 'cat-spesa', title: 'Spesa settimanale', note: 'dal preferito',
+  paidBy: null, participants: ['a', 'b'], splitMode: 'equal', splitValues: null, payments: null, tags: ['casa'], createdAt: NOW, updatedAt: NOW, ...over,
+})
+const withFav = (f = fav()): Db => ({ ...base(), favorites: [f] })
+
+describe('Apple Wallet: esercenti legati a un preferito', () => {
+  it('ogni esercente nuovo entra nell\'elenco, una sola volta', () => {
+    const db = importWallet(base(), emilio, [item(), item({ id: 'x2', merchant: 'ESSELUNGA' }), item({ id: 'x3', merchant: 'Bar' })], undefined, NOW)
+    expect(merchantsOf(db, 'a')).toEqual([{ name: 'Esselunga', favoriteId: null }, { name: 'Bar', favoriteId: null }])
+  })
+  it('esercente legato: la spesa è come il preferito con l\'importo di Wallet, e già approvata', () => {
+    const db = setMerchantFavorite(withFav(), 'a', 'Esselunga', 'f1', NOW)
+    const out = importWallet(db, emilio, [item({ amount: 4250 })], undefined, NOW)
+    expect(out.transactions[0]).toMatchObject({
+      id: 'w-x1', type: 'expense', amount: 4250, date: NOW, accountId: 'casa', categoryId: 'cat-spesa', title: 'Spesa settimanale', note: 'dal preferito',
+      participants: ['a', 'b'], tags: ['casa'], pending: null, walletCard: 'Visa Emilio', by: 'a',
+    })
+    expect(isWalletTx(out.transactions[0])).toBe(true) // il simbolo di Wallet resta
+    expect(pendingCount(out, 'a')).toBe(0)
+  })
+  it('collegando un esercente, le sue spese ancora da approvare passano al preferito e si approvano', () => {
+    let db = importWallet(withFav(), emilio, [item({ amount: 999, id: 'p1' }), item({ id: 'p2', merchant: 'Bar' })], undefined, NOW)
+    expect(pendingCount(db, 'a')).toBe(2)
+    db = setMerchantFavorite(db, 'a', 'esselunga', 'f1', NOW)
+    const x = db.transactions.find((t) => t.id === 'w-p1')!
+    expect(x).toMatchObject({ amount: 999, accountId: 'casa', title: 'Spesa settimanale', pending: null })
+    expect(db.transactions.find((t) => t.id === 'w-p2')!.pending).toBeTruthy() // l'altro esercente non cambia
+  })
+  it('un preferito cancellato, con importi per persona o con conti non più usabili si ignora (spesa da approvare)', () => {
+    const linked = (f: Favorite) => setMerchantFavorite(withFav(f), 'a', 'Esselunga', 'f1', NOW)
+    expect(favoriteForMerchant(linked(fav({ splitMode: 'amount' })), 'a', 'Esselunga')).toBeNull()
+    expect(favoriteForMerchant(linked(fav({ accountId: 'sara' })), 'a', 'Esselunga')).toBeNull() // conto di un altro
+    const gone = { ...linked(fav()), favorites: [] }
+    expect(importWallet(gone, emilio, [item()], undefined, NOW).transactions[0].pending).toBeTruthy()
+  })
+  it('togliere il legame o l\'esercente riporta tutto come prima', () => {
+    let db = setMerchantFavorite(withFav(), 'a', 'Esselunga', 'f1', NOW)
+    db = setMerchantFavorite(db, 'a', 'Esselunga', null, NOW)
+    expect(importWallet(db, emilio, [item()], undefined, NOW).transactions[0].pending).toBeTruthy()
+    expect(merchantsOf(removeMerchant(db, 'a', 'Esselunga', NOW), 'a')).toEqual([])
+  })
+  it('le notifiche dicono «aggiunta» se è già approvata', () => {
+    const db = importWallet(setMerchantFavorite(withFav(), 'a', 'Esselunga', 'f1', NOW), emilio, [item()], undefined, NOW)
+    expect(walletNotifications(db.transactions, NOW)[0].title).toBe('Spesa da Wallet aggiunta')
+  })
+  it('il legame sopravvive a salvataggio e rilettura del file', () => {
+    const db = setMerchantFavorite(withFav(), 'a', 'Esselunga', 'f1', NOW)
+    expect(merchantsOf(parseDb(JSON.parse(JSON.stringify(db))), 'a')).toEqual([{ name: 'Esselunga', favoriteId: 'f1' }])
   })
 })

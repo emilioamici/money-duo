@@ -1,5 +1,13 @@
 /** Traduzioni in inglese. La chiave è il testo italiano usato nel codice con `t('…')`; i segnaposto {nome} e i <b>…</b> devono coincidere. */
 export const EN: Record<string, string> = {
+  "Preferito": "Favourite",
+  "I tuoi esercenti": "Your merchants",
+  "{n} con preferito": "{n} with a favourite",
+  "Lega un esercente a un preferito: quando arriva una sua spesa è già compilata come il preferito (con l'importo pagato) e approvata.": "Link a merchant to a favourite: when one of its expenses arrives it is already filled in like the favourite (with the amount paid) and approved.",
+  "Nessun esercente ancora: compare qui al primo pagamento con Apple Pay.": "No merchants yet: it shows up here at the first Apple Pay payment.",
+  "Preferito per {name}": "Favourite for {name}",
+  "Rimuovi l'esercente {name}": "Remove merchant {name}",
+  "Spesa da Wallet aggiunta": "Wallet expense added",
   "I tuoi dati vivono in questo browser e nel file su Google Drive della famiglia, e nessun dato è nel repository del codice. Se attivi le funzioni del server (notifiche, accesso persistente, ingresso con codice, Apple Wallet), un servizio Cloudflare gestito da chi ha installato l'app fa solo da tramite: non legge né conserva i dati della famiglia.": "Your data lives in this browser and in the family's file on Google Drive, and no data is in the code repository. If you turn on the server features (notifications, persistent login, joining with a code, Apple Wallet), a Cloudflare service run by whoever installed the app only acts as an intermediary: it does not read or keep the family's data.",
   "I dati restano nel Drive del capofamiglia e in questo browser. Il server, se c'è, fa solo da tramite e non conserva i dati.": "Data stays in the head of the family's Drive and in this browser. The server, if there is one, only acts as an intermediary and does not keep the data.",
   "Non riesco a copiare: tieni premuto sul testo e copialo a mano.": "I cannot copy: press and hold the text and copy it by hand.",
