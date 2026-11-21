@@ -30,7 +30,15 @@ export interface Member {
    * Le carte si aggiungono da sole al primo pagamento; l'associazione la sceglie la persona in Impostazioni → Apple Wallet.
    */
   walletCards?: WalletCard[]
+  /** Esercenti di Apple Wallet visti finora e preferito a cui sono legati (null = nessuno): le spese di quell'esercente arrivano già compilate e approvate. */
+  walletMerchants?: WalletMerchant[]
   updatedAt: string
+}
+
+export interface WalletMerchant {
+  /** nome dell'esercente come lo comunica Wallet */
+  name: string
+  favoriteId: string | null
 }
 
 export interface WalletCard {

@@ -118,7 +118,7 @@ export async function walletIngest(env: Env, req: Request, token: string): Promi
     const subs = await loadSubs(env, fileId, email)
     const vapid = { publicKey: env.VAPID_PUBLIC_KEY, privateKey: env.VAPID_PRIVATE_KEY, subject: env.VAPID_SUBJECT || 'https://example.invalid/' }
     const euro = (amount / 100).toFixed(2).replace('.', ',')
-    for (const s of subs) await sendWebPush(s, { title: 'Spesa da approvare', body: `${item.merchant || 'Apple Pay'} · ${euro} €`, tag: 'wallet-' + item.id }, vapid)
+    for (const s of subs) await sendWebPush(s, { title: 'Spesa da Wallet', body: `${item.merchant || 'Apple Pay'} · ${euro} €`, tag: 'wallet-' + item.id }, vapid)
   } catch { /* la spesa è comunque in casella */ }
   return { status: 200, body: { ok: true } }
 }

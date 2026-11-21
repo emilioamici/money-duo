@@ -220,6 +220,6 @@ describe('Apple Wallet', () => {
     const { token } = await mk(); pushed.length = 0
     await ingest(token!, { amount: '12', merchant: 'Bar' })
     expect(pushed).toHaveLength(1)
-    expect(decrypt(d, pushed[0].body)).toMatchObject({ title: 'Spesa da approvare', body: 'Bar · 12,00 €' })
+    expect(decrypt(d, pushed[0].body)).toMatchObject({ title: 'Spesa da Wallet', body: 'Bar · 12,00 €' })
   })
 })
