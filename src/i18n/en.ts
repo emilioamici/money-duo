@@ -396,7 +396,7 @@ export const EN: Record<string, string> = {
   "Permesso negato: serve l'accesso in modifica al file.": "Permission denied: edit access to the file is required.",
   "Posizione del database": "Database location",
   "Preferiti": "Favourites",
-  "Prova inviata dal server: dovrebbe arrivare tra pochi secondi (con l'app in background).": "Test sent by the server: it should arrive in a few seconds (with the app in the background).",
+  "Prova inviata dal server: dovrebbe arrivare tra pochi secondi.": "Test sent by the server: it should arrive in a few seconds.",
   "Quando l'app è aperta o in background": "When the app is open or in the background",
   "Quanto spetta a ciascuno (in euro). Lascia vuoto chi non partecipa.": "How much each person owes (in euros). Leave empty for anyone not taking part.",
   "Questa persona è già nella famiglia. Se non ha ancora accesso al database, usa «Reinvia invito» accanto al suo nome.": "This person is already in the family. If they do not have access to the database yet, use “Resend invitation” next to their name.",

@@ -36,11 +36,11 @@ describe('service worker: push', () => {
     await sw.push({ title: 'T', body: 'B' })
     expect(sw.shown).toHaveLength(1)
   })
-  it('app in primo piano: nessuna notifica di sistema, avvisa l\'app di sincronizzare', async () => {
+  it('app in primo piano: la notifica di sistema si mostra comunque (Safari non ammette push silenziose) e l\'app sincronizza', async () => {
     const msgs: unknown[] = []
     const sw = loadSw([{ visibilityState: 'visible', postMessage: (m) => msgs.push(m) }])
     await sw.push({ title: 'T', body: 'B' })
-    expect(sw.shown).toHaveLength(0)
+    expect(sw.shown).toHaveLength(1)
     expect(msgs).toEqual([{ type: 'moneyduo-push' }])
   })
   it('messaggio non JSON o vuoto: notifica generica, nessun errore', async () => {
