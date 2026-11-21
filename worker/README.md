@@ -54,19 +54,6 @@ Dalla cartella del progetto:
    ```
    Alla fine stampa l'indirizzo, per esempio `https://moneyduo-push.tuo-nome.workers.dev`. Aprendo `…/health` nel browser deve comparire `{"ok":true}`.
 
-## Pubblicazione automatica (facoltativa, consigliata)
-Per non dover più lanciare `npx wrangler deploy` dal computer, il Worker si pubblica da solo a ogni modifica della cartella `worker/` su `main` (workflow *Deploy Worker (Cloudflare)*, esegue prima i test). Si configura una volta sola:
-
-1. **Token Cloudflare:** su <https://dash.cloudflare.com/profile/api-tokens> → *Create Token* → modello **Edit Cloudflare Workers** → *Account Resources*: il tuo account → crea e copia il token (si vede una volta sola).
-2. **ID dell'account:** in *Workers & Pages → Overview*, a destra (*Account ID*).
-3. **ID dell'archivio KV:** in *Workers & Pages → KV*, la riga `SUBS` (oppure `id` nel tuo `worker/wrangler.toml`).
-4. In GitHub, *Settings → Secrets and variables → Actions*:
-   - **Secrets:** `CLOUDFLARE_API_TOKEN` (il token) e `CLOUDFLARE_ACCOUNT_ID`.
-   - **Variables:** `CF_KV_NAMESPACE_ID` (l'ID del KV) e, solo se il tuo Worker non si chiama `moneyduo-push`, `CF_WORKER_NAME`.
-5. *Actions → Deploy Worker (Cloudflare) → Run workflow* per la prima pubblicazione.
-
-Il workflow non cambia i valori già impostati su Cloudflare (`ALLOWED_ORIGINS`, `GOOGLE_CLIENT_ID`…, grazie a `keep_vars`) e non tocca mai i segreti (chiavi VAPID, client secret, `SESSION_KEY`). Finché `CF_KV_NAMESPACE_ID` non è definita il workflow viene saltato. Il token non va mai scritto nel codice né in chat.
-
 ## Collegare l'app
 In GitHub, *Settings → Secrets and variables → Actions → Variables*, crea `VITE_PUSH_URL` (indirizzo del server, senza `/` finale) e `VITE_VAPID_PUBLIC_KEY` (la chiave pubblica). Poi rilancia il deploy (*Actions → Deploy su GitHub Pages → Run workflow*). Sono valori pubblici e vengono inseriti nell'app alla pubblicazione: nessun utente deve inserire nulla. Non c'è più un campo nell'app per modificarli.
 
