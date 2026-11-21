@@ -1,5 +1,8 @@
 /** Traduzioni in inglese. La chiave è il testo italiano usato nel codice con `t('…')`; i segnaposto {nome} e i <b>…</b> devono coincidere. */
 export const EN: Record<string, string> = {
+  "L'iscrizione di questo dispositivo era scaduta e il server l'ha tolta: disattiva e riattiva le notifiche, poi riprova.": "This device's subscription had expired and the server removed it: turn notifications off and on again, then retry.",
+  "Il server ha provato a inviare ma il servizio di notifiche del telefono ha rifiutato (codice {codes}). Disattiva e riattiva le notifiche; se continua, controlla le chiavi VAPID del server.": "The server tried to send but the phone's notification service refused (code {codes}). Turn notifications off and on again; if it continues, check the server's VAPID keys.",
+  "Il server non ha nessun dispositivo iscritto per la tua email ({email}): disattiva e riattiva le notifiche e riprova. Se non cambia, l'iscrizione sta fallendo.": "The server has no subscribed device for your email ({email}): turn notifications off and on again and retry. If nothing changes, the subscription is failing.",
   "Preferito": "Favourite",
   "I tuoi esercenti": "Your merchants",
   "{n} con preferito": "{n} with a favourite",

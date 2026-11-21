@@ -151,6 +151,7 @@ async function notify(env: Env, req: Request): Promise<unknown> {
   // chi scrive non riceve la propria notifica, tranne nella prova ("test": true) che può indirizzarsi solo a se stesso
   const targets = body.test === true ? recipients.filter((r) => r === sender) : recipients.filter((r) => r !== sender)
   let sent = 0, failed = 0, removed = 0
+  const codes: number[] = [] // codici di risposta dei servizi push per gli invii non riusciti (aiutano a capire perché)
   for (const email of targets) {
     const list = await loadSubs(env, body.fileId, email)
     const keep: StoredSub[] = []
@@ -158,11 +159,11 @@ async function notify(env: Env, req: Request): Promise<unknown> {
       const r = await sendWebPush(s, { title, body: text, tag }, vapid)
       if (r.status >= 200 && r.status < 300) { sent++; keep.push(s) }
       else if (r.gone) removed++
-      else { failed++; keep.push(s) }
+      else { failed++; codes.push(r.status); keep.push(s) }
     }
     if (keep.length !== list.length) await saveSubs(env, body.fileId, email, keep)
   }
-  return { ok: true, sent, failed, removed }
+  return { ok: true, sent, failed, removed, ...(codes.length ? { codes } : {}) }
 }
 
 export default {
