@@ -142,6 +142,7 @@ describe('/notify', () => {
     pushStatus[dead.sub.endpoint] = 410; pushStatus[flaky.sub.endpoint] = 500
     const r = await (await call('/notify', { fileId: FILE, recipients: ['anna@example.com'], title: 'T', body: 'B' })).json() as { sent: number; failed: number; removed: number }
     expect(r).toMatchObject({ sent: 1, failed: 1, removed: 1 })
+    expect((r as { codes?: number[] }).codes).toHaveLength(1) // il codice dell'invio fallito, per capire perché
     const left = JSON.parse(kv.data.get(`s:${FILE}:anna@example.com`)!).map((s: { endpoint: string }) => s.endpoint).sort()
     expect(left).toEqual([flaky.sub.endpoint, ok.sub.endpoint].sort())
   })

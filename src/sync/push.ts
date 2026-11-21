@@ -101,9 +101,13 @@ export async function disablePush(fileId: string, token: string | null): Promise
   if (token) await post('/unsubscribe', token, { fileId, endpoint }).catch(() => undefined)
 }
 
+/** Risposta del server a un invio: quanti dispositivi hanno ricevuto la notifica e perché gli altri no. */
+export interface PushResult { sent: number; failed: number; removed: number; codes?: number[] }
+
 export interface PushMessage { recipients: string[]; title: string; body: string; tag?: string; test?: boolean }
 
 /** Chiede al server di inviare una notifica ai destinatari. */
-export async function sendPush(fileId: string, token: string, m: PushMessage): Promise<void> {
-  await post('/notify', token, { fileId, ...m })
+export async function sendPush(fileId: string, token: string, m: PushMessage): Promise<PushResult> {
+  const j = (await post('/notify', token, { fileId, ...m })) as Partial<PushResult>
+  return { sent: j.sent ?? 0, failed: j.failed ?? 0, removed: j.removed ?? 0, ...(j.codes ? { codes: j.codes } : {}) }
 }

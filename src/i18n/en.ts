@@ -1,5 +1,8 @@
 /** Traduzioni in inglese. La chiave è il testo italiano usato nel codice con `t('…')`; i segnaposto {nome} e i <b>…</b> devono coincidere. */
 export const EN: Record<string, string> = {
+  "L'iscrizione di questo dispositivo era scaduta e il server l'ha tolta: disattiva e riattiva le notifiche, poi riprova.": "This device's subscription had expired and the server removed it: turn notifications off and on again, then retry.",
+  "Il server ha provato a inviare ma il servizio di notifiche del telefono ha rifiutato (codice {codes}). Disattiva e riattiva le notifiche; se continua, controlla le chiavi VAPID del server.": "The server tried to send but the phone's notification service refused (code {codes}). Turn notifications off and on again; if it continues, check the server's VAPID keys.",
+  "Il server non ha nessun dispositivo iscritto per la tua email ({email}): disattiva e riattiva le notifiche e riprova. Se non cambia, l'iscrizione sta fallendo.": "The server has no subscribed device for your email ({email}): turn notifications off and on again and retry. If nothing changes, the subscription is failing.",
   "Preferito": "Favourite",
   "I tuoi esercenti": "Your merchants",
   "{n} con preferito": "{n} with a favourite",
@@ -393,7 +396,7 @@ export const EN: Record<string, string> = {
   "Permesso negato: serve l'accesso in modifica al file.": "Permission denied: edit access to the file is required.",
   "Posizione del database": "Database location",
   "Preferiti": "Favourites",
-  "Prova inviata dal server: dovrebbe arrivare tra pochi secondi (con l'app in background).": "Test sent by the server: it should arrive in a few seconds (with the app in the background).",
+  "Prova inviata dal server: dovrebbe arrivare tra pochi secondi.": "Test sent by the server: it should arrive in a few seconds.",
   "Quando l'app è aperta o in background": "When the app is open or in the background",
   "Quanto spetta a ciascuno (in euro). Lascia vuoto chi non partecipa.": "How much each person owes (in euros). Leave empty for anyone not taking part.",
   "Questa persona è già nella famiglia. Se non ha ancora accesso al database, usa «Reinvia invito» accanto al suo nome.": "This person is already in the family. If they do not have access to the database yet, use “Resend invitation” next to their name.",

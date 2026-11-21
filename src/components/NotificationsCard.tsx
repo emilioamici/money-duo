@@ -68,8 +68,12 @@ export function NotificationsCard() {
     setMsg(null); setBusy(true)
     try {
       if (prefs.pushEnabled && server && sync.fileId && me?.email) {
-        await sendPush(sync.fileId, needToken(), { recipients: [me.email], title: t('Notifica di prova'), body: t('Le notifiche di Money Duo funzionano.'), tag: 'moneyduo-push-test', test: true })
-        setMsg({ text: t('Prova inviata dal server: dovrebbe arrivare tra pochi secondi (con l\'app in background).') })
+        const r = await sendPush(sync.fileId, needToken(), { recipients: [me.email], title: t('Notifica di prova'), body: t('Le notifiche di Money Duo funzionano.'), tag: 'moneyduo-push-test', test: true })
+        // il server dice quanti dispositivi ha davvero raggiunto: se zero, la notifica non può arrivare
+        if (r.sent > 0) setMsg({ text: t('Prova inviata dal server: dovrebbe arrivare tra pochi secondi.') })
+        else if (r.removed > 0) setMsg({ text: t('L\'iscrizione di questo dispositivo era scaduta e il server l\'ha tolta: disattiva e riattiva le notifiche, poi riprova.'), bad: true })
+        else if (r.failed > 0) setMsg({ text: t('Il server ha provato a inviare ma il servizio di notifiche del telefono ha rifiutato (codice {codes}). Disattiva e riattiva le notifiche; se continua, controlla le chiavi VAPID del server.', { codes: (r.codes ?? []).join(', ') || '?' }), bad: true })
+        else setMsg({ text: t('Il server non ha nessun dispositivo iscritto per la tua email ({email}): disattiva e riattiva le notifiche e riprova. Se non cambia, l\'iscrizione sta fallendo.', { email: me.email }), bad: true })
       } else {
         const opts: NotificationOptions = { body: t('Le notifiche di Money Duo funzionano su questo dispositivo.'), icon: './icon-192.png', tag: 'moneyduo-test' }
         const reg = await navigator.serviceWorker?.getRegistration()
