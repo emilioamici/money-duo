@@ -1,5 +1,13 @@
 /** Traduzioni in inglese. La chiave è il testo italiano usato nel codice con `t('…')`; i segnaposto {nome} e i <b>…</b> devono coincidere. */
 export const EN: Record<string, string> = {
+  "Copialo o rivedilo": "Copy it or view it again",
+  "Nessuna carta ancora": "No cards yet",
+  "1 carta": "1 card",
+  "{n} carte": "{n} cards",
+  "Nessun esercente ancora": "No merchants yet",
+  "1 esercente": "1 merchant",
+  "{n} esercenti": "{n} merchants",
+  "Nessun arrivo registrato": "No arrival recorded",
   "Su questo database non risulta nessun indirizzo attivo (l'hai creato con un altro database?): premi «Nuovo indirizzo» e aggiorna il Comando Rapido.": "No address is active on this database (did you create it with another database?): press “New address” and update the Shortcut.",
   "Sul server ci sono {n} spese in attesa ma non sono state importate: controlla di avere un conto che puoi usare.": "There are {n} expenses waiting on the server but they were not imported: check that you have an account you can use.",
   "Nessuna nuova spesa da importare. Se ne hai appena fatta una, guarda «Ultimi arrivi» qui sotto: dice cosa ha ricevuto il server.": "No new expenses to import. If you just made one, look at “Latest arrivals” below: it shows what the server received.",
