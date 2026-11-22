@@ -205,7 +205,7 @@ describe('Apple Wallet', () => {
 
   it('ack cancella, importi non validi rifiutati, revoca svuota tutto', async () => {
     const { token } = await mk()
-    for (const bad of [{ amount: 'abc' }, { amount: '-5' }, { amount: '0' }, {}]) expect((await ingest(token!, bad)).status).toBe(400)
+    for (const bad of [{ amount: 'abc' }, { amount: '0' }, { amount: 0 }, {}]) expect((await ingest(token!, bad)).status).toBe(400)
     await ingest(token!, { amount: '3' }); await ingest(token!, { amount: '4' })
     const items = (await pull()).items
     await call('/wallet/ack', { fileId: FILE, ids: [items[0].id] })
@@ -213,7 +213,19 @@ describe('Apple Wallet', () => {
     await call('/wallet/revoke', { fileId: FILE })
     expect(await pull()).toMatchObject({ enabled: false, items: [] })
     expect((await ingest(token!, { amount: '3' })).status).toBe(404)
-    expect([...kv.data.keys()].filter((k) => k.startsWith('wi:') || k.startsWith('wt:') || k.startsWith('wu:'))).toEqual([])
+    expect([...kv.data.keys()].filter((k) => k.startsWith('wi:') || k.startsWith('wt:') || k.startsWith('wu:') || k.startsWith('wl:'))).toEqual([])
+  })
+
+  it('un importo con il segno meno è una spesa; il registro degli arrivi dice cosa è successo', async () => {
+    const { token } = await mk()
+    expect((await ingest(token!, { amount: '-12,50', merchant: 'Bar' })).status).toBe(200)
+    expect((await ingest(token!, { amount: -3 })).status).toBe(200)
+    expect((await ingest(token!, { Amount: 'boh', Merchant: 'X' })).status).toBe(400)
+    const r = (await (await call('/wallet/pull', { fileId: FILE })).json()) as { items: Array<{ amount: number }>; log: Array<{ status: number; reason?: string; amount?: string; fields?: string[] }> }
+    expect(r.items.map((i) => i.amount).sort((a, b) => a - b)).toEqual([300, 1250])
+    expect(r.log.map((l) => l.status)).toEqual([400, 200, 200]) // dal più recente
+    expect(r.log[0]).toMatchObject({ reason: 'importo non valido', amount: 'boh', fields: ['Amount', 'Merchant'] }) // si vede cosa è arrivato
+    expect(JSON.stringify(r.log)).not.toContain('Bar') // niente esercente nel registro
   })
 
   it('avvisa con una notifica push i dispositivi dell\'utente', async () => {

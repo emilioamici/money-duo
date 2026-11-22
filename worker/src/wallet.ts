@@ -18,16 +18,31 @@ const sha = async (s: string) => b64u.enc(new Uint8Array(await crypto.subtle.dig
 const tokKey = (hash: string) => `wt:${hash}`
 const userKey = (fileId: string, email: string) => `wu:${fileId}:${email}`
 const itemPrefix = (fileId: string, email: string) => `wi:${fileId}:${email}:`
+const logKey = (fileId: string, email: string) => `wl:${fileId}:${email}`
+const LOG_KEEP = 8
+const LOG_TTL = 7 * 24 * 3600
+
+/** Gli ultimi arrivi dal Comando Rapido (esito e motivo, senza esercente né importo esatto): servono a capire perché una spesa non compare. */
+export interface WalletLogEntry { at: string; status: number; reason?: string; amount?: string; fields?: string[] }
 
 interface TokenRec { fileId: string; email: string }
+
+async function logAttempt(env: Env, fileId: string, email: string, e: WalletLogEntry): Promise<void> {
+  try {
+    let list: WalletLogEntry[] = []
+    try { list = JSON.parse((await env.SUBS.get(logKey(fileId, email))) ?? '[]') as WalletLogEntry[] } catch { list = [] }
+    await env.SUBS.put(logKey(fileId, email), JSON.stringify([e, ...list].slice(0, LOG_KEEP)), { expirationTtl: LOG_TTL })
+  } catch { /* il registro è solo diagnostico */ }
+}
 export interface WalletItem { id: string; amount: number; merchant: string; card: string; at: string }
 
 /** «12,50», «€12.50», «1.234,56», «1,234.56», «12.5 EUR» → centesimi (null se non è un importo > 0). */
 export function parseAmount(raw: unknown): number | null {
-  if (typeof raw === 'number') return Number.isFinite(raw) && raw > 0 && raw < 1e7 ? Math.round(raw * 100) : null
+  // un pagamento può arrivare con il segno meno (uscita): si usa il valore assoluto
+  if (typeof raw === 'number') return Number.isFinite(raw) && raw !== 0 && Math.abs(raw) < 1e7 ? Math.round(Math.abs(raw) * 100) : null
   if (typeof raw !== 'string') return null
-  let s = raw.replace(/[^\d.,-]/g, '')
-  if (!s || s.startsWith('-')) return null
+  let s = raw.replace(/[^\d.,]/g, '')
+  if (!s) return null
   const lastC = s.lastIndexOf(','), lastD = s.lastIndexOf('.')
   const dec = Math.max(lastC, lastD)
   if (dec >= 0 && s.length - dec - 1 <= 2 && s.length - dec - 1 > 0) s = s.slice(0, dec).replace(/[.,]/g, '') + '.' + s.slice(dec + 1)
@@ -62,6 +77,7 @@ export async function walletRevoke(env: Env, req: Request): Promise<unknown> {
   const old = await env.SUBS.get(userKey(fileId, email))
   if (old) await env.SUBS.delete(tokKey(old))
   await env.SUBS.delete(userKey(fileId, email))
+  await env.SUBS.delete(logKey(fileId, email))
   for (const k of (await env.SUBS.list({ prefix: itemPrefix(fileId, email), limit: 1000 })).keys) await env.SUBS.delete(k.name)
   return { ok: true }
 }
@@ -82,7 +98,9 @@ export async function walletPull(env: Env, req: Request): Promise<unknown> {
       if (it) items.push(it)
     }
   }
-  return { ok: true, enabled, items: items.sort((a, b) => a.at.localeCompare(b.at)) }
+  let log: WalletLogEntry[] = []
+  try { log = JSON.parse((await env.SUBS.get(logKey(fileId, email))) ?? '[]') as WalletLogEntry[] } catch { log = [] }
+  return { ok: true, enabled, items: items.sort((a, b) => a.at.localeCompare(b.at)), log }
 }
 
 export async function walletAck(env: Env, req: Request): Promise<unknown> {
@@ -100,19 +118,25 @@ export async function walletIngest(env: Env, req: Request, token: string): Promi
   let f: Record<string, unknown> = {}
   try {
     const text = await req.text()
-    if (text.length > 4000) return { status: 413, body: { error: 'Richiesta troppo grande' } }
+    if (text.length > 4000) { await logAttempt(env, fileId, email, { at: new Date().toISOString(), status: 413, reason: 'richiesta troppo grande' }); return { status: 413, body: { error: 'Richiesta troppo grande' } } }
     try { const j = JSON.parse(text); if (j && typeof j === 'object') f = j as Record<string, unknown> } catch { f = Object.fromEntries(new URLSearchParams(text)) }
-  } catch { return { status: 400, body: { error: 'Richiesta non valida' } } }
-  const amount = parseAmount(f.amount ?? f.Amount)
-  if (!amount) return { status: 400, body: { error: 'Importo non valido' } }
+  } catch { await logAttempt(env, fileId, email, { at: new Date().toISOString(), status: 400, reason: 'richiesta non valida' }); return { status: 400, body: { error: 'Richiesta non valida' } } }
+  const rawAmount = f.amount ?? f.Amount
+  const amount = parseAmount(rawAmount)
+  if (!amount) {
+    // cosa è arrivato davvero: i nomi dei campi e il testo dell'importo (che non è un dato sensibile) fanno capire cosa manda il Comando Rapido
+    await logAttempt(env, fileId, email, { at: new Date().toISOString(), status: 400, reason: 'importo non valido', amount: typeof rawAmount === 'string' || typeof rawAmount === 'number' ? String(rawAmount).slice(0, 24) : typeof rawAmount, fields: Object.keys(f).slice(0, 8) })
+    return { status: 400, body: { error: 'Importo non valido' } }
+  }
   const existing = (await env.SUBS.list({ prefix: itemPrefix(fileId, email), limit: MAX_ITEMS + 1 })).keys.length
-  if (existing >= MAX_ITEMS) return { status: 429, body: { error: 'Troppe spese in attesa: apri l\'app per importarle' } }
+  if (existing >= MAX_ITEMS) { await logAttempt(env, fileId, email, { at: new Date().toISOString(), status: 429, reason: 'troppe spese in attesa' }); return { status: 429, body: { error: 'Troppe spese in attesa: apri l\'app per importarle' } } }
   const item: WalletItem = {
     id: `${Date.now().toString(36)}${b64u.enc(crypto.getRandomValues(new Uint8Array(4)))}`.replace(/[^\w-]/g, ''),
     amount, merchant: clean(f.merchant ?? f.Merchant ?? f.name, 120), card: clean(f.card ?? f.Card, 80), at: new Date().toISOString(),
   }
   const value = env.SESSION_KEY ? await seal(env, item) : JSON.stringify(item)
   await env.SUBS.put(itemPrefix(fileId, email) + item.id, value, { expirationTtl: ITEM_TTL })
+  await logAttempt(env, fileId, email, { at: item.at, status: 200 })
   // avvisa i dispositivi dell'utente: l'app, appena sveglia, importa la spesa (best effort)
   try {
     const subs = await loadSubs(env, fileId, email)

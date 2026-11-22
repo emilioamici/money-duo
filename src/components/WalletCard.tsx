@@ -1,13 +1,13 @@
-import { useState } from 'react'
-import { CreditCard, Copy, Download, RefreshCw, Star, Store, Trash2, Wallet, XCircle } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { CreditCard, Copy, Download, Inbox, RefreshCw, Star, Store, Trash2, Wallet, XCircle } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
 import { engine } from '../sync/engine'
-import { createToken, ingestUrl, revokeWallet, savedToken, saveToken, setWalletOn, walletAvailable, walletOn } from '../sync/wallet'
+import { createToken, ingestUrl, pullWallet, revokeWallet, savedToken, saveToken, setWalletOn, walletAvailable, walletOn, type WalletLogEntry } from '../sync/wallet'
 import { ask } from './dialogs'
 import { accountMemberIds, sortedAccounts } from '../lib/calc'
 import { nowIso } from '../lib/ids'
 import { cardsOf, favoritesForMerchants, merchantsOf, removeCard, removeMerchant, setCardAccount, setMerchantFavorite } from '../lib/wallet'
-import { formatMoney } from '../lib/format'
+import { dateTimeLabel, formatMoney } from '../lib/format'
 import { t } from '../i18n'
 
 /**
@@ -44,9 +44,23 @@ export function WalletCard() {
     if (!(await ask({ title: t('Disattivare Apple Wallet?'), message: t('L\'indirizzo smette di funzionare e le spese in attesa sul server vengono cancellate. Le transazioni già importate restano.'), ok: t('Disattiva'), danger: true }))) return
     await run(async (auth) => { await revokeWallet(fileId, auth); setWalletOn(fileId, false); saveToken(fileId, null); setOn(false); setToken(null) })
   }
+  const [log, setLog] = useState<WalletLogEntry[] | null>(null)
+  /** Chiede al server cosa ha ricevuto e cosa è in attesa (non importa nulla). */
+  const checkServer = async () => {
+    const auth = engine.currentToken()
+    if (!auth || !fileId) return null
+    try { const r = await pullWallet(fileId, auth); setLog(r.log ?? []); return r } catch { return null }
+  }
+  useEffect(() => { if (on) void checkServer() }, [on, fileId]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const importNow = () => run(async () => {
     const n = await importWalletNow()
-    setMsg({ text: n > 0 ? t('Importate {n} spese: le trovi in Transazioni con il segno giallo.', { n }) : t('Nessuna nuova spesa da importare.') })
+    if (n > 0) return setMsg({ text: t('Importate {n} spese: le trovi in Transazioni con il segno giallo.', { n }) })
+    // nessuna spesa importata: il server dice perché (indirizzo non attivo su questo database, spese in attesa, nulla arrivato)
+    const r = await checkServer()
+    if (r && !r.enabled) setMsg({ text: t('Su questo database non risulta nessun indirizzo attivo (l\'hai creato con un altro database?): premi «Nuovo indirizzo» e aggiorna il Comando Rapido.'), bad: true })
+    else if (r && r.items.length > 0) setMsg({ text: t('Sul server ci sono {n} spese in attesa ma non sono state importate: controlla di avere un conto che puoi usare.', { n: r.items.length }), bad: true })
+    else setMsg({ text: t('Nessuna nuova spesa da importare. Se ne hai appena fatta una, guarda «Ultimi arrivi» qui sotto: dice cosa ha ricevuto il server.') })
   })
   const copy = async () => {
     try { await navigator.clipboard.writeText(ingestUrl(token!)); setMsg({ text: t('Indirizzo copiato.') }) } catch { setMsg({ text: t('Non riesco a copiare: tieni premuto sull\'indirizzo e copialo a mano.'), bad: true }) }
@@ -68,6 +82,7 @@ export function WalletCard() {
           )}
           <CardList />
           <MerchantList />
+          <Arrivals log={log} onRefresh={() => void checkServer()} />
           <div className="grid grid-cols-2 gap-2">
             <button className="btn-soft" disabled={busy} onClick={() => void importNow()}><Download size={16} />{t('Importa ora')}</button>
             <button className="btn-soft" disabled={busy} onClick={() => void activate(true)}><RefreshCw size={16} />{t('Nuovo indirizzo')}</button>
@@ -161,6 +176,37 @@ function MerchantList() {
               </li>
             )
           })}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+/** Gli ultimi arrivi dal Comando Rapido registrati dal server: se una spesa non compare, qui si vede se è arrivata e perché è stata rifiutata. */
+function Arrivals({ log, onRefresh }: { log: WalletLogEntry[] | null; onRefresh: () => void }) {
+  return (
+    <div data-testid="wallet-arrivals" className="rounded-xl bg-bg p-3">
+      <p className="mb-2 flex items-center justify-between gap-2 text-xs font-semibold text-muted">
+        <span className="flex items-center gap-1.5"><Inbox size={14} />{t('Ultimi arrivi dal Comando Rapido')}</span>
+        <button className="rounded-full px-2 py-0.5 text-brand" onClick={onRefresh}>{t('Aggiorna')}</button>
+      </p>
+      {log === null ? (
+        <p className="text-muted">{t('Controllo…')}</p>
+      ) : log.length === 0 ? (
+        <p className="text-muted">{t('Nessun arrivo registrato: il Comando Rapido non ha ancora contattato il server (oppure il Worker non è aggiornato all\'ultima versione).')}</p>
+      ) : (
+        <ul className="space-y-1.5">
+          {log.map((e, i) => (
+            <li key={e.at + i} className="text-xs">
+              <span className="text-muted">{dateTimeLabel(e.at)}</span>{' · '}
+              {e.status === 200
+                ? <span className="font-semibold text-inc">{t('ricevuta')}</span>
+                : <span className="font-semibold text-exp">{t('rifiutata: {reason}', { reason: e.reason ?? String(e.status) })}</span>}
+              {e.status !== 200 && (e.amount || e.fields?.length) && (
+                <span className="block text-muted">{t('arrivato: importo «{amount}», campi {fields}', { amount: e.amount ?? '—', fields: (e.fields ?? []).join(', ') || '—' })}</span>
+              )}
+            </li>
+          ))}
         </ul>
       )}
     </div>
