@@ -7,7 +7,7 @@ import { ask } from './dialogs'
 import { accountMemberIds, sortedAccounts } from '../lib/calc'
 import { nowIso } from '../lib/ids'
 import { cardsOf, favoritesForMerchants, merchantsOf, removeCard, removeMerchant, setCardAccount, setMerchantFavorite } from '../lib/wallet'
-import { dateTimeLabel, formatMoney } from '../lib/format'
+import { dateTimeLabel } from '../lib/format'
 import { t } from '../i18n'
 
 /**
@@ -150,7 +150,10 @@ function MerchantList() {
   const list = [...merchantsOf(db, me.id)].reverse() // i più recenti in alto
   const favs = favoritesForMerchants(db, me.id)
   const cats = new Map(db.categories.map((c) => [c.id, c.name]))
-  const label = (f: (typeof favs)[number]) => `${f.title || (f.categoryId && cats.get(f.categoryId)) || t('Preferito')} · ${formatMoney(f.amount)}`
+  // nel menu solo il nome del preferito (l'importo lo decide Wallet); se due si chiamano uguale si aggiunge la categoria o il conto per distinguerli
+  const baseLabel = (f: (typeof favs)[number]) => f.title || (f.categoryId && cats.get(f.categoryId)) || t('Preferito')
+  const accNames = new Map(db.accounts.map((a) => [a.id, a.name]))
+  const label = (f: (typeof favs)[number]) => (favs.filter((x) => baseLabel(x) === baseLabel(f)).length > 1 ? `${baseLabel(f)} · ${(f.categoryId && cats.get(f.categoryId)) || accNames.get(f.accountId) || ''}` : baseLabel(f))
   const linked = list.filter((m) => m.favoriteId && favs.some((f) => f.id === m.favoriteId)).length
   return (
     <div data-testid="wallet-merchants" className="rounded-xl bg-bg p-3">
