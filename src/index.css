@@ -130,7 +130,7 @@ button { @apply select-none; }
 @keyframes shine { 0% { transform: translateX(-120%) skewX(-20deg); } 100% { transform: translateX(220%) skewX(-20deg); } }
 @media (prefers-reduced-motion: reduce) { .btn::after { display: none; } .animate-float1, .animate-float2, .animate-float3 { animation: none; } }
 .pb-safe { padding-bottom: max(env(safe-area-inset-bottom), 0px); }
-.pt-safe { padding-top: env(safe-area-inset-top); }
+.pt-safe { padding-top: calc(max(env(safe-area-inset-top), 0px) + 1rem); }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { scrollbar-width: none; }
 

@@ -51,7 +51,7 @@ function Shell() {
 
       <main className="min-w-0 flex-1 pb-40 md:pb-10">
         <AnimatePresence mode="wait" initial={false}>
-          <m.div key={tab} initial={{ opacity: 0, y: 10, filter: 'blur(6px)' }} animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }} exit={{ opacity: 0, y: -6, filter: 'blur(6px)' }} transition={{ duration: 0.18 }}>
+          <m.div key={tab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.18 }}>
             {tab === 'home' && <HomePage onOpenSync={goSync} />}
             {tab === 'stats' && <StatsPage />}
             {tab === 'accounts' && <AccountsPage />}
