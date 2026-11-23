@@ -1,5 +1,6 @@
 /** Traduzioni in inglese. La chiave è il testo italiano usato nel codice con `t('…')`; i segnaposto {nome} e i <b>…</b> devono coincidere. */
 export const EN: Record<string, string> = {
+  "{name} non ha conti utilizzabili": "{name} has no usable accounts",
   "Copialo o rivedilo": "Copy it or view it again",
   "Nessuna carta ancora": "No cards yet",
   "1 carta": "1 card",
@@ -344,7 +345,6 @@ export const EN: Record<string, string> = {
   "Nascondi conto": "Hide account",
   "Nell'app trovi sempre la campanella: ti avviso quando un altro membro aggiunge una transazione che ti riguarda o un conto in comune, o condivide un conto con te. Attivando le notifiche le ricevi anche come avviso del telefono.": "In the app you always have the bell: I let you know when another member adds a transaction that concerns you or a joint account, or shares an account with you. Turn on notifications to also get them as phone alerts.",
   "Nessun conto": "No accounts",
-  "Nessun conto di {name} visibile a te": "None of {name}’s accounts is visible to you",
   "Nessun conto visibile: crea o mostra un conto dalla sezione Conti.": "No visible account: create or show an account from the Accounts section.",
   "Nessun dato in questo periodo.": "No data in this period.",
   "Nessun dato per questo anno": "No data for this year",
