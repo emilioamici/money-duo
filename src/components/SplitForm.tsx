@@ -3,7 +3,7 @@ import { Plus, Trash2, X } from 'lucide-react'
 import { WalletTag } from './WalletBadge'
 import type { Payment, Transaction } from '../types'
 import { useApp, type TxFormState } from '../store/AppProvider'
-import { accountMemberIds, expenseShares, familyBalances, sortedAccounts, txPayments, visibleTo } from '../lib/calc'
+import { accountMemberIds, expenseShares, familyBalances, sortedAccounts, txPayments } from '../lib/calc'
 import { centsToInput, formatMoney, fromLocalInput, parseAmount, toLocalInput } from '../lib/format'
 import { nowIso, uid } from '../lib/ids'
 import { deleteTransaction, saveTransaction } from '../lib/mutations'
@@ -27,12 +27,9 @@ export function SplitForm({ state, onClose }: { state: TxFormState; onClose: () 
   const { db, commit, prefs, setPrefs, me, members, nameOf } = useApp()
   const { tx, initial } = state
   const seed = { ...initial, ...tx }
-  const accounts = useMemo(
-    () => sortedAccounts(db).filter((a) => (tx ? txPayments(tx).some((p) => p.accountId === a.id) : false) || (!a.hidden && visibleTo(db, a, me?.id ?? null))),
-    [db, tx, me],
-  )
-  /** conti da cui un membro può pagare: quelli che lo includono e che io vedo */
-  const eligible = (member: string, current?: string) => accounts.filter((a) => a.id === current || accountMemberIds(db, a).includes(member))
+  const allAccounts = useMemo(() => sortedAccounts(db), [db])
+  /** conti da cui un membro può pagare: tutti quelli che lo includono (anche i suoi personali, anche se io non li vedo: sto registrando un pagamento suo) */
+  const eligible = (member: string, current?: string) => allAccounts.filter((a) => a.id === current || (!a.hidden && accountMemberIds(db, a).includes(member)))
   const firstAccount = (member: string) => {
     const list = eligible(member)
     return list.find((a) => a.id === prefs.lastAccountId)?.id ?? list[0]?.id ?? ''
@@ -51,7 +48,7 @@ export function SplitForm({ state, onClose }: { state: TxFormState; onClose: () 
       const fallback = me?.id ?? members[0]?.id ?? ''
       return txPayments(src).map((p) => {
         const member = p.member ?? fallback
-        return { key: newKey(), member, accountId: tx || accounts.some((a) => a.id === p.accountId) ? p.accountId : firstAccount(member), amount: centsToInput(p.amount) }
+        return { key: newKey(), member, accountId: tx || eligible(member).some((a) => a.id === p.accountId) ? p.accountId : firstAccount(member), amount: centsToInput(p.amount) }
       })
     }
     const first = me?.id ?? members[0]?.id ?? ''
@@ -182,7 +179,7 @@ export function SplitForm({ state, onClose }: { state: TxFormState; onClose: () 
                 <span className="shrink-0 text-xs text-muted">{t('dal conto')}</span>
                 <div className="min-w-0 flex-1">
                   <SelectField ariaLabel={t('Conto di {name}', { name: nameOf(r.member) })} className={`${plain} !text-sm`} value={r.accountId} onChange={(v) => setRow(r.key, { accountId: v })}
-                    options={list.length ? list.map((a) => ({ value: a.id, label: accountLabel(a, nameOf) })) : [{ value: '', label: t('Nessun conto di {name} visibile a te', { name: nameOf(r.member) }), disabled: true }]} />
+                    options={list.length ? list.map((a) => ({ value: a.id, label: accountLabel(a, nameOf) })) : [{ value: '', label: t('{name} non ha conti utilizzabili', { name: nameOf(r.member) }), disabled: true }]} />
                 </div>
               </div>
               {multi && (
