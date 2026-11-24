@@ -1,4 +1,4 @@
-import { bridgeAccess, bridgeEnabled, dbMeta, dbRead, dbWrite, houseMine, houseRegister } from './bridge'
+import { bridgeAccess, bridgeEnabled, dbMeta, dbRead, dbWrite, houseJoin, houseMine, houseRegister } from './bridge'
 import { authCallback, authConfigured, authLogout, authRefresh, authStart } from './auth'
 import { walletAck, walletIngest, walletPull, walletRevoke, walletToken } from './wallet'
 import { sendWebPush, type PushSubscriptionData, type VapidKeys } from './webpush'
@@ -187,6 +187,7 @@ export default {
       if (pathname === '/unsubscribe') return json(200, await unsubscribe(env, req))
       if (pathname === '/notify') return json(200, await notify(env, req))
       if (pathname === '/house/register') return json(200, await houseRegister(env, req))
+      if (pathname === '/house/join') return json(200, await houseJoin(env, req))
       if (pathname === '/house/mine') return json(200, await houseMine(env, req))
       if (pathname === '/db/meta') return json(200, await dbMeta(env, req))
       if (pathname === '/db/read') return await dbRead(env, req, headers)

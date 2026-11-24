@@ -39,7 +39,7 @@ Il Client ID si può anche incollare dall'app (Impostazioni → Google Drive); r
    - `https://<utente>.github.io` (produzione; solo l'origine, senza il percorso `/money-duo/`).
 4. Copia il **Client ID** (non serve il client secret).
 
-Scope richiesto: `https://www.googleapis.com/auth/drive`. Serve per vedere e collegare anche file creati dall'altro account e condivisi con te (lo scope ristretto `drive.file` non lo permette senza Google Picker). L'app legge e scrive **solo** il file che colleghi. In modalità *Testing* Google mostra l'avviso "app non verificata": è normale per un uso personale.
+Scope: con il Selettore di Google configurato (`VITE_GOOGLE_API_KEY` e `VITE_GOOGLE_APP_ID`) l'app chiede solo `https://www.googleapis.com/auth/drive.file`; altrimenti `https://www.googleapis.com/auth/drive` (compatibilità, come descritto sotto). Serve per vedere e collegare anche file creati dall'altro account e condivisi con te (lo scope ristretto `drive.file` non lo permette senza Google Picker). L'app legge e scrive **solo** il file che colleghi. In modalità *Testing* Google mostra l'avviso "app non verificata": è normale per un uso personale.
 
 ## Pubblicazione su GitHub Pages
 1. *Settings → Pages → Source*: **GitHub Actions**.

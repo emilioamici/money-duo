@@ -7,7 +7,9 @@ import { Field, MemberAvatar } from './ui'
 import { ask } from './dialogs'
 import { FolderPicker } from './FolderPicker'
 import { pickerConfigured } from '../sync/picker'
-import { inviteLink } from '../sync/invite'
+import { inviteLink, setPendingInvite } from '../sync/invite'
+import { bridgeAvailable, isRegistered, type BridgeHouse } from '../sync/bridge'
+import { hasSession } from '../sync/auth'
 import { parsePaypalHandle } from '../lib/paypal'
 import { t } from '../i18n'
 import { tb } from '../i18n/rich'
@@ -124,7 +126,8 @@ export function FamilyCard() {
       ) : (
         <p className="rounded-xl bg-bg p-3 text-xs text-muted">{t('Solo il capofamiglia ({owner}) può invitare o rimuovere membri.', { owner: sync.ownerEmail ?? t('proprietario del file') })}</p>
       )}
-      {sync.fileId && <FamilyCode fileId={sync.fileId} family={db.family.name} />}
+      {sync.fileId && <ReceivedInvites currentId={sync.fileId} dirty={sync.dirty} />}
+      {sync.fileId && <FamilyCode fileId={sync.fileId} family={db.family.name} owner={canManage} />}
       {err && <p className="mt-3 rounded-xl bg-exp/10 p-3 text-sm text-exp">{err}</p>}
       {info && <p className="mt-3 rounded-xl bg-inc/10 p-3 text-sm text-inc">{info}</p>}
 
@@ -166,8 +169,17 @@ function PaypalField({ handle, onSave }: { handle: string; onSave: (h: string | 
 }
 
 /** Il codice famiglia (l'ID del file del database) e il link d'invito: chi li riceve entra nella famiglia dopo l'accesso con Google. */
-function FamilyCode({ fileId, family }: { fileId: string; family: string }) {
+function FamilyCode({ fileId, family, owner }: { fileId: string; family: string; owner: boolean }) {
   const [msg, setMsg] = useState('')
+  const [bridgeUp, setBridgeUp] = useState<boolean | null>(null)
+  useEffect(() => { void bridgeAvailable().then(setBridgeUp) }, [])
+  // onestà: il codice basta davvero solo se il Worker ha il ponte e il capofamiglia ha registrato la famiglia con l'accesso persistente
+  const works = bridgeUp && owner && hasSession() && isRegistered(fileId)
+  const note = bridgeUp === null ? '' : !bridgeUp
+    ? t('Il server non ha il ponte attivo: chi riceve il codice deve prima essere invitato per email e scegliere il file con il selettore di Google.')
+    : !owner ? t('Chi lo riceve entra con il link o il codice se il capofamiglia ha attivato l\'accesso persistente; altrimenti il capofamiglia deve invitarlo per email.')
+    : works ? t('Il codice basta: chi lo riceve entra da solo con l\'accesso Google, anche senza invito per email. Chiunque abbia il codice può entrare: per togliere qualcuno rimuovilo dalle condivisioni del file su Drive.')
+    : t('Per ora il codice non basta: chi lo riceve deve prima essere invitato per email. Per farlo entrare con il solo codice attiva l\'accesso persistente (Impostazioni → Sincronizzazione) e riapri l\'app.')
   const link = inviteLink(fileId)
   const copy = async (text: string, done: string) => {
     try { await navigator.clipboard.writeText(text); setMsg(done) } catch { setMsg(t('Non riesco a copiare: tieni premuto sul testo e copialo a mano.')) }
@@ -187,8 +199,32 @@ function FamilyCode({ fileId, family }: { fileId: string; family: string }) {
         <button className="btn-soft !px-3 !text-xs" onClick={() => void copy(fileId, t('Codice copiato.'))}><Copy size={14} />{t('Copia codice')}</button>
         <button className="btn-soft !px-3 !text-xs" onClick={() => void share()}><Share2 size={14} />{t('Condividi link d\'invito')}</button>
       </div>
-      <p className="text-xs text-muted">{t('Chi lo riceve entra con il link o incollando il codice dopo l\'accesso con Google. Il capofamiglia deve prima averlo invitato (email) e aver aperto l\'app con l\'accesso persistente.')}</p>
+      {note && <p className="text-xs text-muted" data-testid="family-code-note">{note}</p>}
       {msg && <p className="text-xs text-inc">{msg}</p>}
+    </div>
+  )
+}
+
+/** Le altre famiglie a cui sono stato invitato (se oggi sono collegato a una): si può passare a una di quelle. */
+function ReceivedInvites({ currentId, dirty }: { currentId: string; dirty: boolean }) {
+  const [list, setList] = useState<BridgeHouse[]>([])
+  useEffect(() => { void engine.houses().then((h) => setList(h.filter((x) => x.id !== currentId))).catch(() => undefined) }, [currentId])
+  if (list.length === 0) return null
+  const switchTo = async (h: BridgeHouse) => {
+    if (dirty) return void ask({ title: t('Prima sincronizza'), message: t('Ci sono modifiche di questo dispositivo non ancora inviate a Drive: aspetta che la sincronizzazione finisca, poi riprova.'), ok: t('Ho capito') })
+    if (!(await ask({ title: t('Passare a «{name}»?', { name: h.name }), message: t('Questo dispositivo si scollega dalla famiglia attuale (i dati restano su Drive) e apre quella dell\'invito.'), ok: t('Passa') }))) return
+    setPendingInvite(h.id)
+    engine.unlink()
+  }
+  return (
+    <div className="mt-3 space-y-2 rounded-2xl bg-trf/10 p-3" data-testid="received-invites">
+      <p className="text-sm font-semibold text-trf">{list.length === 1 ? t('Hai un invito in un\'altra famiglia') : t('Hai {n} inviti in altre famiglie', { n: list.length })}</p>
+      {list.map((h) => (
+        <div key={h.id} className="flex items-center gap-2">
+          <span className="min-w-0 flex-1 truncate text-sm">{h.name}</span>
+          <button className="btn-soft !px-3 !py-1.5 !text-xs" onClick={() => void switchTo(h)}>{t('Collega')}</button>
+        </div>
+      ))}
     </div>
   )
 }

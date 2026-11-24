@@ -12,7 +12,9 @@ import { authConfigured, seal, unseal } from './auth'
  */
 
 const MAX_HOUSES_PER_USER = 10
-const MAX_DB_BYTES = 12_000_000
+const MAX_DB_BYTES = 8_000_000   // oggi il database pesa ~4 MB; il tetto evita corpi enormi
+const MAX_ACCOUNTS = 20          // account che possono entrare con il codice
+const TOKEN_CACHE_MS = 60_000
 const WRITER_ROLES = ['owner', 'organizer', 'fileOrganizer', 'writer']
 const hkey = (fileId: string) => `house:${fileId}`
 const ikey = (email: string) => `inv:${email.toLowerCase()}`
@@ -53,14 +55,29 @@ export async function permissionsOf(env: Env, token: string, fileId: string): Pr
 }
 
 const clientIds = (env: Env): string[] => [env.GOOGLE_CLIENT_ID, ...(env.ALLOWED_CLIENT_IDS ?? '').split(',')].map((s) => (s ?? '').trim()).filter(Boolean)
+const SCOPE_OK = ['https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive']
 
-/** Il token è stato emesso per questa app? (senza questo controllo basterebbe un token qualsiasi dello stesso utente) */
+/** Esito della verifica di un token, tenuto in memoria per al massimo 60 secondi (mai salvato altrove; il token non viene mai conservato, solo il suo esito per pochi secondi). */
+const verified = new Map<string, { ok: boolean; email?: string; exp: number }>()
+
+/**
+ * Il token è stato emesso per questa app (`aud`/`azp` = nostro client ID) con lo scope `drive.file` (o `drive`, che lo include)?
+ * Senza questo controllo basterebbe un token qualsiasi dello stesso utente, emesso per un'altra app.
+ */
 async function issuedForApp(env: Env, token: string): Promise<boolean> {
+  const hit = verified.get(token)
+  if (hit && hit.exp > Date.now()) return hit.ok
   const r = await fetch(`${oauth(env)}/tokeninfo?access_token=${encodeURIComponent(token)}`)
-  if (!r.ok) return false
-  const j = (await r.json()) as { aud?: string; azp?: string }
-  const ids = clientIds(env)
-  return ids.includes(j.aud ?? '') || ids.includes(j.azp ?? '')
+  let ok = false
+  if (r.ok) {
+    const j = (await r.json()) as { aud?: string; azp?: string; scope?: string }
+    const ids = clientIds(env)
+    const scopes = (j.scope ?? '').split(/\s+/)
+    ok = (ids.includes(j.aud ?? '') || ids.includes(j.azp ?? '')) && scopes.some((x) => SCOPE_OK.includes(x))
+  }
+  if (verified.size > 200) verified.clear()
+  verified.set(token, { ok, exp: Date.now() + TOKEN_CACHE_MS })
+  return ok
 }
 
 /** Per `authenticate`: chi non ha accesso diretto al file può comunque passare se la famiglia è registrata e il file è condiviso con lui. */
@@ -86,7 +103,7 @@ async function whoami(env: Env, req: Request): Promise<{ token: string; email: s
   if (!r.ok) throw new HttpError(502, 'Google non risponde')
   const email = ((await r.json()) as { user?: { emailAddress?: string } }).user?.emailAddress
   if (!email) throw new HttpError(401, 'Account Google non riconosciuto')
-  if (!(await issuedForApp(env, token))) throw new HttpError(403, 'Token non emesso per questa app')
+  if (!(await issuedForApp(env, token))) throw new HttpError(401, 'Token non emesso per questa app')
   return { token, email: email.toLowerCase() }
 }
 
@@ -144,14 +161,40 @@ export async function houseMine(env: Env, req: Request): Promise<unknown> {
   return { houses }
 }
 
+/**
+ * POST /house/join {fileId}: il CODICE è l'ID del file. Chi lo presenta (con un token valido per questa app) viene aggiunto dal Worker,
+ * con l'accesso del capofamiglia, tra gli scrittori del file (senza email di notifica). Idempotente. Tetto di 20 account.
+ * Chi ha il codice può quindi entrare: è un segreto condiviso. Si revoca togliendo l'account dalle condivisioni su Drive.
+ */
+export async function houseJoin(env: Env, req: Request): Promise<unknown> {
+  const body = await readJson(req)
+  if (!validFileId(body.fileId)) throw new HttpError(400, 'File non valido')
+  const { email } = await whoami(env, req)
+  const house = await loadHouse(env, body.fileId)
+  if (!house) throw new HttpError(404, 'Famiglia non collegata: il capofamiglia deve riaprire l\'app con l\'accesso persistente.')
+  const owner = await houseToken(env, body.fileId, house)
+  const perms = await permissionsOf(env, owner, body.fileId)
+  if (!perms.some((p) => p.emailAddress?.toLowerCase() === email)) {
+    if (perms.filter((p) => p.emailAddress).length >= MAX_ACCOUNTS) throw new HttpError(403, 'La famiglia ha già il numero massimo di account')
+    const r = await fetch(`${google(env)}/drive/v3/files/${encodeURIComponent(body.fileId)}/permissions?sendNotificationEmail=false&supportsAllDrives=true`, {
+      method: 'POST', headers: { Authorization: `Bearer ${owner}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'user', role: 'writer', emailAddress: email }),
+    })
+    if (!r.ok) throw new HttpError(502, 'Non riesco a condividere il file: il capofamiglia deve riaprire l\'app')
+  }
+  const k = ikey(email)
+  let list: string[] = []
+  try { list = JSON.parse((await env.SUBS.get(k)) ?? '[]') as string[] } catch { list = [] }
+  if (!list.includes(body.fileId)) await env.SUBS.put(k, JSON.stringify([body.fileId, ...list].slice(0, MAX_HOUSES_PER_USER)))
+  return { ok: true }
+}
+
 /** Autorizza la richiesta e ritorna il token del capofamiglia per parlare con Drive. `write` richiede un ruolo con diritto di modifica. */
 async function asHouse(env: Env, req: Request, write: boolean): Promise<{ token: string; id: string }> {
   const id = new URL(req.url).searchParams.get('fileId')
   if (!validFileId(id)) throw new HttpError(400, 'File non valido')
-  const { token, email } = await whoami(env, req)
+  const { email } = await whoami(env, req)
   const house = await loadHouse(env, id)
   if (!house) throw new HttpError(404, 'Famiglia non collegata: il capofamiglia deve riaprire l\'app con l\'accesso persistente.')
-  if (!(await issuedForApp(env, token))) throw new HttpError(403, 'Token non emesso per questa app')
   const owner = await houseToken(env, id, house)
   const role = (await permissionsOf(env, owner, id)).find((p) => p.emailAddress?.toLowerCase() === email)?.role
   if (!role || (write && !WRITER_ROLES.includes(role))) throw new HttpError(403, 'Nessun accesso al database della famiglia')
@@ -175,15 +218,38 @@ export async function dbRead(env: Env, req: Request, cors: Record<string, string
   return new Response(r.body, { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...cors } })
 }
 
-/** POST /db/write?fileId= (corpo = il database): lo inoltra a Drive senza leggerlo; ritorna i nuovi metadati. */
+/**
+ * Controllo veloce della forma (senza interpretare 4 MB di JSON: il Worker ha pochissima CPU): un oggetto con `schemaVersion` numerico
+ * in testa e le raccolte principali presenti. Chi scrive è comunque un membro autorizzato; serve a scartare corpi sbagliati o troncati.
+ */
+export function plausibleDb(text: string): boolean {
+  const t = text.trimEnd()
+  if (!t.startsWith('{') || !t.endsWith('}')) return false
+  if (!/^\{\s*"schemaVersion"\s*:\s*\d+/.test(t.slice(0, 200))) return false
+  return ['"members"', '"accounts"', '"transactions"'].every((k) => t.includes(k))
+}
+
+/**
+ * POST /db/write?fileId=&expectedVersion= (corpo = il database): scrive solo se la versione di Drive coincide con `expectedVersion`
+ * (altrimenti 409: l'app rilegge, fa il merge e riprova). Il contenuto non viene salvato né registrato.
+ */
 export async function dbWrite(env: Env, req: Request): Promise<unknown> {
+  const url = new URL(req.url)
+  const expected = url.searchParams.get('expectedVersion')
+  if (!expected) throw new HttpError(400, 'Versione mancante')
   const len = Number(req.headers.get('Content-Length') ?? '0')
-  if (!len) throw new HttpError(411, 'Lunghezza mancante')
   if (len > MAX_DB_BYTES) throw new HttpError(413, 'Database troppo grande')
   const { token, id } = await asHouse(env, req, true)
+  const text = await req.text()
+  if (!text || text.length > MAX_DB_BYTES) throw new HttpError(text ? 413 : 400, text ? 'Database troppo grande' : 'Database mancante')
+  if (!plausibleDb(text)) throw new HttpError(400, 'Database non valido')
+  const cur = await fetch(`${google(env)}/drive/v3/files/${encodeURIComponent(id)}?fields=version&supportsAllDrives=true`, { headers: { Authorization: `Bearer ${token}` } })
+  if (cur.status === 404) throw new HttpError(404, 'File non trovato')
+  if (!cur.ok) throw new HttpError(502, 'Google non risponde')
+  if (((await cur.json()) as { version?: string }).version !== expected) throw new HttpError(409, 'Versione cambiata')
   const r = await fetch(`${google(env)}/upload/drive/v3/files/${encodeURIComponent(id)}?uploadType=media&fields=${FIELDS}&supportsAllDrives=true`, {
-    method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'Content-Length': String(len) }, body: req.body, duplex: 'half',
-  } as RequestInit)
+    method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: text,
+  })
   if (!r.ok) throw new HttpError(502, 'Impossibile scrivere il database')
   return { ...((await r.json()) as object), ownedByMe: false, capabilities: { canEdit: true, canShare: false } }
 }

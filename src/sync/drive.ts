@@ -73,12 +73,12 @@ export function setBridged(fileId: string, on: boolean): void {
 }
 
 /** Chiamata al ponte con gli stessi errori di Drive: 401 = sessione scaduta, 403/404/410 = niente accesso (con il messaggio del server). */
-async function bridgeCall(token: string, path: string, fileId: string, body?: string): Promise<Response> {
-  const r = await bridgeFetch(`${path}?fileId=${enc(fileId)}`, token, body)
+async function bridgeCall(token: string, path: string, fileId: string, body?: string, expectedVersion?: string): Promise<Response> {
+  const r = await bridgeFetch(`${path}?fileId=${enc(fileId)}${expectedVersion ? `&expectedVersion=${enc(expectedVersion)}` : ''}`, token, body)
   if (r.ok) return r
   let msg = r.statusText
   try { msg = ((await r.json()) as { error?: string }).error || msg } catch { /* corpo non JSON */ }
-  throw new DriveError([403, 404, 410].includes(r.status) ? 404 : r.status, msg)
+  throw new DriveError([403, 404, 410].includes(r.status) ? 404 : r.status, msg) // 409 resta 409: versione cambiata
 }
 
 export async function getMeta(token: string, id: string): Promise<DriveFile> {
@@ -110,8 +110,9 @@ export async function createFile(token: string, content: string, name: string, f
   return r.json()
 }
 
-export async function updateFile(token: string, id: string, content: string): Promise<DriveFile> {
-  if (isBridged(id)) return (await bridgeCall(token, '/db/write', id, content)).json()
+/** `expectedVersion`: per i file aperti dal ponte, la versione letta; se su Drive è cambiata il server risponde 409 (DriveError 409). */
+export async function updateFile(token: string, id: string, content: string, expectedVersion?: string): Promise<DriveFile> {
+  if (isBridged(id)) return (await bridgeCall(token, '/db/write', id, content, expectedVersion ?? '0')).json()
   const r = await call(token, `${UPLOAD}/files/${enc(id)}?uploadType=media&fields=${FIELDS}&supportsAllDrives=true`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json; charset=UTF-8' },
