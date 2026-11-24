@@ -41,22 +41,34 @@ export function Gate({ reconnect = false }: { reconnect?: boolean }) {
   const connect = async (id: string) => {
     const ok = await linkDatabase(db, id)
     if (!ok) setPhase('choose')
+    else clearInvite() // collegata: l'invito è usato (altrimenti riaprirebbe questa schermata a ogni avvio)
   }
+  /** Perché il ponte non ha aperto la famiglia (messaggio del server), se lo ha detto. */
+  const bridgeWhy = useRef('')
   const notFound = (e: unknown) => e instanceof DriveError && e.status === 404
   /** Apre una famiglia dal ponte del Worker. false se il ponte non c'è o non ti riconosce. */
-  const viaBridge = async (id: string): Promise<boolean> => {
+  const viaBridge = async (id: string, join = false): Promise<boolean> => {
     if (!(await bridgeAvailable())) return false
     setBridged(id, true)
-    try { await connect(id); return true } catch (e) {
-      setBridged(id, false)
-      if (notFound(e)) return false
-      throw e
-    }
+    const attempt = async () => { try { await connect(id); return true } catch (e) { if (notFound(e)) return false; throw e } }
+    try {
+      if (await attempt()) return true
+      if (join) {
+        // con il codice (o il link d'invito) il server ti aggiunge tra gli scrittori del file e poi si riprova
+        const r = await engine.joinFamily(id)
+        if (r.ok) { if (await attempt()) return true }
+        else if (r.status === 404) bridgeWhy.current = r.error ?? ''
+        else if (r.status !== 0) throw new Error(r.error || t('Il server non ha accettato il codice ({status}).', { status: r.status }))
+      }
+    } catch (e) { setBridged(id, false); throw e }
+    setBridged(id, false)
+    return false
   }
   /** Con il codice famiglia: prima l'accesso diretto, poi il ponte del Worker; con `picker` anche il Selettore di Google (serve un tocco). */
-  const openFamily = async (id: string, picker: boolean): Promise<boolean> => {
+  const openFamily = async (id: string, picker: boolean, join = false): Promise<boolean> => {
+    bridgeWhy.current = ''
     try { await connect(id); return true } catch (e) { if (!notFound(e)) throw e }
-    if (await viaBridge(id)) return true
+    if (await viaBridge(id, join)) return true
     if (picker && pickerConfigured()) {
       const f = await engine.pickDatabase(id)
       if (f) { await connect(f.id); return true }
@@ -67,7 +79,7 @@ export function Gate({ reconnect = false }: { reconnect?: boolean }) {
   const joinWithCode = () => guard(async () => {
     const id = parseFamilyCode(code)
     if (!id) throw new Error(t('Il codice famiglia non è valido: incolla il codice o il link d\'invito che ti ha mandato il capofamiglia.'))
-    if (!(await openFamily(id, true)) && !pickerConfigured()) throw new Error(t('Non riesco ad aprire la famiglia: controlla il codice e che il capofamiglia ti abbia invitato con questo account Google (e che abbia aperto l\'app di recente).'))
+    if (!(await openFamily(id, true, true)) && !pickerConfigured()) throw new Error(bridgeWhy.current || t('Non riesco ad aprire la famiglia: controlla il codice e che il capofamiglia ti abbia invitato con questo account Google (e che abbia aperto l\'app di recente).'))
   })
 
   const connectListed = async (id: string, viaHouse: boolean) => { if (viaHouse) { if (!(await viaBridge(id))) throw new Error(t('Non riesco ad aprire la famiglia dal server: il capofamiglia deve riaprire l\'app con l\'accesso persistente.')) } else await connect(id) }
@@ -78,8 +90,10 @@ export function Gate({ reconnect = false }: { reconnect?: boolean }) {
       const inv = pendingInvite()
       if (inv) {
         try {
-          if (await openFamily(inv, false)) { clearInvite(); return }
-          setPhase('invite'); return
+          if (await openFamily(inv, false, true)) { clearInvite(); return }
+          // il Selettore di Google è l'ultimo ripiego (un tocco); senza, si spiega perché e si prosegue con le altre strade
+          if (pickerConfigured()) { setPhase('invite'); return }
+          setErr(bridgeWhy.current || t('Non riesco ad aprire la famiglia del link d\'invito: controlla che il capofamiglia ti abbia invitato con questo account Google (e che abbia aperto l\'app di recente).'))
         } catch (e) { setErr(msg(e)) }
       }
       const all = await engine.listCandidates()
@@ -163,7 +177,7 @@ export function Gate({ reconnect = false }: { reconnect?: boolean }) {
           <>
             <p className="flex items-center gap-2 text-sm font-semibold"><Users size={16} className="text-brand" />{t('Hai ricevuto un invito')}</p>
             <p className="text-sm text-muted">{t('Il capofamiglia ti ha invitato: manca un tocco per dare all\'app il permesso sul database di famiglia (il selettore di Google ti mostra solo quel file).')}</p>
-            <button className="btn-primary w-full" disabled={busy} onClick={() => void guard(async () => { const id = pendingInvite(); if (id && (await openFamily(id, true))) clearInvite() })}>{busy ? <Loader2 size={18} className="animate-spin" /> : <Folder size={18} />}{t('Apri la famiglia')}</button>
+            <button className="btn-primary w-full" disabled={busy} onClick={() => void guard(async () => { const id = pendingInvite(); if (id && (await openFamily(id, true, true))) clearInvite() })}>{busy ? <Loader2 size={18} className="animate-spin" /> : <Folder size={18} />}{t('Apri la famiglia')}</button>
             <button className="btn-ghost w-full !text-xs" disabled={busy} onClick={() => { clearInvite(); void search() }}>{t('Non è il mio invito: cerca o crea un\'altra famiglia')}</button>
           </>
         )}

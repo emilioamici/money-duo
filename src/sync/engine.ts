@@ -9,7 +9,7 @@ import { GoogleAuthError, cachedToken, clearToken, requestToken, revokeToken, se
 import { SessionExpired, brokerAvailable, hasSession, logoutBroker, refreshAccessToken, startBrokerLogin } from './auth'
 import { t } from '../i18n'
 import { pickDatabase, pickFolder, pickerConfigured, type Picked } from './picker'
-import { ensureRegistered, myHouses, type BridgeHouse } from './bridge'
+import { ensureRegistered, joinHouse, myHouses, type BridgeHouse, type JoinResult } from './bridge'
 import { inviteLink } from './invite'
 
 /**
@@ -339,6 +339,11 @@ export class SyncEngine {
     return pickDatabase(await this.token(), onlyFileId)
   }
 
+  /** Entra con il codice famiglia: il Worker, con l'accesso del capofamiglia, ti aggiunge tra gli scrittori del file. */
+  async joinFamily(fileId: string): Promise<JoinResult> {
+    return joinHouse(fileId, await this.token())
+  }
+
   /** Le famiglie a cui sono stato invitato, aperte dal ponte del Worker (nessun selettore, nessun codice). */
   async houses(): Promise<BridgeHouse[]> {
     const token = cachedToken()
@@ -427,7 +432,7 @@ export class SyncEngine {
       if (needPush) {
         const seq = this.dirtySeq
         const out = this.stamp(this.host.getDb(), 1)
-        const f = await drive.updateFile(token, id, JSON.stringify(out))
+        const f = await drive.updateFile(token, id, JSON.stringify(out), version)
         this.host.applyDb((prev) => ({ ...prev, meta: out.meta }), false)
         version = f.version
         // se nel frattempo ci sono state altre modifiche locali, restano "dirty" per il ciclo successivo
@@ -455,6 +460,13 @@ export class SyncEngine {
     if (e instanceof GoogleAuthError || (e instanceof DriveError && e.status === 401)) {
       clearToken()
       return this.set('auth', t('Sessione Google scaduta: riconnettiti per continuare a sincronizzare.'))
+    }
+    // dal ponte: nel frattempo un altro dispositivo ha scritto (409). Non è un errore: si rilegge, si fa il merge e si riprova
+    if (e instanceof DriveError && e.status === 409) {
+      this.p.remoteVersion = null; this.p.dirty = true; this.persist()
+      this.set('pending')
+      this.debounce = setTimeout(() => void this.syncNow(), 300)
+      return
     }
     if (e instanceof DriveError) {
       if (e.status === 404 && this.p.fileId && isBridged(this.p.fileId)) return this.set('error', e.message || t('Non riesco ad aprire la famiglia dal server: il capofamiglia deve riaprire l\'app con l\'accesso persistente.'))

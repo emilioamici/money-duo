@@ -43,6 +43,25 @@ export async function ensureRegistered(fileId: string, token: string, opts: { ow
   } catch { return false }
 }
 
+export interface JoinResult { ok: boolean; status: number; error?: string }
+
+/**
+ * Entra in una famiglia con il codice (l'ID del file): il Worker, con l'accesso del capofamiglia, aggiunge l'account tra gli scrittori.
+ * `ok: false` con `status` 404 = famiglia non collegata al ponte (il capofamiglia deve riaprire l'app con l'accesso persistente).
+ */
+export async function joinHouse(fileId: string, token: string): Promise<JoinResult> {
+  if (!(await bridgeAvailable())) return { ok: false, status: 0 }
+  try {
+    const r = await bridgeFetch('/house/join', token, JSON.stringify({ fileId }))
+    if (r.ok) return { ok: true, status: r.status }
+    const j = (await r.json().catch(() => ({}))) as { error?: string }
+    return { ok: false, status: r.status, error: j.error }
+  } catch { return { ok: false, status: 0 } }
+}
+
+/** Il capofamiglia ha già registrato questa famiglia sul ponte (da questo dispositivo, di recente)? */
+export const isRegistered = (fileId: string): boolean => { try { return !!localStorage.getItem(REG_KEY + fileId) } catch { return false } }
+
 export interface BridgeHouse { id: string; name: string; modifiedTime: string }
 
 /** Le famiglie a cui questo account è stato invitato e che si possono aprire dal ponte. */

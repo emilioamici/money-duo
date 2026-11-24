@@ -105,15 +105,52 @@ Non serve altro (l'app usa lo stesso indirizzo del server delle notifiche). Sull
 - **Dopo 7 giorni chiede di nuovo l'accesso:** l'app è ancora in *Testing*; vedi il punto 1.1.
 - **«Origine non autorizzata»:** `ALLOWED_ORIGINS` deve contenere l'origine dell'app (per esempio `https://emilioamici.github.io`, senza percorso).
 
-## Ingresso con codice famiglia: il «ponte» (facoltativo)
+## Condivisione del database: il «ponte» e il codice famiglia (facoltativo)
 
-Con il permesso ristretto `drive.file` un file condiviso da altri si apre solo dal Selettore di Google, che su iPhone spesso non funziona. Con l'accesso persistente attivo, il Worker può fare da **ponte**: il capofamiglia (proprietario del file) apre l'app e la famiglia viene registrata sul Worker con la sua sessione (si ripete ogni 3 giorni e dopo ogni invito). Chi è invitato (file condiviso con lui su Drive) accede con Google e trova la famiglia da solo, oppure incolla il **codice famiglia** o apre il **link d'invito** (`…/#join=<codice>`): il database viene letto e scritto dal Worker, senza Selettore.
+Con il permesso minimo `drive.file` un'app vede solo i file che ha creato o che l'utente ha aperto con il **Google Picker**: un file creato dal capofamiglia **non** è accessibile agli altri, nemmeno se condiviso su Drive, senza Picker (che richiede una chiave API valida e su iPhone spesso non funziona). Per questo, con l'accesso persistente attivo, il Worker può fare da **ponte**: legge e scrive il database con l'accesso del capofamiglia per chi ha il diritto di entrare.
 
-- **L'autorizzazione resta su Drive:** il Worker ricontrolla a ogni richiesta che l'account compaia tra le condivisioni del file (in scrittura serve un ruolo con diritto di modifica). Togliere la condivisione su Drive chiude l'accesso; se il capofamiglia revoca l'accesso a Google, la famiglia si scollega.
-- **Il database non viene letto né salvato:** passa al volo (lettura e scrittura inoltrate così come sono, fino a 12 MB), quindi non pesa sulla CPU del piano gratuito.
-- **Token d'accesso:** il ponte accetta solo token emessi per questa app (`GOOGLE_CLIENT_ID`; altri client con `ALLOWED_CLIENT_IDS`, separati da virgola, nelle `[vars]`). Tutto il resto viene rifiutato.
-- **Privacy:** il contenuto passa dal Worker. Se non vuoi questo, non attivare l'accesso persistente: gli invitati useranno il Selettore di Google.
-- Un Worker vecchio (senza ponte) viene riconosciuto da `/health`, e l'app usa i percorsi di prima.
+**Come funziona**
+1. Il capofamiglia (**proprietario** del file) apre l'app con l'accesso persistente: la famiglia viene **registrata** sul Worker (`POST /house/register`, KV `house:<fileId>` = token di rinnovo cifrato). Si ripete all'avvio, ogni 3 giorni e **subito dopo ogni invito** (prima si condivide il file con l'email, poi si registra, così l'invitato risulta tra gli inviti).
+2. Chi entra ha tre strade (invitato per email = file condiviso con il suo account): la famiglia **compare da sola** dopo l'accesso (`POST /house/mine`); oppure apre il **link d'invito** `…/#join=<codice>`; oppure incolla il **codice famiglia** (= l'ID del file). Con il codice, `POST /house/join {fileId}` fa aggiungere dal Worker l'account tra gli **scrittori** del file (con l'accesso del capofamiglia, senza email di notifica, idempotente, **tetto di 20 account**).
+3. Poi l'app legge e scrive da `POST /db/meta`, `/db/read`, `/db/write`. Ordine dei tentativi dell'app: accesso diretto → ponte (con `/house/join` se c'è un codice) → Picker limitato a quel file (un tocco; mai nei tentativi automatici) → errore con la causa.
+
+**Endpoint** (tutti `POST` con `Authorization: Bearer <token Google>`; `/health` è `GET` e dichiara `{ ok, auth, bridge }`)
+
+| Percorso | Cosa fa |
+|---|---|
+| `/house/register {fileId, session}` | solo il proprietario: affida la famiglia al ponte con la sua sessione (deve essere dello stesso account); indicizza in `inv:<email>` gli account già condivisi |
+| `/house/join {fileId}` | entra con il codice: aggiunge l'account come scrittore; 404 = famiglia non collegata, 403 = al completo |
+| `/house/mine` | le famiglie condivise con l'account e collegate al ponte |
+| `/db/meta?fileId=` | metadati (versione, nome, proprietario; per il membro `ownedByMe` e `canShare` sono falsi) |
+| `/db/read?fileId=` | il database, inoltrato così com'è |
+| `/db/write?fileId=&expectedVersion=` (corpo = database) | scrive **solo se** la versione su Drive è `expectedVersion`, altrimenti **409**: l'app rilegge, fa il merge e riprova (non è un errore per l'utente) |
+
+**Modello di sicurezza**
+- **L'unica fonte di autorizzazione è la condivisione del file su Drive**: non esiste un elenco di membri nel Worker. Il Worker la **ricontrolla a ogni chiamata** (`permissions.list` con l'accesso del capofamiglia): togliere un account da Drive chiude subito l'accesso. In scrittura serve il ruolo `writer`/`owner`.
+- **Il server non si fida del client:** ogni richiesta porta un token Google; il Worker verifica con `tokeninfo` che `aud`/`azp` sia il **tuo** client ID (`GOOGLE_CLIENT_ID`; altri con `ALLOWED_CLIENT_IDS`) e che lo scope sia `drive.file` (o `drive`, che lo include), poi ricava l'email da `drive/v3/about`. Token di un'altra app o senza lo scope → **401**. L'esito è tenuto **in memoria per al massimo 60 secondi**; il token non viene mai salvato.
+- **Solo da origini autorizzate** (`ALLOWED_ORIGINS`, schema + dominio, senza percorso); segreti solo con `wrangler secret put`.
+- Se Google revoca l'accesso del capofamiglia (`invalid_grant`) il collegamento `house:<fileId>` si cancella e il Worker risponde **410**.
+- Anche iscrizioni push, notifiche e Wallet accettano chi passa dal ponte.
+- **Il codice è un segreto condiviso:** chiunque lo abbia e acceda con Google può entrare come scrittore (fino a 20 account). Si revoca togliendo l'account dalle condivisioni su Drive. Con l'app Google in modalità *Testing* possono entrare solo gli utenti di prova.
+
+**Il database passa dal Worker, ma non viene salvato né registrato.** Per non appesantire la CPU del piano gratuito (il file pesa circa 4 MB) la scrittura **non interpreta** il JSON: controlla solo la forma (oggetto con `schemaVersion` numerico in testa e le raccolte `members`, `accounts`, `transactions`) e un tetto di **8 MB**; `fileId` e `expectedVersion` stanno nell'URL.
+
+**Senza Worker (o con un Worker vecchio)** l'app funziona lo stesso: l'invito per email e il Selettore di Google restano il ripiego (l'app lo capisce da `/health`).
+
+**Dopo ogni modifica del Worker:** `npx wrangler deploy` dalla cartella `worker`. Poi il capofamiglia apre l'app una volta con l'accesso persistente, così la famiglia si registra.
+
+### Checklist Google Cloud
+1. *Client ID OAuth → Applicazione web*, **Origini JavaScript autorizzate**: `https://<utente>.github.io` (solo l'origine) e, per sviluppo, `http://localhost:5173`.
+2. **URI di reindirizzamento autorizzati**: `https://<il-tuo-worker>.workers.dev/auth/callback`.
+3. **Pubblica l'app** (*In produzione*): con la modalità *Testing* il token di rinnovo scade dopo **7 giorni** e l'accesso persistente non è davvero persistente. Con il solo scope `drive.file` (non sensibile) non serve la verifica.
+4. Abilita **Google Drive API** e **Google Picker API** nel progetto.
+
+### Se compare «API key invalid» (Google Picker)
+- Il **numero del progetto** (`VITE_GOOGLE_APP_ID`) e la **chiave API** (`VITE_GOOGLE_API_KEY`) vanno creati **nello stesso progetto** del Client ID.
+- Sono **valori pubblici**: in GitHub vanno in *Settings → Secrets and variables → Actions → **Variables***, non *Secrets* (i Secrets non arrivano alla build).
+- Restrizioni della chiave: *Restrizioni delle applicazioni → Siti web* con `https://<utente>.github.io/*`; *Restrizioni API* → **Google Picker API**.
+- Dopo aver cambiato le variabili, rilancia il deploy del sito (*Actions → Deploy su GitHub Pages → Run workflow*).
+- Con il ponte attivo il Picker non serve per entrare in una famiglia: la chiave non valida non blocca più gli invitati.
 
 ## Apple Wallet (facoltativo)
 

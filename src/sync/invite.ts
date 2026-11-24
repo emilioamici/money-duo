@@ -29,4 +29,5 @@ export function consumeInviteFromUrl(): boolean {
 export function pendingInvite(): string | null {
   try { const v = localStorage.getItem(KEY); return v && ID.test(v) ? v : null } catch { return null }
 }
+export function setPendingInvite(id: string): void { try { if (ID.test(id)) localStorage.setItem(KEY, id) } catch { /* noop */ } }
 export function clearInvite(): void { try { localStorage.removeItem(KEY) } catch { /* noop */ } }
