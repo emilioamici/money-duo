@@ -3,6 +3,7 @@ import { AnimatePresence, m } from 'framer-motion'
 import { ListChecks, PieChart, Plus, Receipt, Settings, Star, Users, Wallet, X } from 'lucide-react'
 import { AppProvider, useApp } from './store/AppProvider'
 import { DialogHost } from './components/dialogs'
+import { AppLock } from './components/AppLock'
 import { TransactionForm } from './components/TransactionForm'
 import { SplitForm } from './components/SplitForm'
 import { FavoritesSheet } from './components/FavoritesSheet'
@@ -116,6 +117,7 @@ function Root() {
       <div aria-hidden={locked || undefined} {...(locked ? { inert: '' } : {})} data-locked={locked || undefined}><Shell /></div>
       {locked && <div className="fixed inset-0 z-[100] overflow-y-auto bg-bg" data-testid="login-overlay"><Gate reconnect /></div>}
       <DialogHost />
+      <AppLock />
     </>
   )
 }
