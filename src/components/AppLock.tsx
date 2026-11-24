@@ -1,6 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { Loader2, ScanFace } from 'lucide-react'
-import { getLockState, forgetLock, subscribeLock, unlock, watchVisibility } from '../lib/appLock'
+import { getLockState, forgetLock, hasPin, isPin, subscribeLock, unlock, unlockWithPin, watchVisibility } from '../lib/appLock'
+import { PinField } from './PinField'
 import { useApp } from '../store/AppProvider'
 import { engine } from '../sync/engine'
 import { MascotImg } from './Mascots'
@@ -13,19 +14,31 @@ export function AppLock() {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [confirm, setConfirm] = useState(false)
+  const [pinMode, setPinMode] = useState(false)
+  const [pin, setPin] = useState('')
+  const [pinErr, setPinErr] = useState('')
 
   useEffect(() => watchVisibility(), [])
 
   const attempt = async (silent: boolean) => {
     setBusy(true); if (!silent) setErr('')
     try { await unlock(); setConfirm(false) } catch (e) {
+      // dopo un tentativo fallito (non quello automatico) si passa al codice di sblocco
+      if (!silent && hasPin()) setPinMode(true)
       // su iPhone l'autenticazione parte solo da un tocco: il tentativo automatico può fallire senza che sia un problema
       if (!silent) setErr(e instanceof Error && e.name === 'NotAllowedError' ? t('Sblocco annullato o non riuscito: riprova.') : t('Non riesco a sbloccare con questo dispositivo.'))
     } finally { setBusy(false) }
   }
   // appena l'app si blocca prova da sola; se serve un tocco, resta il pulsante
-  useEffect(() => { if (s.locked) void attempt(true); else { setErr(''); setConfirm(false) } }, [s.locked]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (s.locked) void attempt(true); else { setErr(''); setConfirm(false); setPinMode(false); setPin(''); setPinErr('') } }, [s.locked]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const tryPin = async (v: string) => {
+    if (!isPin(v)) return
+    const r = await unlockWithPin(v)
+    if (r.ok) return
+    setPin('')
+    setPinErr(r.wait ? t('Troppi tentativi: riprova tra {s} secondi.', { s: r.wait }) : t('Codice errato.'))
+  }
   if (!s.locked) return null
   // anche l'accesso Google va chiuso: altrimenti il login persistente riscaricherebbe i dati senza passare dal blocco
   const detach = () => { forgetLock(); void engine.signOut(); resetLocal() }
@@ -38,7 +51,15 @@ export function AppLock() {
         <button className="btn-primary w-full !py-3.5" disabled={busy} onClick={() => void attempt(false)}>
           {busy ? <Loader2 size={18} className="animate-spin" /> : <ScanFace size={18} />}{t('Sblocca con Face ID o impronta')}
         </button>
-        {err && <p className="rounded-xl bg-exp/10 p-3 text-sm text-exp" data-testid="lock-error">{err}</p>}
+        {pinMode && (
+          <div className="space-y-2" data-testid="pin-box">
+            <p className="text-sm text-muted">{t('Oppure inserisci il codice di sblocco a 6 cifre')}</p>
+            <PinField value={pin} onChange={(v) => { setPin(v); setPinErr(''); void tryPin(v) }} label={t('Codice di sblocco')} testId="pin-input" autoFocus />
+            {pinErr && <p className="rounded-xl bg-exp/10 p-3 text-sm text-exp" data-testid="pin-error">{pinErr}</p>}
+          </div>
+        )}
+        {err && !pinMode && <p className="rounded-xl bg-exp/10 p-3 text-sm text-exp" data-testid="lock-error">{err}</p>}
+        {err && pinMode && <p className="text-xs text-muted" data-testid="lock-error">{err}</p>}
         {!confirm ? (
           <button className="btn-ghost w-full !text-xs" onClick={() => setConfirm(true)}>{t('Non riesci a sbloccare?')}</button>
         ) : (
