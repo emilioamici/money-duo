@@ -6,6 +6,7 @@ import { deactivateMember, newMember, saveFamilyName, saveMember } from '../lib/
 import { Field, MemberAvatar } from './ui'
 import { ask } from './dialogs'
 import { FolderPicker } from './FolderPicker'
+import { SubSection } from './SubSection'
 import { pickerConfigured } from '../sync/picker'
 import { inviteLink, setPendingInvite } from '../sync/invite'
 import { bridgeAvailable, isRegistered, type BridgeHouse } from '../sync/bridge'
@@ -110,8 +111,7 @@ export function FamilyCard() {
       {me && <PaypalField key={me.id + (me.paypal ?? '')} handle={me.paypal ?? ''} onSave={(h) => commit((d) => saveMember(d, { ...me, paypal: h }))} />}
 
       {canManage ? (
-        <div className="space-y-2 rounded-2xl bg-bg p-3">
-          <p className="flex items-center gap-2 text-sm font-semibold"><Mail size={16} className="text-brand" />{t('Invita un membro')}</p>
+        <SubSection storageKey="moneyduo:familySections" id="invite" testId="family-invite" icon={<Mail size={16} className="text-brand" />} title={t('Invita un membro')} summary={t('Invia un invito per email')}>
           <input className="input" type="email" placeholder={t('Email Google della persona')} value={email} onChange={(e) => setEmail(e.target.value)} />
           {unclaimed.length > 0 && (
             <select className="input" value={target} onChange={(e) => setTarget(e.target.value)} aria-label={t('Associa a')}>
@@ -122,7 +122,7 @@ export function FamilyCard() {
           {target === 'new' && <input className="input" placeholder={t('Nome (opzionale)')} value={name} onChange={(e) => setName(e.target.value)} />}
           <button className="btn-primary w-full" disabled={busy || !validEmail(email)} onClick={() => void invite()}>{t('Invia invito')}</button>
           <p className="text-xs text-muted">{tb('L\'invito dà accesso in modifica al database su Drive. Se l\'app Google è in modalità <b>Testing</b>, aggiungi la stessa email anche tra gli <b>utenti di prova</b> in Google Cloud Console, altrimenti la persona non potrà accedere.')}</p>
-        </div>
+        </SubSection>
       ) : (
         <p className="rounded-xl bg-bg p-3 text-xs text-muted">{t('Solo il capofamiglia ({owner}) può invitare o rimuovere membri.', { owner: sync.ownerEmail ?? t('proprietario del file') })}</p>
       )}
@@ -131,14 +131,12 @@ export function FamilyCard() {
       {err && <p className="mt-3 rounded-xl bg-exp/10 p-3 text-sm text-exp">{err}</p>}
       {info && <p className="mt-3 rounded-xl bg-inc/10 p-3 text-sm text-inc">{info}</p>}
 
-      <div className="mt-4 flex items-center gap-3 border-t border-line/70 pt-3 text-sm">
-        <FolderOpen size={18} className="shrink-0 text-brand" />
-        <div className="min-w-0 flex-1">
-          <p className="font-semibold">{t('Posizione del database')}</p>
-          <p className="truncate text-xs text-muted">{sync.fileName}{folder ? ` · ${folder}` : ''}</p>
+      <SubSection storageKey="moneyduo:familySections" id="location" testId="family-location" icon={<FolderOpen size={16} className="text-brand" />} title={t('Posizione del database')} summary={`${sync.fileName ?? ''}${folder ? ` · ${folder}` : ''}`}>
+        <div className="flex items-center gap-3 text-sm">
+          <p className="min-w-0 flex-1 truncate text-xs text-muted">{sync.fileName}{folder ? ` · ${folder}` : ''}</p>
+          {canManage && !pickerConfigured() && <button className="btn-soft !px-3 !py-1.5 !text-xs" disabled={busy} onClick={() => setPicking(true)}>{t('Sposta…')}</button>}
         </div>
-        {canManage && !pickerConfigured() && <button className="btn-soft !px-3 !py-1.5 !text-xs" disabled={busy} onClick={() => setPicking(true)}>{t('Sposta…')}</button>}
-      </div>
+      </SubSection>
       {picking && (
         <FolderPicker title={t('Sposta il database in…')} onClose={() => setPicking(false)}
           onPick={(f) => { setPicking(false); void guard(async () => { await engine.moveTo(f.id); setFolder(f.name); setInfo(t('Database spostato in «{name}».', { name: f.name })) }) }} />
@@ -158,13 +156,12 @@ function PaypalField({ handle, onSave }: { handle: string; onSave: (h: string | 
     if (r.handle !== (handle || null)) onSave(r.handle)
   }
   return (
-    <div className="mb-4 rounded-2xl bg-bg p-3">
-      <p className="mb-1 flex items-center gap-2 text-sm font-semibold"><Wallet size={16} className="text-trf" />{t('Il tuo PayPal')}</p>
+    <SubSection storageKey="moneyduo:familySections" id="paypal" testId="family-paypal" icon={<Wallet size={16} className="text-trf" />} title={t('Il tuo PayPal')} summary={handle ? `paypal.me/${handle}` : t('Non collegato')}>
       <input className="input" aria-label={t('Nome PayPal.Me')} placeholder={t('Il tuo nome PayPal.Me (es. mario.rossi)')} value={text} autoCapitalize="none" autoCorrect="off"
         onChange={(e) => { setText(e.target.value); setErr('') }} onBlur={save} onKeyDown={(e) => { if (e.key === 'Enter') save() }} />
       {err && <p className="mt-1 text-xs text-exp">{err}</p>}
       <p className="mt-1 text-xs text-muted">{t('È il nome dopo paypal.me/ nel tuo link (lo crei dall\'app PayPal → «Il mio link PayPal.Me»). Gli altri membri lo useranno per rimborsarti: sarà visibile a tutta la famiglia.')}</p>
-    </div>
+    </SubSection>
   )
 }
 
@@ -192,8 +189,7 @@ function FamilyCode({ fileId, family, owner }: { fileId: string; family: string;
     } catch { /* condivisione annullata */ }
   }
   return (
-    <div className="mt-3 space-y-2 rounded-2xl bg-bg p-3" data-testid="family-code">
-      <p className="flex items-center gap-2 text-sm font-semibold"><KeyRound size={16} className="text-brand" />{t('Codice famiglia')}</p>
+    <SubSection storageKey="moneyduo:familySections" id="code" testId="family-code" icon={<KeyRound size={16} className="text-brand" />} title={t('Codice famiglia')} summary={t('Copia il codice o condividi il link d\'invito')}>
       <p className="break-all font-mono text-xs" data-testid="family-code-value">{fileId}</p>
       <div className="grid grid-cols-2 gap-2">
         <button className="btn-soft !px-3 !text-xs" onClick={() => void copy(fileId, t('Codice copiato.'))}><Copy size={14} />{t('Copia codice')}</button>
@@ -201,7 +197,7 @@ function FamilyCode({ fileId, family, owner }: { fileId: string; family: string;
       </div>
       {note && <p className="text-xs text-muted" data-testid="family-code-note">{note}</p>}
       {msg && <p className="text-xs text-inc">{msg}</p>}
-    </div>
+    </SubSection>
   )
 }
 

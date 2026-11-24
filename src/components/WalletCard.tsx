@@ -1,9 +1,10 @@
-import { useEffect, useState, type ReactNode } from 'react'
-import { ChevronDown, CreditCard, Copy, Download, Inbox, KeyRound, RefreshCw, Star, Store, Trash2, Wallet, XCircle } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { CreditCard, Copy, Download, Inbox, KeyRound, RefreshCw, Star, Store, Trash2, Wallet, XCircle } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
 import { engine } from '../sync/engine'
 import { createToken, ingestUrl, pullWallet, revokeWallet, savedToken, saveToken, setWalletOn, walletAvailable, walletOn, type WalletLogEntry } from '../sync/wallet'
 import { ask } from './dialogs'
+import { SubSection } from './SubSection'
 import { accountMemberIds, sortedAccounts } from '../lib/calc'
 import { nowIso } from '../lib/ids'
 import { cardsOf, favoritesForMerchants, merchantsOf, removeCard, removeMerchant, setCardAccount, setMerchantFavorite } from '../lib/wallet'
@@ -74,7 +75,7 @@ export function WalletCard() {
       ) : (
         <>
           {token && (
-            <SubSection id="address" testId="wallet-address" icon={<KeyRound size={16} />} title={t('Il tuo indirizzo personale (non condividerlo)')} summary={t('Copialo o rivedilo')}>
+            <SubSection storageKey="moneyduo:walletSections" id="address" testId="wallet-address" icon={<KeyRound size={16} />} title={t('Il tuo indirizzo personale (non condividerlo)')} summary={t('Copialo o rivedilo')}>
               <p data-testid="wallet-url" className="break-all font-mono text-xs">{ingestUrl(token)}</p>
               <button className="btn-soft mt-2 w-full" onClick={() => void copy()}><Copy size={16} />{t('Copia indirizzo')}</button>
             </SubSection>
@@ -114,7 +115,7 @@ function CardList() {
   const accounts = sortedAccounts(db).filter((a) => !a.hidden && accountMemberIds(db, a).includes(me.id))
   const unlinked = cards.filter((c) => !c.accountId || !accounts.some((a) => a.id === c.accountId)).length
   return (
-    <SubSection id="cards" testId="wallet-cards" icon={<CreditCard size={16} />} title={t('Le tue carte')}
+    <SubSection storageKey="moneyduo:walletSections" id="cards" testId="wallet-cards" icon={<CreditCard size={16} />} title={t('Le tue carte')}
       summary={cards.length === 0 ? t('Nessuna carta ancora') : cards.length === 1 ? t('1 carta') : t('{n} carte', { n: cards.length })}
       badge={unlinked > 0 ? <span className="rounded-full bg-warn/20 px-2 py-0.5 text-[11px] font-bold text-warn">{t('{n} da associare', { n: unlinked })}</span> : undefined}>
       {cards.length === 0 ? (
@@ -156,7 +157,7 @@ function MerchantList() {
   const label = (f: (typeof favs)[number]) => (favs.filter((x) => baseLabel(x) === baseLabel(f)).length > 1 ? `${baseLabel(f)} · ${(f.categoryId && cats.get(f.categoryId)) || accNames.get(f.accountId) || ''}` : baseLabel(f))
   const linked = list.filter((m) => m.favoriteId && favs.some((f) => f.id === m.favoriteId)).length
   return (
-    <SubSection id="merchants" testId="wallet-merchants" icon={<Store size={16} />} title={t('I tuoi esercenti')}
+    <SubSection storageKey="moneyduo:walletSections" id="merchants" testId="wallet-merchants" icon={<Store size={16} />} title={t('I tuoi esercenti')}
       summary={list.length === 0 ? t('Nessun esercente ancora') : list.length === 1 ? t('1 esercente') : t('{n} esercenti', { n: list.length })}
       badge={linked > 0 ? <span className="rounded-full bg-trf/15 px-2 py-0.5 text-[11px] font-bold text-trf">{t('{n} con preferito', { n: linked })}</span> : undefined}>
       <p className="mb-2 text-xs text-muted">{t('Lega un esercente a un preferito: quando arriva una sua spesa è già compilata come il preferito (con l\'importo pagato) e approvata.')}</p>
@@ -189,7 +190,7 @@ function MerchantList() {
 /** Gli ultimi arrivi dal Comando Rapido registrati dal server: se una spesa non compare, qui si vede se è arrivata e perché è stata rifiutata. */
 function Arrivals({ log, onRefresh }: { log: WalletLogEntry[] | null; onRefresh: () => void }) {
   return (
-    <SubSection id="arrivals" testId="wallet-arrivals" icon={<Inbox size={16} />} title={t('Ultimi arrivi dal Comando Rapido')}
+    <SubSection storageKey="moneyduo:walletSections" id="arrivals" testId="wallet-arrivals" icon={<Inbox size={16} />} title={t('Ultimi arrivi dal Comando Rapido')}
       summary={log === null ? t('Controllo…') : log.length === 0 ? t('Nessun arrivo registrato') : `${dateTimeLabel(log[0].at)} · ${log[0].status === 200 ? t('ricevuta') : t('rifiutata: {reason}', { reason: log[0].reason ?? String(log[0].status) })}`}>
       <p className="mb-2 text-right"><button className="rounded-full px-2 py-0.5 text-xs font-semibold text-brand" onClick={onRefresh}>{t('Aggiorna')}</button></p>
       {log === null ? (
@@ -212,32 +213,5 @@ function Arrivals({ log, onRefresh }: { log: WalletLogEntry[] | null; onRefresh:
         </ul>
       )}
     </SubSection>
-  )
-}
-
-const SECTIONS_KEY = 'moneyduo:walletSections'
-const loadSections = (): Record<string, boolean> => { try { return JSON.parse(localStorage.getItem(SECTIONS_KEY) ?? '{}') } catch { return {} } }
-
-/** Sotto-sezione a scomparsa della scheda Wallet: da chiusa mostra un riepilogo in una riga; lo stato si ricorda su questo dispositivo. */
-function SubSection({ id, testId, icon, title, summary, badge, children }: { id: string; testId: string; icon: ReactNode; title: string; summary?: string; badge?: ReactNode; children: ReactNode }) {
-  const [open, setOpen] = useState(() => !!loadSections()[id])
-  const flip = () => setOpen((o) => {
-    const n = !o
-    try { localStorage.setItem(SECTIONS_KEY, JSON.stringify({ ...loadSections(), [id]: n })) } catch { /* noop */ }
-    return n
-  })
-  return (
-    <div data-testid={testId} data-open={open || undefined} className="rounded-xl bg-bg">
-      <button type="button" onClick={flip} aria-expanded={open} className="flex w-full items-center gap-2 p-3 text-left active:bg-line/30">
-        <span className="shrink-0 text-muted">{icon}</span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-semibold">{title}</span>
-          {!open && summary && <span className="block truncate text-xs text-muted">{summary}</span>}
-        </span>
-        {badge}
-        <ChevronDown size={18} className={`shrink-0 text-muted transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-      {open && <div className="px-3 pb-3">{children}</div>}
-    </div>
   )
 }
