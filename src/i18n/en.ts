@@ -1,5 +1,7 @@
 /** Traduzioni in inglese. La chiave è il testo italiano usato nel codice con `t('…')`; i segnaposto {nome} e i <b>…</b> devono coincidere. */
 export const EN: Record<string, string> = {
+  "Invia un invito per email": "Send an invitation by email",
+  "Copia il codice o condividi il link d'invito": "Copy the code or share the invitation link",
   "Il server non ha il ponte attivo: chi riceve il codice deve prima essere invitato per email e scegliere il file con il selettore di Google.": "The server does not have the bridge on: whoever receives the code must first be invited by email and choose the file with Google's picker.",
   "Chi lo riceve entra con il link o il codice se il capofamiglia ha attivato l'accesso persistente; altrimenti il capofamiglia deve invitarlo per email.": "Whoever receives it joins with the link or the code if the head of the family turned on persistent login; otherwise the head of the family must invite them by email.",
   "Il codice basta: chi lo riceve entra da solo con l'accesso Google, anche senza invito per email. Chiunque abbia il codice può entrare: per togliere qualcuno rimuovilo dalle condivisioni del file su Drive.": "The code is enough: whoever receives it joins on their own with Google sign-in, even without an email invitation. Anyone with the code can join: to remove someone, remove them from the file's sharing on Drive.",
