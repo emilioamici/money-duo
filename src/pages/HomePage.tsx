@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Receipt, Search, SlidersHorizontal, X } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
-import { countFilters, emptyFilters, filterTransactions, periodRange, summarize } from '../lib/calc'
+import { ALL_TIME, countFilters, emptyFilters, filterTransactions, periodRange, summarize } from '../lib/calc'
 import { formatMoney } from '../lib/format'
 import { MonthNav, ScopeChips, SyncChip } from '../components/Nav'
 import { TxGroups } from '../components/TxGroups'
@@ -16,8 +16,10 @@ export function HomePage({ onOpenSync }: { onOpenSync: () => void }) {
   const [search, setSearch] = useState(!!view.q)
   const [filtering, setFiltering] = useState(false)
   const nFilters = countFilters(view.filters)
-  const { from, to } = periodRange(view.month, view.period)
-  const txs = useMemo(() => filterTransactions(db, { from, to, scope: view.scope, accountId: view.accountId, q: view.q, me: me?.id ?? null, adv: view.filters }), [db, view, me, from.getTime()]) // eslint-disable-line react-hooks/exhaustive-deps
+  const searching = view.q.trim() !== ''
+  // con un testo di ricerca si cerca in tutte le transazioni, non solo nel periodo visualizzato
+  const { from, to } = searching ? ALL_TIME : periodRange(view.month, view.period)
+  const txs = useMemo(() => filterTransactions(db, { from, to, scope: view.scope, accountId: view.accountId, q: view.q, me: me?.id ?? null, adv: view.filters }), [db, view, me, from.getTime(), to.getTime()]) // eslint-disable-line react-hooks/exhaustive-deps
   const sum = summarize(txs)
   return (
     <div>
@@ -34,7 +36,7 @@ export function HomePage({ onOpenSync }: { onOpenSync: () => void }) {
             <button className="icon-btn" aria-label={t('Cerca')} onClick={() => { setSearch((s) => !s); if (search) setView({ q: '' }) }}>{search ? <X size={20} /> : <Search size={20} />}</button>
           </div>
         </div>
-        <MonthNav />
+        {searching ? <p className="rounded-xl bg-brand/10 px-3 py-2 text-center text-sm font-semibold text-brand" data-testid="search-all">{t('Ricerca in tutte le transazioni, di ogni periodo')}</p> : <MonthNav />}
         {search && <input autoFocus className="input" placeholder={t('Cerca per titolo, nota, categoria, conto, importo…')} value={view.q} onChange={(e) => setView({ q: e.target.value })} />}
         <ScopeChips />
       </div>

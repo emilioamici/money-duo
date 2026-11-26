@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import type { TxType } from '../types'
 import { useApp } from '../store/AppProvider'
-import { allTags, childCategories, countFilters, emptyFilters, filterTransactions, periodRange, sortedAccounts, topCategories, visibleTo, type TxFilters } from '../lib/calc'
+import { ALL_TIME, allTags, childCategories, countFilters, emptyFilters, filterTransactions, periodRange, sortedAccounts, topCategories, visibleTo, type TxFilters } from '../lib/calc'
 import { centsToInput, parseAmount } from '../lib/format'
 import { Sheet, Toggle } from './ui'
 import { t } from '../i18n'
@@ -31,7 +31,7 @@ export function FilterSheet({ onClose }: { onClose: () => void }) {
   const set = (patch: Partial<TxFilters>) => setView({ filters: { ...f, ...patch } })
   const accounts = useMemo(() => sortedAccounts(db).filter((a) => (!a.hidden && visibleTo(db, a, me?.id ?? null)) || f.accountIds.includes(a.id)), [db, me, f.accountIds])
   const tags = useMemo(() => allTags(db), [db])
-  const { from, to } = periodRange(view.month, view.period)
+  const { from, to } = view.q.trim() ? ALL_TIME : periodRange(view.month, view.period)
   const n = useMemo(() => filterTransactions(db, { from, to, scope: view.scope, accountId: view.accountId, q: view.q, me: me?.id ?? null, adv: f }).length, [db, from, to, view.scope, view.accountId, view.q, me, f])
 
   // importi: si digitano come testo e si convertono quando sono validi
