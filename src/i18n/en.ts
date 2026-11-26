@@ -16,6 +16,8 @@ export const EN: Record<string, string> = {
   "1 risultato": "1 result",
   "{n} risultati": "{n} results",
   "Mostra altre ({n})": "Show more ({n})",
+  "Conto Split": "Split account",
+  "Il conto che si usa per dividere le spese: uno solo per persona, preselezionato quando paghi uno split. Il suo saldo è sempre zero, qualunque spesa ci finisca.": "The account used to split expenses: only one per person, preselected when you pay a split. Its balance is always zero, whatever expenses end up there.",
   "Troppi tentativi: riprova tra {s} secondi.": "Too many attempts: try again in {s} seconds.",
   "Codice errato.": "Wrong code.",
   "Oppure inserisci il codice di sblocco a 6 cifre": "Or enter your 6-digit unlock code",

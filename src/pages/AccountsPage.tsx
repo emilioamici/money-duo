@@ -79,7 +79,7 @@ export function AccountsPage() {
                     ]}>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-semibold">{a.name}</span>
-                      <span className="mt-0.5 flex items-center gap-1.5"><MembersBadge ids={a.members} />{a.excludeFromTotal && <span className="text-[11px] text-muted">{t('fuori dal totale')}</span>}</span>
+                      <span className="mt-0.5 flex items-center gap-1.5"><MembersBadge ids={a.members} />{a.splitAccount && <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-semibold text-brand">{t('Conto Split')}</span>}{a.excludeFromTotal && <span className="text-[11px] text-muted">{t('fuori dal totale')}</span>}</span>
                     </span>
                     <span className={`font-bold tabular-nums ${(bal[a.id] ?? 0) < 0 ? 'text-exp' : ''}`}>{formatMoney(bal[a.id] ?? 0)}</span>
                   </SwipeRow>

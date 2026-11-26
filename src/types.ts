@@ -57,6 +57,11 @@ export interface Account {
   initialBalance: number
   /** escluso dal totale liquidità (investimenti, fondi vincolati…) */
   excludeFromTotal: boolean
+  /**
+   * «Conto Split»: conto personale (uno solo per membro) usato per dividere le spese. È preselezionato quando quel membro paga uno split
+   * e il suo saldo è sempre zero, qualunque spesa ci finisca. Assente = conto normale.
+   */
+  splitAccount?: boolean
   hidden: boolean
   order: number
   /** membro che ha creato / modificato per ultimo il conto (serve alle notifiche) */

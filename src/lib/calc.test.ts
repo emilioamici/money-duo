@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createDefaultDb, createFamilyDb, isPristine } from './defaults'
-import { accountBalances, allTags, categoryBreakdown, expenseShares, familyBalances, filterTransactions, involvedAccountIds, isSharedAccount, isSplit, liquiditySeries, normalizeTag, totalLiquidity, txPayerIds, visibleTo } from './calc'
+import { accountBalances, splitAccountOf, allTags, categoryBreakdown, expenseShares, familyBalances, filterTransactions, involvedAccountIds, isSharedAccount, isSplit, liquiditySeries, normalizeTag, totalLiquidity, txPayerIds, visibleTo } from './calc'
 import { mergeDb, parseDb, replaceData, sameData } from './merge'
 import { deactivateMember, deleteCategory, deleteTransaction, newMember, saveAccount, saveFamilyName, saveMember, saveTransaction, setCategoryHidden } from './mutations'
 import { parseAmount } from './format'
@@ -400,5 +400,33 @@ describe('parseDb e migrazione v1 -> v2', () => {
     expect(sameData(mergeDb(a, b), a)).toBe(true)
     // anche dopo un round trip nel nuovo formato
     expect(sameData(parseDb(JSON.parse(JSON.stringify(a))), a)).toBe(true)
+  })
+})
+
+describe('Conto Split', () => {
+  const withSplit = (db: Db, id: string): Db => saveAccount(db, { ...db.accounts.find((a) => a.id === id)!, splitAccount: true })
+  it('il saldo è sempre zero, anche con saldo iniziale e spese', () => {
+    let db = family3()
+    db = { ...db, accounts: db.accounts.map((a) => (a.id === 'acc-m2' ? { ...a, initialBalance: 5000 } : a)) }
+    db = withSplit(db, 'acc-m2')
+    db = saveTransaction(db, base({ accountId: 'acc-m2', amount: 3000, paidBy: 'm2', participants: ['m1', 'm2'] }))
+    db = saveTransaction(db, base({ type: 'income', accountId: 'acc-m2', amount: 700 }))
+    expect(accountBalances(db)['acc-m2']).toBe(0)
+    expect(totalLiquidity(db, accountBalances(db))).toBe(totalLiquidity({ ...db, accounts: db.accounts.filter((a) => a.id !== 'acc-m2') }, accountBalances(db)))
+  })
+  it('uno solo per membro: impostarlo su un altro conto lo toglie dal primo', () => {
+    let db = family3()
+    db = saveAccount(db, { ...acc('acc-m2b', ['m2']), splitAccount: true })
+    db = withSplit(db, 'acc-m2')
+    expect(db.accounts.filter((a) => a.splitAccount).map((a) => a.id)).toEqual(['acc-m2'])
+    expect(splitAccountOf(db, 'm2')?.id).toBe('acc-m2')
+  })
+  it('solo i conti personali: su un conto condiviso il flag cade', () => {
+    const db = withSplit(family3(), 'acc-duo')
+    expect(db.accounts.find((a) => a.id === 'acc-duo')?.splitAccount).toBeUndefined()
+  })
+  it('il flag sopravvive a lettura e salvataggio del file', () => {
+    const db = withSplit(family3(), 'acc-m3')
+    expect(parseDb(JSON.parse(JSON.stringify(db))).accounts.find((a) => a.id === 'acc-m3')?.splitAccount).toBe(true)
   })
 })
