@@ -160,6 +160,7 @@ export function parseDb(input: unknown): Db {
     members: strArr(x.members),
     initialBalance: Math.round(num(x.initialBalance)),
     excludeFromTotal: bool(x.excludeFromTotal),
+    ...(x.splitAccount === true ? { splitAccount: true } : {}),
     hidden: bool(x.hidden),
     order: num(x.order, i),
     by: typeof x.by === 'string' ? x.by : null,

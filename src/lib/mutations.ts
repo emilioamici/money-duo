@@ -24,11 +24,16 @@ export function deleteTransaction(db: Db, id: string): Db {
 }
 
 export function saveAccount(db: Db, acc: Account): Db {
-  const next = { ...acc, updatedAt: nowIso() }
+  const t = nowIso()
+  // Conto Split: solo personale e uno solo per membro (impostarlo su un conto lo toglie dall'altro)
+  const split = !!acc.splitAccount && acc.members.length === 1
+  const next: Account = { ...acc, updatedAt: t }
+  if (split) next.splitAccount = true; else delete next.splitAccount
   const exists = db.accounts.some((x) => x.id === acc.id)
+  const others = split ? db.accounts.map((x) => (x.id !== acc.id && x.splitAccount && x.members.length === 1 && x.members[0] === acc.members[0] ? (({ splitAccount: _s, ...r }) => ({ ...r, updatedAt: t }))(x) : x)) : db.accounts
   return {
     ...db,
-    accounts: exists ? db.accounts.map((x) => (x.id === acc.id ? next : x)) : [...db.accounts, next],
+    accounts: exists ? others.map((x) => (x.id === acc.id ? next : x)) : [...others, next],
     deleted: without(db.deleted, acc.id),
   }
 }

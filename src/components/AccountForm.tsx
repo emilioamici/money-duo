@@ -21,6 +21,7 @@ export function AccountForm({ account, onClose }: { account?: Account; onClose: 
   const [initial, setInitial] = useState(account ? centsToInput(account.initialBalance) : '')
   const [exclude, setExclude] = useState(account?.excludeFromTotal ?? false)
   const [hidden, setHidden] = useState(account?.hidden ?? false)
+  const [split, setSplit] = useState(account?.splitAccount ?? false)
   const [error, setError] = useState('')
   const used = account ? accountInUse(db, account.id) : false
 
@@ -31,7 +32,7 @@ export function AccountForm({ account, onClose }: { account?: Account; onClose: 
     if (bal === null) return setError(t('Saldo iniziale non valido.'))
     const now = nowIso()
     commit((d) => saveAccount(d, {
-      id: account?.id ?? uid(), name: name.trim(), group, members: everyone ? [] : ids, initialBalance: bal, excludeFromTotal: exclude, hidden,
+      id: account?.id ?? uid(), name: name.trim(), group, members: everyone ? [] : ids, initialBalance: bal, excludeFromTotal: exclude, splitAccount: split && !everyone && ids.length === 1, hidden,
       order: account?.order ?? nextOrder(d.accounts), by: me?.id ?? null, createdAt: account?.createdAt ?? now, updatedAt: now,
     }))
     onClose()
@@ -62,6 +63,9 @@ export function AccountForm({ account, onClose }: { account?: Account; onClose: 
         {!everyone && <MemberChips multi value={ids} onChange={setIds} includeIds={account?.members ?? []} />}
       </Field>
       <Field label={t('Saldo iniziale (opzionale)')}><input className="input" inputMode="decimal" placeholder={t('0,00')} value={initial} onChange={(e) => setInitial(e.target.value)} /></Field>
+      {!everyone && ids.length === 1 && (
+        <Toggle checked={split} onChange={setSplit} label={t('Conto Split')} hint={t('Il conto che si usa per dividere le spese: uno solo per persona, preselezionato quando paghi uno split. Il suo saldo è sempre zero, qualunque spesa ci finisca.')} />
+      )}
       <Toggle checked={exclude} onChange={setExclude} label={t('Escludi dal totale liquidità')} hint={t('Per investimenti o fondi vincolati')} />
       <Toggle checked={hidden} onChange={setHidden} label={t('Nascondi conto')} hint={t('Lo storico resta salvato; riattivabile da Conti → Mostra nascosti')} />
       {used && account && <p className="text-xs text-muted">{t('Il conto ha transazioni collegate: non può essere eliminato, ma solo nascosto.')}</p>}

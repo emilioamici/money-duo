@@ -57,8 +57,13 @@ export function accountBalances(db: Db): Record<string, number> {
       if (t.toAccountId) bal[t.toAccountId] = (bal[t.toAccountId] ?? 0) + t.amount
     }
   }
+  // il Conto Split serve solo a dividere le spese: il suo saldo è sempre zero
+  for (const a of db.accounts) if (a.splitAccount) bal[a.id] = 0
   return bal
 }
+
+/** Il Conto Split di un membro (se l'ha impostato). */
+export const splitAccountOf = (db: Db, member: MemberId): Account | undefined => db.accounts.find((a) => a.splitAccount && !a.hidden && a.members.length === 1 && a.members[0] === member)
 
 /** Totale liquidità: conti visibili, non nascosti e non esclusi; `include` restringe ulteriormente (es. per membro). */
 export function totalLiquidity(db: Db, bal: Record<string, number>, include: (a: Account) => boolean = () => true): number {
@@ -368,7 +373,7 @@ export interface LiquidityPoint {
  * `start` è la liquidità a inizio anno.
  */
 export function liquiditySeries(db: Db, year: number, me: MemberId | null, now: Date = new Date()): { start: number; points: LiquidityPoint[] } {
-  const counted = new Map(db.accounts.filter((a) => !a.hidden && !a.excludeFromTotal && visibleTo(db, a, me)).map((a) => [a.id, a]))
+  const counted = new Map(db.accounts.filter((a) => !a.hidden && !a.excludeFromTotal && !a.splitAccount && visibleTo(db, a, me)).map((a) => [a.id, a]))
   const flows: Array<{ t: number; delta: number }> = []
   for (const t of db.transactions) {
     const ts = new Date(t.date).getTime()

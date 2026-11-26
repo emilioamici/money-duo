@@ -3,7 +3,7 @@ import { Plus, Trash2, X } from 'lucide-react'
 import { WalletTag } from './WalletBadge'
 import type { Payment, Transaction } from '../types'
 import { useApp, type TxFormState } from '../store/AppProvider'
-import { accountMemberIds, expenseShares, familyBalances, sortedAccounts, txPayments } from '../lib/calc'
+import { accountMemberIds, expenseShares, familyBalances, sortedAccounts, splitAccountOf, txPayments } from '../lib/calc'
 import { centsToInput, formatMoney, fromLocalInput, parseAmount, toLocalInput } from '../lib/format'
 import { nowIso, uid } from '../lib/ids'
 import { deleteTransaction, saveTransaction } from '../lib/mutations'
@@ -32,6 +32,9 @@ export function SplitForm({ state, onClose }: { state: TxFormState; onClose: () 
   const eligible = (member: string, current?: string) => allAccounts.filter((a) => a.id === current || (!a.hidden && accountMemberIds(db, a).includes(member)))
   const firstAccount = (member: string) => {
     const list = eligible(member)
+    // il Conto Split di chi paga è quello preselezionato
+    const sp = splitAccountOf(db, member)
+    if (sp && list.some((a) => a.id === sp.id)) return sp.id
     return list.find((a) => a.id === prefs.lastAccountId)?.id ?? list[0]?.id ?? ''
   }
 
