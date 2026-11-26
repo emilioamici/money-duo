@@ -133,6 +133,9 @@ function matchesFilters(t: Transaction, f: TxFilters, catIds: Set<string> | null
   return true
 }
 
+/** Intervallo che comprende tutte le transazioni: usato quando si cerca del testo. */
+export const ALL_TIME = { from: new Date(0), to: new Date(9999, 0, 1) }
+
 export function filterTransactions(db: Db, f: Filters): Transaction[] {
   const accs = accountById(db)
   const cats = categoryById(db)
