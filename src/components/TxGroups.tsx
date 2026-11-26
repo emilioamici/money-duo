@@ -9,7 +9,7 @@ import { TransactionRow } from './TransactionRow'
 export function TxGroups({ txs }: { txs: Transaction[] }) {
   const groups = useMemo(() => {
     const m = new Map<string, Transaction[]>()
-    for (const t of txs) { const k = dayKey(t.date); m.set(k, [...(m.get(k) ?? []), t]) }
+    for (const t of txs) { const k = dayKey(t.date); const l = m.get(k); if (l) l.push(t); else m.set(k, [t]) }
     return [...m.entries()]
   }, [txs])
   return (

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Receipt, Search, SlidersHorizontal, X } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
 import { ALL_TIME, countFilters, emptyFilters, filterTransactions, periodRange, summarize } from '../lib/calc'
@@ -11,10 +11,23 @@ import { EmptyState } from '../components/ui'
 import { NotificationBell } from '../components/Notifications'
 import { t } from '../i18n'
 
+const PAGE = 100
+
 export function HomePage({ onOpenSync }: { onOpenSync: () => void }) {
   const { db, view, setView, openTx, me } = useApp()
   const [search, setSearch] = useState(!!view.q)
   const [filtering, setFiltering] = useState(false)
+  // il testo digitato resta subito reattivo; la ricerca vera parte 250 ms dopo l'ultimo tasto
+  const [text, setText] = useState(view.q)
+  useEffect(() => { if (view.q === '' && text !== '') setText('') }, [view.q]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (text === view.q) return
+    const id = setTimeout(() => setView({ q: text }), 250)
+    return () => clearTimeout(id)
+  }, [text]) // eslint-disable-line react-hooks/exhaustive-deps
+  // a schermo si disegnano al massimo `shown` movimenti per volta: migliaia di righe insieme bloccherebbero il telefono
+  const [shown, setShown] = useState(PAGE)
+  useEffect(() => { setShown(PAGE) }, [view.q, view.month, view.period, view.scope, view.accountId, view.filters])
   const nFilters = countFilters(view.filters)
   const searching = view.q.trim() !== ''
   // con un testo di ricerca si cerca in tutte le transazioni, non solo nel periodo visualizzato
@@ -33,11 +46,11 @@ export function HomePage({ onOpenSync }: { onOpenSync: () => void }) {
               <SlidersHorizontal size={20} />
               {nFilters > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[10px] font-bold text-onbrand">{nFilters}</span>}
             </button>
-            <button className="icon-btn" aria-label={t('Cerca')} onClick={() => { setSearch((s) => !s); if (search) setView({ q: '' }) }}>{search ? <X size={20} /> : <Search size={20} />}</button>
+            <button className="icon-btn" aria-label={t('Cerca')} onClick={() => { setSearch((s) => !s); if (search) { setText(''); setView({ q: '' }) } }}>{search ? <X size={20} /> : <Search size={20} />}</button>
           </div>
         </div>
         {searching ? <p className="rounded-xl bg-brand/10 px-3 py-2 text-center text-sm font-semibold text-brand" data-testid="search-all">{t('Ricerca in tutte le transazioni, di ogni periodo')}</p> : <MonthNav />}
-        {search && <input autoFocus className="input" placeholder={t('Cerca per titolo, nota, categoria, conto, importo…')} value={view.q} onChange={(e) => setView({ q: e.target.value })} />}
+        {search && <input autoFocus className="input" placeholder={t('Cerca per titolo, nota, categoria, conto, importo…')} value={text} onChange={(e) => setText(e.target.value)} />}
         <ScopeChips />
       </div>
 
@@ -60,7 +73,13 @@ export function HomePage({ onOpenSync }: { onOpenSync: () => void }) {
         {txs.length === 0 ? (
           <div className="card"><EmptyState icon={<Receipt size={28} />} title={t('Nessuna transazione')} text={view.q || nFilters ? t('Nessun risultato per questa ricerca o questi filtri.') : t('Non ci sono movimenti in questo periodo.')}
             action={<button className="btn-primary" onClick={() => openTx()}>{t('Aggiungi transazione')}</button>} /></div>
-        ) : <TxGroups txs={txs} />}
+        ) : (
+          <>
+            {searching && <p className="px-1 text-xs font-semibold text-muted" data-testid="search-count">{txs.length === 1 ? t('1 risultato') : t('{n} risultati', { n: txs.length })}</p>}
+            <TxGroups txs={txs.length > shown ? txs.slice(0, shown) : txs} />
+            {txs.length > shown && <button className="btn-ghost w-full" data-testid="show-more" onClick={() => setShown((n) => n + PAGE)}>{t('Mostra altre ({n})', { n: txs.length - shown })}</button>}
+          </>
+        )}
       </div>
       {filtering && <FilterSheet onClose={() => setFiltering(false)} />}
     </div>
