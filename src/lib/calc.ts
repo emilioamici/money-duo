@@ -65,6 +65,12 @@ export function accountBalances(db: Db): Record<string, number> {
 /** Il Conto Split di un membro (se l'ha impostato). */
 export const splitAccountOf = (db: Db, member: MemberId): Account | undefined => db.accounts.find((a) => a.splitAccount && !a.hidden && a.members.length === 1 && a.members[0] === member)
 
+/** La transazione passa da un Conto Split? Serve solo a dividere le spese: non conta nelle statistiche. */
+export function touchesSplitAccount(db: Db, t: Transaction): boolean {
+  const split = new Set(db.accounts.filter((a) => a.splitAccount).map((a) => a.id))
+  return split.size > 0 && involvedAccountIds(t).some((id) => split.has(id))
+}
+
 /** Totale liquidità: conti visibili, non nascosti e non esclusi; `include` restringe ulteriormente (es. per membro). */
 export function totalLiquidity(db: Db, bal: Record<string, number>, include: (a: Account) => boolean = () => true): number {
   return db.accounts.filter((a) => !a.hidden && !a.excludeFromTotal && include(a)).reduce((s, a) => s + (bal[a.id] ?? 0), 0)
