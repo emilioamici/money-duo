@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { ChevronDown, CircleCheck, Handshake, Wallet } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
 import { NotificationBell } from '../components/Notifications'
-import { categoryBreakdown, debtTone, headlineDebt, familyBalances, filterTransactions, periodRange, sortedAccounts, summarize, type Debt } from '../lib/calc'
+import { categoryBreakdown, debtTone, headlineDebt, familyBalances, filterTransactions, periodRange, sortedAccounts, summarize, touchesSplitAccount, type Debt } from '../lib/calc'
 import { formatMoney } from '../lib/format'
 import { paypalUrl } from '../lib/paypal'
 import { MonthNav, ScopeChips } from '../components/Nav'
@@ -22,7 +22,8 @@ export function StatsPage() {
   const [type, setType] = useState<CategoryType>('expense')
   const [open, setOpen] = useState<string | null>(null)
   const { from, to } = periodRange(view.month, view.period)
-  const txs = useMemo(() => filterTransactions(db, { from, to, scope: view.scope, accountId: view.accountId, q: '', me: me?.id ?? null }), [db, view.scope, view.accountId, me, from.getTime()]) // eslint-disable-line react-hooks/exhaustive-deps
+  // le transazioni sui Conti Split servono solo a dividere le spese: non entrano nelle statistiche (i debiti tra i membri restano)
+  const txs = useMemo(() => filterTransactions(db, { from, to, scope: view.scope, accountId: view.accountId, q: '', me: me?.id ?? null }).filter((x) => !touchesSplitAccount(db, x)), [db, view.scope, view.accountId, me, from.getTime()]) // eslint-disable-line react-hooks/exhaustive-deps
   const items = useMemo(() => categoryBreakdown(db, txs, type), [db, txs, type])
   const total = items.reduce((s, i) => s + i.total, 0)
   const sum = summarize(txs)

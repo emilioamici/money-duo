@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Receipt, Search, SlidersHorizontal, X } from 'lucide-react'
 import { useApp } from '../store/AppProvider'
-import { ALL_TIME, countFilters, emptyFilters, filterTransactions, periodRange, summarize } from '../lib/calc'
+import { ALL_TIME, countFilters, emptyFilters, filterTransactions, periodRange, summarize, touchesSplitAccount } from '../lib/calc'
 import { formatMoney } from '../lib/format'
 import { MonthNav, ScopeChips, SyncChip } from '../components/Nav'
 import { TxGroups } from '../components/TxGroups'
@@ -33,7 +33,8 @@ export function HomePage({ onOpenSync }: { onOpenSync: () => void }) {
   // con un testo di ricerca si cerca in tutte le transazioni, non solo nel periodo visualizzato
   const { from, to } = searching ? ALL_TIME : periodRange(view.month, view.period)
   const txs = useMemo(() => filterTransactions(db, { from, to, scope: view.scope, accountId: view.accountId, q: view.q, me: me?.id ?? null, adv: view.filters }), [db, view, me, from.getTime(), to.getTime()]) // eslint-disable-line react-hooks/exhaustive-deps
-  const sum = summarize(txs)
+  // le transazioni sui Conti Split servono solo a dividere le spese: restano in elenco ma non entrano nei totali
+  const sum = useMemo(() => summarize(txs.filter((x) => !touchesSplitAccount(db, x))), [db, txs])
   return (
     <div>
       <div className="space-y-3 px-4 pb-3 pt-safe">

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createDefaultDb, createFamilyDb, isPristine } from './defaults'
-import { accountBalances, splitAccountOf, allTags, categoryBreakdown, expenseShares, familyBalances, filterTransactions, involvedAccountIds, isSharedAccount, isSplit, liquiditySeries, normalizeTag, totalLiquidity, txPayerIds, visibleTo } from './calc'
+import { accountBalances, splitAccountOf, touchesSplitAccount, allTags, categoryBreakdown, expenseShares, familyBalances, filterTransactions, involvedAccountIds, isSharedAccount, isSplit, liquiditySeries, normalizeTag, totalLiquidity, txPayerIds, visibleTo } from './calc'
 import { mergeDb, parseDb, replaceData, sameData } from './merge'
 import { deactivateMember, deleteCategory, deleteTransaction, newMember, saveAccount, saveFamilyName, saveMember, saveTransaction, setCategoryHidden } from './mutations'
 import { parseAmount } from './format'
@@ -428,5 +428,14 @@ describe('Conto Split', () => {
   it('il flag sopravvive a lettura e salvataggio del file', () => {
     const db = withSplit(family3(), 'acc-m3')
     expect(parseDb(JSON.parse(JSON.stringify(db))).accounts.find((a) => a.id === 'acc-m3')?.splitAccount).toBe(true)
+  })
+  it('le transazioni sul Conto Split non entrano nelle statistiche, ma i debiti restano', () => {
+    let db = withSplit(family3(), 'acc-m2')
+    const onSplit = base({ id: 'ts', accountId: 'acc-m2', amount: 9000, paidBy: 'm2', participants: ['m1', 'm2', 'm3'] })
+    const normal = base({ id: 'tn', accountId: 'acc-cash', amount: 1000 })
+    db = saveTransaction(saveTransaction(db, onSplit), normal)
+    expect(touchesSplitAccount(db, onSplit)).toBe(true)
+    expect(touchesSplitAccount(db, normal)).toBe(false)
+    expect(familyBalances(db, db.transactions).length).toBeGreaterThan(0)
   })
 })
