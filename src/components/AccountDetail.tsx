@@ -48,7 +48,7 @@ export function AccountDetail({ account, onBack, onEdit }: { account: Account; o
         </div>
         {txs.length === 0
           ? <div className="card"><EmptyState icon={<Receipt size={28} />} title={t('Nessun movimento')} text={t('Non ci sono movimenti su questo conto nel periodo scelto.')} action={<button className="btn-primary" onClick={() => openTx({ initial: { accountId: account.id } })}>{t('Aggiungi transazione')}</button>} /></div>
-          : <TxGroups txs={txs} />}
+          : <TxGroups txs={txs} countSplit />}
       </div>
     </div>
   )

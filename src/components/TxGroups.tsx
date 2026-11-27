@@ -1,12 +1,14 @@
 import { useMemo } from 'react'
 import { AnimatePresence, m } from 'framer-motion'
 import type { Transaction } from '../types'
-import { summarize } from '../lib/calc'
+import { summarize, touchesSplitAccount } from '../lib/calc'
+import { useApp } from '../store/AppProvider'
 import { dayKey, dayLabel, formatMoney } from '../lib/format'
 import { TransactionRow } from './TransactionRow'
 
 /** Transazioni raggruppate per giorno, con il totale di ogni giorno. */
-export function TxGroups({ txs }: { txs: Transaction[] }) {
+export function TxGroups({ txs, countSplit }: { txs: Transaction[]; /** true nel dettaglio di un conto: lì i totali del giorno contano tutto */ countSplit?: boolean }) {
+  const { db } = useApp()
   const groups = useMemo(() => {
     const m = new Map<string, Transaction[]>()
     for (const t of txs) { const k = dayKey(t.date); const l = m.get(k); if (l) l.push(t); else m.set(k, [t]) }
@@ -15,7 +17,8 @@ export function TxGroups({ txs }: { txs: Transaction[] }) {
   return (
     <>
       {groups.map(([k, list], gi) => {
-        const day = summarize(list)
+        // i Conti Split servono solo a dividere le spese: non entrano nel totale del giorno
+        const day = summarize(countSplit ? list : list.filter((x) => !touchesSplitAccount(db, x)))
         return (
           <m.section key={k} className="card overflow-hidden" initial={gi < 8 ? { opacity: 0, y: 12 } : false} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 400, damping: 34, delay: Math.min(gi, 6) * 0.04 }}>
             <header className="flex justify-between border-b border-line/60 bg-line/20 px-4 py-2 text-xs font-semibold text-muted">
